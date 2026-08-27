@@ -1,0 +1,44 @@
+# Dependencies and build output
+node_modules/
+dist/
+lib/
+coverage/
+.pnpm-store/
+*.log
+
+# Tool caches and reports
+.cache/
+.turbo/
+.vite/
+playwright-report/
+test-results/
+.tmp/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+*.p12
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+
+# Internal material must remain outside this repository. These patterns are a
+# second line of defense, not a substitute for physical separation.
+.internal/
+internal/
+_private/
+docs/internal/
+docs-internal/
+research/
+notes/
+evidence/
+screenshots/private/
+*.private.md
+*.internal.md
+.codex-*
+.qa-*

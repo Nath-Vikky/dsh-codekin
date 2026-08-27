@@ -1,0 +1,59 @@
+import { CAPTURE_CORE_QUALITIES } from './catalog.ts'
+import type { BattleMove, CaptureCoreQuality, TraceWildAction } from './types.ts'
+
+function plainRecord(value: unknown): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)
+    || Object.getPrototypeOf(value) !== Object.prototype) {
+    throw new TypeError('invalid action')
+  }
+  return value as Record<string, unknown>
+}
+
+function exactKeys(record: Record<string, unknown>, keys: readonly string[]): void {
+  const actual = Object.keys(record)
+  if (actual.length !== keys.length || actual.some(key => !keys.includes(key))) {
+    throw new TypeError('invalid action')
+  }
+}
+
+function safeId(value: unknown, prefix?: string): string {
+  if (typeof value !== 'string' || value.length < 3 || value.length > 96
+    || !/^[a-z0-9_-]+$/.test(value) || (prefix !== undefined && !value.startsWith(prefix))) {
+    throw new TypeError('invalid action')
+  }
+  return value
+}
+
+export function normalizeTraceWildAction(value: unknown): TraceWildAction {
+  const row = plainRecord(value)
+  switch (row.type) {
+    case 'choose-starter':
+      exactKeys(row, ['type', 'creatureId'])
+      return { type: 'choose-starter', creatureId: safeId(row.creatureId) }
+    case 'start-battle':
+      exactKeys(row, ['type', 'encounterId'])
+      return { type: 'start-battle', encounterId: safeId(row.encounterId, 'wild_') }
+    case 'battle-move': {
+      exactKeys(row, ['type', 'move'])
+      const move = row.move
+      if (move !== 'strike' && move !== 'scan' && move !== 'guard') throw new TypeError('invalid action')
+      return { type: 'battle-move', move: move as BattleMove }
+    }
+    case 'capture':
+      exactKeys(row, ['type', 'quality'])
+      if (!CAPTURE_CORE_QUALITIES.includes(row.quality as never)) throw new TypeError('invalid action')
+      return { type: 'capture', quality: row.quality as CaptureCoreQuality }
+    case 'flee':
+      exactKeys(row, ['type'])
+      return { type: 'flee' }
+    case 'set-squad': {
+      exactKeys(row, ['type', 'instanceIds'])
+      if (!Array.isArray(row.instanceIds) || row.instanceIds.length < 1 || row.instanceIds.length > 3) {
+        throw new TypeError('invalid action')
+      }
+      return { type: 'set-squad', instanceIds: row.instanceIds.map(id => safeId(id, 'pet_')) }
+    }
+    default:
+      throw new TypeError('invalid action')
+  }
+}

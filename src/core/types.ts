@@ -60,6 +60,20 @@ export interface MatchTile {
   special: TileSpecial
 }
 
+export interface MatchCascadeFrame {
+  chain: number
+  before: MatchTile[]
+  after: MatchTile[]
+  removed: number[]
+  fallRows: number[]
+}
+
+export interface TraceWildBattleAnimation {
+  kind: 'match'
+  battleId: string
+  frames: MatchCascadeFrame[]
+}
+
 export interface BattlePartyMember {
   instanceId: string
   creatureId: string
@@ -193,6 +207,7 @@ export interface TraceWildSnapshot {
 export interface TraceWildActionResponse extends TraceWildSnapshot {
   ok: true
   notice?: 'capture-success' | 'capture-failed' | 'battle-lost' | 'skill-cast'
+  animation?: TraceWildBattleAnimation
 }
 
 export interface TraceWildFailureResponse {

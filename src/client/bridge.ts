@@ -1,8 +1,12 @@
 import type {
+  MatchTile,
   TraceWildAction,
   TraceWildActionResponse,
+  TraceWildBattleAnimation,
   TraceWildSnapshot,
 } from '../core/types.ts'
+import { TRACE_ECOLOGIES } from '../core/catalog.ts'
+import { MATCH_BOARD_CELLS, MAX_MATCH_CASCADES } from '../core/match3.ts'
 
 const API = '/api/tracewild'
 
@@ -10,6 +14,62 @@ export class TraceWildConnectionError extends Error {
   constructor(readonly code: 'invalid-action' | 'conflict' | 'unavailable') {
     super(code)
   }
+}
+
+const TILE_SPECIALS = ['none', 'row', 'column', 'burst', 'origin'] as const
+
+function plainRecord(value: unknown): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)
+    || Object.getPrototypeOf(value) !== Object.prototype) throw new TypeError('invalid animation')
+  return value as Record<string, unknown>
+}
+
+function matchTile(value: unknown): MatchTile {
+  const row = plainRecord(value)
+  if (Object.keys(row).length !== 2 || !('ecology' in row) || !('special' in row)
+    || !TRACE_ECOLOGIES.includes(row.ecology as never)
+    || !TILE_SPECIALS.includes(row.special as never)) throw new TypeError('invalid animation')
+  return { ecology: row.ecology as MatchTile['ecology'], special: row.special as MatchTile['special'] }
+}
+
+function matchBoard(value: unknown): MatchTile[] {
+  if (!Array.isArray(value) || value.length !== MATCH_BOARD_CELLS) throw new TypeError('invalid animation')
+  return value.map(matchTile)
+}
+
+function battleAnimation(value: unknown): TraceWildBattleAnimation {
+  const row = plainRecord(value)
+  if (row.kind !== 'match' || typeof row.battleId !== 'string' || row.battleId.length < 3 || row.battleId.length > 96
+    || !Array.isArray(row.frames) || row.frames.length < 1 || row.frames.length > MAX_MATCH_CASCADES) {
+    throw new TypeError('invalid animation')
+  }
+  const frames = row.frames.map((value, frameIndex) => {
+    const frame = plainRecord(value)
+    if (frame.chain !== frameIndex + 1 || !Array.isArray(frame.removed) || frame.removed.length < 1
+      || frame.removed.length > MATCH_BOARD_CELLS || !Array.isArray(frame.fallRows)
+      || frame.fallRows.length !== MATCH_BOARD_CELLS) throw new TypeError('invalid animation')
+    const removed = frame.removed.map(index => {
+      if (!Number.isSafeInteger(index) || (index as number) < 0 || (index as number) >= MATCH_BOARD_CELLS) {
+        throw new TypeError('invalid animation')
+      }
+      return index as number
+    })
+    if (new Set(removed).size !== removed.length) throw new TypeError('invalid animation')
+    const fallRows = frame.fallRows.map(distance => {
+      if (!Number.isSafeInteger(distance) || (distance as number) < 0 || (distance as number) > 7) {
+        throw new TypeError('invalid animation')
+      }
+      return distance as number
+    })
+    return {
+      chain: frame.chain as number,
+      before: matchBoard(frame.before),
+      after: matchBoard(frame.after),
+      removed,
+      fallRows,
+    }
+  })
+  return { kind: 'match', battleId: row.battleId, frames }
 }
 
 function snapshot(value: unknown): TraceWildSnapshot {
@@ -76,6 +136,7 @@ export function createTraceWildConnection(): TraceWildConnection {
         ok: true,
         ...parsed,
         ...(row.notice === undefined ? {} : { notice: row.notice }),
+        ...(row.animation === undefined ? {} : { animation: battleAnimation(row.animation) }),
       }
     },
 

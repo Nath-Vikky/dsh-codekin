@@ -27,6 +27,7 @@ import type {
   CapturedCreature,
   CreatureStats,
   EnemyIntent,
+  MatchCascadeFrame,
   MatchTile,
   RandomSource,
   TileSpecial,
@@ -34,6 +35,7 @@ import type {
   TraceLogEntry,
   TraceSignal,
   TraceWildAction,
+  TraceWildBattleAnimation,
   TraceWildState,
 } from './types.ts'
 
@@ -698,17 +700,23 @@ function startBattle(state: TraceWildState, encounterId: string, now: number, ra
   state.stats.battlesStarted += 1
 }
 
-function performBattleSwap(state: TraceWildState, from: number, to: number, random: RandomSource): boolean {
+function performBattleSwap(
+  state: TraceWildState,
+  from: number,
+  to: number,
+  random: RandomSource,
+): { defeated: boolean; animation: TraceWildBattleAnimation } {
   const battle = state.battle
   if (battle === undefined) throw new TraceWildRuleError('conflict')
   const resolution = resolveBattleSwap(battle.board, from, to, random)
   if (resolution === undefined) throw new TraceWildRuleError('invalid-action')
+  const animation: TraceWildBattleAnimation = { kind: 'match', battleId: battle.id, frames: resolution.frames }
   applyResolution(battle, resolution, random, true)
   battle.actionsRemaining -= 1
   if (battle.affinityFloorActions > 0) battle.affinityFloorActions -= 1
   if (battle.boardLockActions > 0) battle.boardLockActions -= 1
-  if (battle.actionsRemaining === 0) return performEnemyAction(battle, random)
-  return false
+  const defeated = battle.actionsRemaining === 0 && performEnemyAction(battle, random)
+  return { defeated, animation }
 }
 
 function selectedIndexes(board: readonly MatchTile[], ecology: TraceEcology, maximum: number): number[] {
@@ -716,12 +724,13 @@ function selectedIndexes(board: readonly MatchTile[], ecology: TraceEcology, max
     .filter(index => index >= 0).slice(0, maximum)
 }
 
-function resolveConvertedBoard(battle: BattleState, random: RandomSource): void {
+function resolveConvertedBoard(battle: BattleState, random: RandomSource): MatchCascadeFrame[] {
   const resolution = resolveExistingBattleMatches(battle.board, random)
   if (resolution.steps.length > 0) applyResolution(battle, resolution, random, false)
+  return resolution.frames
 }
 
-function castActiveSkill(state: TraceWildState, creatureInstanceId: string, random: RandomSource): void {
+function castActiveSkill(state: TraceWildState, creatureInstanceId: string, random: RandomSource): MatchCascadeFrame[] {
   const battle = state.battle
   if (battle === undefined) throw new TraceWildRuleError('conflict')
   const member = activeMember(battle)
@@ -736,12 +745,13 @@ function castActiveSkill(state: TraceWildState, creatureInstanceId: string, rand
     member.overcharge = 0
   }
   let damage = 0
+  const animationFrames: MatchCascadeFrame[] = []
   switch (member.creatureId) {
     case 'lumen-indeximp':
       damage += applyRawHit(battle, member, 0.8 * scale)
       battle.enemyMarks = Math.min(3, battle.enemyMarks + 1)
       battle.board = convertRandomBattleTiles(battle.board, 'lumen', 3, random)
-      resolveConvertedBoard(battle, random)
+      animationFrames.push(...resolveConvertedBoard(battle, random))
       break
     case 'lumen-foliomoth':
       for (const ally of livingMembers(battle)) healMember(ally, ally.maxHp * 0.08 * scale)
@@ -750,7 +760,7 @@ function castActiveSkill(state: TraceWildState, creatureInstanceId: string, rand
     case 'lumen-lensel': {
       const wild = creatureById(battleEncounterCreatureId(battle))!
       battle.board = convertRandomBattleTiles(battle.board, ecologyThatCounters(wild.ecology), 4, random)
-      resolveConvertedBoard(battle, random)
+      animationFrames.push(...resolveConvertedBoard(battle, random))
       break
     }
     case 'lumen-echocoil':
@@ -769,7 +779,7 @@ function castActiveSkill(state: TraceWildState, creatureInstanceId: string, rand
     case 'forge-solderling':
       battle.board = convertRandomBattleTiles(battle.board, 'forge', 4, random)
       battle.enemyBurn = Math.min(4.2, battle.enemyBurn + scale)
-      resolveConvertedBoard(battle, random)
+      animationFrames.push(...resolveConvertedBoard(battle, random))
       break
     case 'forge-anvilback':
       damage += applyRawHit(battle, member, 1.8 * scale)
@@ -778,11 +788,12 @@ function castActiveSkill(state: TraceWildState, creatureInstanceId: string, rand
     case 'forge-kiln-colossus': {
       const resolution = resolveForcedTiles(battle.board, selectedIndexes(battle.board, 'forge', MATCH_BOARD_CELLS), random)
       damage += applyResolution(battle, resolution, random, false)
+      animationFrames.push(...resolution.frames)
       break
     }
     case 'relay-pingfly': {
       battle.board = createGuaranteedMatch(battle.board, 'relay')
-      resolveConvertedBoard(battle, random)
+      animationFrames.push(...resolveConvertedBoard(battle, random))
       break
     }
     case 'relay-duplex-hare':
@@ -797,7 +808,7 @@ function castActiveSkill(state: TraceWildState, creatureInstanceId: string, rand
     case 'relay-mesh-jelly':
       for (const ally of livingMembers(battle)) grantEnergy(ally, Math.round(2 * scale))
       battle.board = convertRandomBattleTiles(battle.board, 'relay', 3, random)
-      resolveConvertedBoard(battle, random)
+      animationFrames.push(...resolveConvertedBoard(battle, random))
       break
     case 'aegis-veribud':
       for (const ally of livingMembers(battle)) healMember(ally, ally.maxHp * 0.1 * scale)
@@ -827,7 +838,7 @@ function castActiveSkill(state: TraceWildState, creatureInstanceId: string, rand
     case 'glitch-stack-weaver':
       battle.board = convertRandomBattleTiles(battle.board, 'glitch', 5, random)
       battle.enemyMarks = Math.min(3, battle.enemyMarks + 1)
-      resolveConvertedBoard(battle, random)
+      animationFrames.push(...resolveConvertedBoard(battle, random))
       break
     case 'glitch-lagtoad':
       damage += applyRawHit(battle, member, 1.1 * scale)
@@ -840,11 +851,13 @@ function castActiveSkill(state: TraceWildState, creatureInstanceId: string, rand
     case 'glitch-overflow-maw': {
       const resolution = resolveForcedTiles(battle.board, selectedIndexes(battle.board, 'glitch', 12), random)
       damage += applyResolution(battle, resolution, random, false)
+      animationFrames.push(...resolution.frames)
       break
     }
   }
   battle.lastPlayerDamage = Math.max(battle.lastPlayerDamage, damage)
   appendBattleLog(battle, { turn: battle.turn, kind: 'skill', amount: damage, creatureId: member.creatureId })
+  return animationFrames
 }
 
 function addCapturedCreature(
@@ -915,10 +928,15 @@ export function applyTraceWildAction(
   action: TraceWildAction,
   random: RandomSource,
   now = Date.now(),
-): { state: TraceWildState; notice?: 'capture-success' | 'capture-failed' | 'battle-lost' | 'skill-cast' } {
+): {
+  state: TraceWildState
+  notice?: 'capture-success' | 'capture-failed' | 'battle-lost' | 'skill-cast'
+  animation?: TraceWildBattleAnimation
+} {
   const next = structuredClone(current)
   purgeExpiredEncounters(next, now)
   let notice: 'capture-success' | 'capture-failed' | 'battle-lost' | 'skill-cast' | undefined
+  let animation: TraceWildBattleAnimation | undefined
   switch (action.type) {
     case 'choose-starter': {
       if (next.starterChosen || !STARTER_CREATURE_IDS.includes(action.creatureId as typeof STARTER_CREATURE_IDS[number])) {
@@ -936,8 +954,9 @@ export function applyTraceWildAction(
       startBattle(next, action.encounterId, now, random)
       break
     case 'battle-swap': {
-      const defeated = performBattleSwap(next, action.from, action.to, random)
-      if (defeated) {
+      const result = performBattleSwap(next, action.from, action.to, random)
+      animation = result.animation
+      if (result.defeated) {
         const encounter = next.encounters.find(row => row.id === next.battle?.encounterId)
         logEntry(next, {
           at: now,
@@ -949,10 +968,13 @@ export function applyTraceWildAction(
       }
       break
     }
-    case 'battle-cast':
-      castActiveSkill(next, action.creatureInstanceId, random)
+    case 'battle-cast': {
+      const battleId = next.battle?.id
+      const frames = castActiveSkill(next, action.creatureInstanceId, random)
+      if (battleId !== undefined && frames.length > 0) animation = { kind: 'match', battleId, frames }
       notice = 'skill-cast'
       break
+    }
     case 'capture':
       notice = attemptCapture(next, action.quality, now, random)
       break
@@ -972,7 +994,11 @@ export function applyTraceWildAction(
     }
   }
   const state = commit(next, now)
-  return notice === undefined ? { state } : { state, notice }
+  return {
+    state,
+    ...(notice === undefined ? {} : { notice }),
+    ...(animation === undefined ? {} : { animation }),
+  }
 }
 
 function record(value: unknown): Record<string, unknown> | undefined {

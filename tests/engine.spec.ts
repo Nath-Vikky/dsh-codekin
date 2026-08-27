@@ -53,7 +53,12 @@ describe('TraceWild match battle', () => {
     for (let move = 0; move < 3; move += 1) {
       const swap = findFirstLegalBattleSwap(state.battle!.board)
       expect(swap).toBeDefined()
-      state = applyTraceWildAction(state, { type: 'battle-swap', ...swap! }, low, 220 + move).state
+      const result = applyTraceWildAction(state, { type: 'battle-swap', ...swap! }, low, 220 + move)
+      expect(result.animation?.frames[0]).toMatchObject({ chain: 1 })
+      expect(result.animation?.frames[0]?.removed.length).toBeGreaterThanOrEqual(3)
+      expect(result.animation?.frames[0]?.fallRows).toHaveLength(49)
+      expect(Math.max(...(result.animation?.frames[0]?.fallRows ?? []))).toBeGreaterThan(0)
+      state = result.state
     }
     expect(state.battle?.actionsRemaining).toBe(3)
     expect(state.battle?.stage).toBe(2)

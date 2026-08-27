@@ -1,5 +1,5 @@
 import { TRACE_ECOLOGIES } from './catalog.ts'
-import type { MatchTile, RandomSource, TileSpecial, TraceEcology } from './types.ts'
+import type { MatchCascadeFrame, MatchTile, RandomSource, TileSpecial, TraceEcology } from './types.ts'
 
 export const MATCH_BOARD_SIZE = 7
 export const MATCH_BOARD_CELLS = MATCH_BOARD_SIZE * MATCH_BOARD_SIZE
@@ -21,6 +21,7 @@ export interface MatchResolutionStep {
 export interface MatchResolution {
   board: MatchTile[]
   steps: MatchResolutionStep[]
+  frames: MatchCascadeFrame[]
 }
 
 export interface MatchSwap {
@@ -231,23 +232,33 @@ function collapseAndFill(
   removed: ReadonlySet<number>,
   plans: ReadonlyMap<number, TileSpecial>,
   random: RandomSource,
-): void {
-  const survivors: (MatchTile | undefined)[] = board.map((current, index) => {
+): number[] {
+  const survivors: ({ tile: MatchTile; source: number } | undefined)[] = board.map((current, index) => {
     const planned = plans.get(index)
-    if (planned !== undefined && !removed.has(index)) return tile(current.ecology, planned)
-    return removed.has(index) ? undefined : current
+    if (removed.has(index)) return undefined
+    return { tile: planned === undefined ? current : tile(current.ecology, planned), source: index }
   })
+  const fallRows = Array.from({ length: MATCH_BOARD_CELLS }, () => 0)
   for (let column = 0; column < MATCH_BOARD_SIZE; column += 1) {
-    const kept: MatchTile[] = []
+    const kept: { tile: MatchTile; source: number }[] = []
     for (let row = MATCH_BOARD_SIZE - 1; row >= 0; row -= 1) {
       const current = survivors[row * MATCH_BOARD_SIZE + column]
       if (current !== undefined) kept.push(current)
     }
+    const spawnedRows = MATCH_BOARD_SIZE - kept.length
     for (let row = MATCH_BOARD_SIZE - 1, cursor = 0; row >= 0; row -= 1, cursor += 1) {
-      board[row * MATCH_BOARD_SIZE + column] = kept[cursor]
-        ?? tile(chooseEcology(random, () => true))
+      const destination = row * MATCH_BOARD_SIZE + column
+      const current = kept[cursor]
+      if (current !== undefined) {
+        board[destination] = current.tile
+        fallRows[destination] = row - rowOf(current.source)
+      } else {
+        board[destination] = tile(chooseEcology(random, () => true))
+        fallRows[destination] = spawnedRows
+      }
     }
   }
+  return fallRows
 }
 
 function resolveFrom(
@@ -258,6 +269,7 @@ function resolveFrom(
 ): MatchResolution {
   let board = cloneBoard(boardValue)
   const steps: MatchResolutionStep[] = []
+  const frames: MatchCascadeFrame[] = []
   let initial = firstIndexes
   for (let chain = 1; chain <= MAX_MATCH_CASCADES; chain += 1) {
     const groups = initial === undefined ? groupsInBoard(board) : []
@@ -269,7 +281,16 @@ function resolveFrom(
     const expanded = expandSpecials(board, seeds)
     const counts = emptyCounts()
     for (const index of expanded.indexes) counts[board[index]!.ecology] += 1
-    collapseAndFill(board, expanded.indexes, plans, random)
+    const before = cloneBoard(board)
+    for (const [index, special] of plans) before[index] = tile(before[index]!.ecology, special)
+    const fallRows = collapseAndFill(board, expanded.indexes, plans, random)
+    frames.push({
+      chain,
+      before,
+      after: cloneBoard(board),
+      removed: [...expanded.indexes].sort((left, right) => left - right),
+      fallRows,
+    })
     steps.push(Object.freeze({
       chain,
       counts: Object.freeze(counts),
@@ -280,7 +301,7 @@ function resolveFrom(
   if (groupsInBoard(board).length > 0 || findFirstLegalBattleSwap(board) === undefined) {
     board = createMatchBoard(random)
   }
-  return { board, steps }
+  return { board, steps, frames }
 }
 
 export function resolveBattleSwap(
@@ -317,7 +338,7 @@ export function resolveForcedTiles(
 ): MatchResolution {
   const bounded = new Set(indexes.filter(index => Number.isInteger(index) && index >= 0 && index < MATCH_BOARD_CELLS))
   return bounded.size === 0
-    ? { board: cloneBoard(board), steps: [] }
+    ? { board: cloneBoard(board), steps: [], frames: [] }
     : resolveFrom(board, random, bounded, [])
 }
 
@@ -326,7 +347,7 @@ export function resolveExistingBattleMatches(
   random: RandomSource,
 ): MatchResolution {
   return groupsInBoard(board).length === 0
-    ? { board: cloneBoard(board), steps: [] }
+    ? { board: cloneBoard(board), steps: [], frames: [] }
     : resolveFrom(board, random, undefined, [])
 }
 

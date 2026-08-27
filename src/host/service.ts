@@ -70,9 +70,12 @@ export class TraceWildService {
     this.stateValue = result.state
     const snapshot = this.snapshot()
     this.publish(snapshot)
-    return result.notice === undefined
-      ? { ok: true, ...snapshot }
-      : { ok: true, ...snapshot, notice: result.notice }
+    return {
+      ok: true,
+      ...snapshot,
+      ...(result.notice === undefined ? {} : { notice: result.notice }),
+      ...(result.animation === undefined ? {} : { animation: result.animation }),
+    }
   }
 
   private publish(snapshot = this.snapshot()): void {

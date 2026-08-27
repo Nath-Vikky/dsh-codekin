@@ -19,6 +19,7 @@ import type {
   TraceEcology,
   TraceLogEntry,
   TraceWildAction,
+  TraceWildActionResponse,
   TraceWildSnapshot,
 } from '../../core/types.ts'
 import { TraceWildConnectionError, createTraceWildConnection } from '../bridge.ts'
@@ -118,6 +119,8 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   const [pulse, setPulse] = useState(false)
   const [squadDraft, setSquadDraft] = useState<string[]>([])
   const previousEncounters = useRef(0)
+  const actionInFlight = useRef(false)
+  const pendingSnapshot = useRef<TraceWildSnapshot>()
   const zh = t('title') === '迹境荒野'
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
@@ -133,6 +136,10 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
     const controller = new AbortController()
     void refresh(controller.signal)
     const unsubscribe = connection.subscribe((value) => {
+      if (actionInFlight.current) {
+        pendingSnapshot.current = value
+        return
+      }
       setSnapshot(value)
       if (value.state.encounters.length > previousEncounters.current) {
         setPulse(true)
@@ -159,8 +166,9 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
     return () => { window.removeEventListener('keydown', onKey) }
   }, [open, snapshot?.state.battle])
 
-  const act = useCallback(async (action: TraceWildAction): Promise<void> => {
-    if (busy) return
+  const act = useCallback(async (action: TraceWildAction): Promise<TraceWildActionResponse | undefined> => {
+    if (busy || actionInFlight.current) return undefined
+    actionInFlight.current = true
     setBusy(true)
     setNotice(undefined)
     try {
@@ -171,6 +179,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
       if (response.notice === 'capture-failed') setNotice(t('captureFailed'))
       if (response.notice === 'battle-lost') setNotice(t('battleLost'))
       if (response.notice === 'skill-cast') setNotice(t('skillReleased'))
+      return response
     } catch (error) {
       if (error instanceof TraceWildConnectionError && error.code === 'invalid-action') {
         setNotice(t('invalidSwap'))
@@ -181,8 +190,13 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
         await refresh()
       }
     } finally {
+      actionInFlight.current = false
+      const pending = pendingSnapshot.current
+      pendingSnapshot.current = undefined
+      if (pending !== undefined) setSnapshot(pending)
       setBusy(false)
     }
+    return undefined
   }, [busy, connection, refresh, t])
 
   const state = snapshot?.state
@@ -535,16 +549,23 @@ function BattleView(props: {
   t: TraceWildOverlayProps['t']
   zh: boolean
   busy: boolean
-  act: (action: TraceWildAction) => Promise<void>
+  act: (action: TraceWildAction) => Promise<TraceWildActionResponse | undefined>
 }) {
   const battle = props.state.battle!
   const [selectedTile, setSelectedTile] = useState<number>()
   const [gesture, setGesture] = useState<TileGesture>()
   const [swapMotion, setSwapMotion] = useState<SwapMotion>()
   const [animating, setAnimating] = useState(false)
+  const [visualBoard, setVisualBoard] = useState<MatchTile[]>(() => battle.board.map(tile => ({ ...tile })))
+  const [clearingTiles, setClearingTiles] = useState<ReadonlySet<number>>()
+  const [fallRows, setFallRows] = useState<readonly number[]>()
+  const [activeChain, setActiveChain] = useState<number>()
   const [damageBurst, setDamageBurst] = useState<{ key: number; amount: number }>()
   const [partyHitKey, setPartyHitKey] = useState(0)
+  const gestureRef = useRef<TileGesture>()
   const swapTimer = useRef<number>()
+  const motionTimers = useRef(new Set<number>())
+  const animationEpoch = useRef(0)
   const suppressClick = useRef(false)
   const previousBattle = useRef({ id: battle.id, wildHp: battle.wildHp, partyHp: battle.party.reduce((sum, row) => sum + row.hp, 0) })
   const encounter = props.state.encounters.find(row => row.id === battle.encounterId)
@@ -556,8 +577,22 @@ function BattleView(props: {
 
   useEffect(() => {
     setSelectedTile(undefined)
+    gestureRef.current = undefined
     setGesture(undefined)
   }, [battle.id, battle.turn, battle.actionsRemaining, battle.activeIndex])
+
+  useEffect(() => {
+    animationEpoch.current += 1
+    setSwapMotion(undefined)
+    setClearingTiles(undefined)
+    setFallRows(undefined)
+    setActiveChain(undefined)
+    setVisualBoard(battle.board.map(tile => ({ ...tile })))
+  }, [battle.id])
+
+  useEffect(() => {
+    if (!animating) setVisualBoard(battle.board.map(tile => ({ ...tile })))
+  }, [animating, battle.board])
 
   useEffect(() => {
     const previous = previousBattle.current
@@ -572,7 +607,10 @@ function BattleView(props: {
   }, [battle.id, battle.wildHp, partyHp])
 
   useEffect(() => () => {
+    animationEpoch.current += 1
     if (swapTimer.current !== undefined) window.clearTimeout(swapTimer.current)
+    for (const timer of motionTimers.current) window.clearTimeout(timer)
+    motionTimers.current.clear()
   }, [])
 
   if (encounter === undefined || wild === undefined || active === undefined || activeDefinition === undefined) return null
@@ -581,22 +619,84 @@ function BattleView(props: {
   const latestLog = battle.log.slice(-2)
   const lastLog = battle.log.at(-1)
 
+  const pause = (duration: number): Promise<void> => new Promise(resolve => {
+    const timer = window.setTimeout(() => {
+      motionTimers.current.delete(timer)
+      resolve()
+    }, duration)
+    motionTimers.current.add(timer)
+  })
+
+  const playCascade = async (
+    animation: NonNullable<TraceWildActionResponse['animation']>,
+    finalBoard: readonly MatchTile[],
+  ): Promise<void> => {
+    if (animation.battleId !== battle.id) return
+    const epoch = ++animationEpoch.current
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    for (const frame of animation.frames) {
+      if (animationEpoch.current !== epoch) return
+      setFallRows(undefined)
+      setVisualBoard(frame.before.map(tile => ({ ...tile })))
+      setClearingTiles(new Set(frame.removed))
+      setActiveChain(frame.chain)
+      await pause(reducedMotion ? 20 : 190)
+      if (animationEpoch.current !== epoch) return
+      setClearingTiles(undefined)
+      setVisualBoard(frame.after.map(tile => ({ ...tile })))
+      setFallRows(frame.fallRows)
+      const longestFall = Math.max(...frame.fallRows)
+      await pause(reducedMotion ? 20 : Math.min(540, 270 + longestFall * 34))
+      if (animationEpoch.current !== epoch) return
+      setFallRows(undefined)
+      await pause(reducedMotion ? 0 : 45)
+    }
+    if (animationEpoch.current !== epoch) return
+    setActiveChain(undefined)
+    setVisualBoard(finalBoard.map(tile => ({ ...tile })))
+  }
+
   const swap = (from: number, to: number): void => {
     if (locked || !areAdjacentTiles(from, to)) {
       setSelectedTile(to)
       return
     }
     setSelectedTile(undefined)
+    gestureRef.current = undefined
     setGesture(undefined)
     setSwapMotion({ from, to })
     setAnimating(true)
     swapTimer.current = window.setTimeout(() => {
       swapTimer.current = undefined
-      void props.act({ type: 'battle-swap', from, to }).finally(() => {
+      void props.act({ type: 'battle-swap', from, to }).then(async (response) => {
         setSwapMotion(undefined)
+        const finalBattle = response?.state.battle
+        if (response?.animation !== undefined && finalBattle?.id === battle.id) {
+          await playCascade(response.animation, finalBattle.board)
+        }
+      }).finally(() => {
+        setClearingTiles(undefined)
+        setFallRows(undefined)
+        setActiveChain(undefined)
         setAnimating(false)
       })
     }, 130)
+  }
+
+  const castSkill = (creatureInstanceId: string): void => {
+    if (locked) return
+    setAnimating(true)
+    void props.act({ type: 'battle-cast', creatureInstanceId }).then(async (response) => {
+      const finalBattle = response?.state.battle
+      if (response?.animation !== undefined && finalBattle?.id === battle.id) {
+        await playCascade(response.animation, finalBattle.board)
+      }
+    }).finally(() => {
+      setClearingTiles(undefined)
+      setFallRows(undefined)
+      setActiveChain(undefined)
+      setAnimating(false)
+    })
   }
 
   const select = (index: number): void => {
@@ -613,15 +713,23 @@ function BattleView(props: {
   }
 
   const moveGesture = (index: number, clientX: number, clientY: number, tileSize: number): void => {
-    if (gesture === undefined || gesture.index !== index || locked) return
-    const offsetX = clientX - gesture.startX
-    const offsetY = clientY - gesture.startY
+    const currentGesture = gestureRef.current
+    if (currentGesture === undefined || currentGesture.index !== index || locked) return
+    const offsetX = clientX - currentGesture.startX
+    const offsetY = clientY - currentGesture.startY
     const limit = tileSize * 0.42
-    setGesture({ ...gesture, offsetX: Math.max(-limit, Math.min(limit, offsetX)), offsetY: Math.max(-limit, Math.min(limit, offsetY)) })
+    const nextGesture = {
+      ...currentGesture,
+      offsetX: Math.max(-limit, Math.min(limit, offsetX)),
+      offsetY: Math.max(-limit, Math.min(limit, offsetY)),
+    }
+    gestureRef.current = nextGesture
+    setGesture(nextGesture)
     const threshold = Math.max(15, tileSize * 0.28)
     if (Math.max(Math.abs(offsetX), Math.abs(offsetY)) < threshold) return
     const target = swipeTarget(index, offsetX, offsetY)
     if (target === undefined) return
+    gestureRef.current = undefined
     suppressClick.current = true
     window.setTimeout(() => { suppressClick.current = false }, 350)
     swap(index, target)
@@ -635,7 +743,7 @@ function BattleView(props: {
             <h2>{props.t('battle')}</h2>
             <span>{props.t('round')} {battle.round} · {props.t('movesRemaining')} {battle.actionsRemaining}/3</span>
           </div>
-          <button type="button" className={css.flee} disabled={props.busy} onClick={() => { void props.act({ type: 'flee' }) }}>{props.t('flee')}</button>
+          <button type="button" className={css.flee} disabled={locked} onClick={() => { void props.act({ type: 'flee' }) }}>{props.t('flee')}</button>
         </header>
 
         <div className={`${css.wildBanner} ${encounter.enhanced ? css.fighterEnhanced : ''}`} key={`${battle.id}-${battle.wildHp}`}>
@@ -689,7 +797,7 @@ function BattleView(props: {
                         type="button"
                         className={css.skillButton}
                         disabled={locked || !canCast}
-                        onClick={() => { void props.act({ type: 'battle-cast', creatureInstanceId: member.instanceId }) }}
+                        onClick={() => { castSkill(member.instanceId) }}
                         title={props.zh ? skill.activeDescriptionZh : skill.activeDescriptionEn}
                       >
                         {props.zh ? skill.activeNameZh : skill.activeNameEn}
@@ -708,20 +816,24 @@ function BattleView(props: {
               <span className={css.actionDots} aria-label={`${props.t('movesRemaining')} ${battle.actionsRemaining}`}>
                 {[0, 1, 2].map(index => <i key={index} className={index < battle.actionsRemaining ? css.actionDotActive : ''} />)}
               </span>
+              {activeChain !== undefined && <span className={css.cascadePill}>CHAIN {activeChain}</span>}
             </div>
             <div
-              key={`${battle.id}-${battle.turn}-${battle.actionsRemaining}-${battle.wildHp}-${battle.log.length}`}
               className={css.matchBoard}
               role="grid"
               aria-label={props.t('boardHelp')}
               aria-busy={locked}
             >
-              {battle.board.map((tile, index) => {
+              {visualBoard.map((tile, index) => {
                 const dragging = gesture?.index === index
+                const fallDistance = fallRows?.[index] ?? 0
                 const tileStyle = {
                   '--tile-row': Math.floor(index / 7),
                   '--drag-x': `${dragging ? gesture.offsetX : 0}px`,
                   '--drag-y': `${dragging ? gesture.offsetY : 0}px`,
+                  '--fall-y': `${fallDistance * -110}%`,
+                  '--fall-duration': `${240 + fallDistance * 34}ms`,
+                  '--fall-delay': `${(index % 7) * 9}ms`,
                 } as CSSProperties
                 return (
                   <button
@@ -730,7 +842,7 @@ function BattleView(props: {
                     role="gridcell"
                     draggable={false}
                     style={tileStyle}
-                    className={`${css.matchTile} ${css[`tile_${tile.ecology}`]} ${selectedTile === index ? css.matchTileSelected : ''} ${dragging ? css.matchTileDragging : ''} ${tile.special !== 'none' ? css.matchTileSpecial : ''} ${swapMotionClass(index, swapMotion)}`}
+                    className={`${css.matchTile} ${css[`tile_${tile.ecology}`]} ${selectedTile === index ? css.matchTileSelected : ''} ${dragging ? css.matchTileDragging : ''} ${clearingTiles?.has(index) === true ? css.matchTileClearing : ''} ${fallDistance > 0 ? css.matchTileFalling : ''} ${tile.special !== 'none' ? css.matchTileSpecial : ''} ${swapMotionClass(index, swapMotion)}`}
                     aria-label={tileLabel(tile, index, props.t)}
                     disabled={locked}
                     onClick={() => {
@@ -744,22 +856,36 @@ function BattleView(props: {
                     onPointerDown={(event) => {
                       if (locked) return
                       event.currentTarget.setPointerCapture(event.pointerId)
-                      setGesture({ index, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, offsetX: 0, offsetY: 0 })
+                      const nextGesture = { index, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, offsetX: 0, offsetY: 0 }
+                      gestureRef.current = nextGesture
+                      setGesture(nextGesture)
                     }}
                     onPointerMove={(event) => {
-                      if (gesture?.pointerId !== event.pointerId) return
+                      if (gestureRef.current?.pointerId !== event.pointerId) return
                       event.preventDefault()
                       moveGesture(index, event.clientX, event.clientY, event.currentTarget.clientWidth)
                     }}
                     onPointerUp={(event) => {
-                      if (gesture?.pointerId !== event.pointerId) return
-                      if (Math.max(Math.abs(gesture.offsetX), Math.abs(gesture.offsetY)) > 6) {
+                      const currentGesture = gestureRef.current
+                      if (currentGesture?.pointerId !== event.pointerId) return
+                      const offsetX = event.clientX - currentGesture.startX
+                      const offsetY = event.clientY - currentGesture.startY
+                      const threshold = Math.max(15, event.currentTarget.clientWidth * 0.28)
+                      const target = Math.max(Math.abs(offsetX), Math.abs(offsetY)) >= threshold
+                        ? swipeTarget(index, offsetX, offsetY)
+                        : undefined
+                      if (Math.max(Math.abs(offsetX), Math.abs(offsetY)) > 6) {
                         suppressClick.current = true
                         window.setTimeout(() => { suppressClick.current = false }, 250)
                       }
+                      gestureRef.current = undefined
+                      setGesture(undefined)
+                      if (target !== undefined) swap(index, target)
+                    }}
+                    onPointerCancel={() => {
+                      gestureRef.current = undefined
                       setGesture(undefined)
                     }}
-                    onPointerCancel={() => { setGesture(undefined) }}
                   >
                     <span aria-hidden="true">{TILE_SYMBOLS[tile.ecology]}</span>
                     {tile.special !== 'none' && <b aria-hidden="true">{tile.special === 'origin' ? '◎' : tile.special === 'burst' ? '✣' : tile.special === 'row' ? '↔' : '↕'}</b>}

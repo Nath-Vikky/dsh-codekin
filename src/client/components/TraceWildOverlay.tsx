@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import {
@@ -190,10 +191,11 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   const launcher = (
     <button
       type="button"
-      className={`${css.launcher} ${pulse ? css.launcherPulse : ''}`}
-      onClick={() => { setOpen(true); setPulse(false) }}
-      title={t('open')}
-      aria-label={t('open')}
+      className={`${css.launcher} ${open ? css.launcherOpen : ''} ${pulse ? css.launcherPulse : ''}`}
+      onClick={() => { setOpen(value => !value); setPulse(false) }}
+      title={open ? t('close') : t('open')}
+      aria-label={open ? t('close') : t('open')}
+      aria-expanded={open}
     >
       <span className={css.launcherCore} aria-hidden="true" />
       {uncaught > 0 && <span className={css.badge}>{uncaught > 99 ? '99+' : uncaught}</span>}
@@ -480,6 +482,54 @@ function tileLabel(tile: MatchTile, index: number, t: TraceWildOverlayProps['t']
   return `${ecology}${special} · ${Math.floor(index / 7) + 1},${index % 7 + 1}`
 }
 
+interface TileGesture {
+  index: number
+  pointerId: number
+  startX: number
+  startY: number
+  offsetX: number
+  offsetY: number
+}
+
+interface SwapMotion {
+  from: number
+  to: number
+}
+
+function swipeTarget(index: number, deltaX: number, deltaY: number): number | undefined {
+  const row = Math.floor(index / 7)
+  const column = index % 7
+  if (Math.abs(deltaX) >= Math.abs(deltaY)) {
+    if (deltaX > 0 && column < 6) return index + 1
+    if (deltaX < 0 && column > 0) return index - 1
+    return undefined
+  }
+  if (deltaY > 0 && row < 6) return index + 7
+  if (deltaY < 0 && row > 0) return index - 7
+  return undefined
+}
+
+function swapMotionClass(index: number, motion: SwapMotion | undefined): string {
+  if (motion === undefined || (index !== motion.from && index !== motion.to)) return ''
+  const delta = motion.to - motion.from
+  if (index === motion.from) {
+    return delta === 1
+      ? css.tileSwapRight ?? ''
+      : delta === -1
+        ? css.tileSwapLeft ?? ''
+        : delta === 7
+          ? css.tileSwapDown ?? ''
+          : css.tileSwapUp ?? ''
+  }
+  return delta === 1
+    ? css.tileSwapLeft ?? ''
+    : delta === -1
+      ? css.tileSwapRight ?? ''
+      : delta === 7
+        ? css.tileSwapUp ?? ''
+        : css.tileSwapDown ?? ''
+}
+
 function BattleView(props: {
   state: TraceWildSnapshot['state']
   t: TraceWildOverlayProps['t']
@@ -489,30 +539,68 @@ function BattleView(props: {
 }) {
   const battle = props.state.battle!
   const [selectedTile, setSelectedTile] = useState<number>()
+  const [gesture, setGesture] = useState<TileGesture>()
+  const [swapMotion, setSwapMotion] = useState<SwapMotion>()
+  const [animating, setAnimating] = useState(false)
+  const [damageBurst, setDamageBurst] = useState<{ key: number; amount: number }>()
+  const [partyHitKey, setPartyHitKey] = useState(0)
+  const swapTimer = useRef<number>()
+  const suppressClick = useRef(false)
+  const previousBattle = useRef({ id: battle.id, wildHp: battle.wildHp, partyHp: battle.party.reduce((sum, row) => sum + row.hp, 0) })
   const encounter = props.state.encounters.find(row => row.id === battle.encounterId)
   const wild = creatureById(battle.wildCreatureId)
   const active = battle.party[battle.activeIndex]
   const activeDefinition = active === undefined ? undefined : creatureById(active.creatureId)
+  const locked = props.busy || animating
+  const partyHp = battle.party.reduce((sum, row) => sum + row.hp, 0)
 
   useEffect(() => {
     setSelectedTile(undefined)
+    setGesture(undefined)
   }, [battle.id, battle.turn, battle.actionsRemaining, battle.activeIndex])
+
+  useEffect(() => {
+    const previous = previousBattle.current
+    if (previous.id !== battle.id) {
+      previousBattle.current = { id: battle.id, wildHp: battle.wildHp, partyHp }
+      return
+    }
+    const wildDamage = previous.wildHp - battle.wildHp
+    if (wildDamage > 0) setDamageBurst({ key: Date.now(), amount: wildDamage })
+    if (previous.partyHp > partyHp) setPartyHitKey(value => value + 1)
+    previousBattle.current = { id: battle.id, wildHp: battle.wildHp, partyHp }
+  }, [battle.id, battle.wildHp, partyHp])
+
+  useEffect(() => () => {
+    if (swapTimer.current !== undefined) window.clearTimeout(swapTimer.current)
+  }, [])
 
   if (encounter === undefined || wild === undefined || active === undefined || activeDefinition === undefined) return null
   const availableCores = CAPTURE_CORE_QUALITIES.filter(quality => props.state.cores[quality] > 0)
   const captureReady = battle.wildArmor === 0 && battle.wildHp / battle.wildMaxHp <= 0.3
+  const latestLog = battle.log.slice(-2)
+  const lastLog = battle.log.at(-1)
 
   const swap = (from: number, to: number): void => {
-    if (props.busy || !areAdjacentTiles(from, to)) {
+    if (locked || !areAdjacentTiles(from, to)) {
       setSelectedTile(to)
       return
     }
     setSelectedTile(undefined)
-    void props.act({ type: 'battle-swap', from, to })
+    setGesture(undefined)
+    setSwapMotion({ from, to })
+    setAnimating(true)
+    swapTimer.current = window.setTimeout(() => {
+      swapTimer.current = undefined
+      void props.act({ type: 'battle-swap', from, to }).finally(() => {
+        setSwapMotion(undefined)
+        setAnimating(false)
+      })
+    }, 130)
   }
 
   const select = (index: number): void => {
-    if (props.busy) return
+    if (locked) return
     if (selectedTile === undefined) {
       setSelectedTile(index)
       return
@@ -524,9 +612,24 @@ function BattleView(props: {
     swap(selectedTile, index)
   }
 
+  const moveGesture = (index: number, clientX: number, clientY: number, tileSize: number): void => {
+    if (gesture === undefined || gesture.index !== index || locked) return
+    const offsetX = clientX - gesture.startX
+    const offsetY = clientY - gesture.startY
+    const limit = tileSize * 0.42
+    setGesture({ ...gesture, offsetX: Math.max(-limit, Math.min(limit, offsetX)), offsetY: Math.max(-limit, Math.min(limit, offsetY)) })
+    const threshold = Math.max(15, tileSize * 0.28)
+    if (Math.max(Math.abs(offsetX), Math.abs(offsetY)) < threshold) return
+    const target = swipeTarget(index, offsetX, offsetY)
+    if (target === undefined) return
+    suppressClick.current = true
+    window.setTimeout(() => { suppressClick.current = false }, 350)
+    swap(index, target)
+  }
+
   return (
     <div className={css.battleBackdrop}>
-      <section className={css.battlePanel} role="dialog" aria-modal="true" aria-label={props.t('battle')}>
+      <section className={`${css.battlePanel} ${partyHitKey > 0 ? css.battleWasHit : ''}`} role="dialog" aria-modal="true" aria-label={props.t('battle')}>
         <header className={css.battleHeader}>
           <div>
             <h2>{props.t('battle')}</h2>
@@ -535,7 +638,8 @@ function BattleView(props: {
           <button type="button" className={css.flee} disabled={props.busy} onClick={() => { void props.act({ type: 'flee' }) }}>{props.t('flee')}</button>
         </header>
 
-        <div className={`${css.wildBanner} ${encounter.enhanced ? css.fighterEnhanced : ''}`}>
+        <div className={`${css.wildBanner} ${encounter.enhanced ? css.fighterEnhanced : ''}`} key={`${battle.id}-${battle.wildHp}`}>
+          <div className={css.enemyAura} aria-hidden="true" />
           <CreatureSprite creature={wild} size="medium" />
           <div className={css.wildVitals}>
             <div className={css.fighterName}>
@@ -552,9 +656,51 @@ function BattleView(props: {
             <span>{props.t('enemyIntent')}</span>
             <strong>{props.t(INTENT_KEYS[battle.enemyIntent])}</strong>
           </div>
+          {damageBurst !== undefined && <strong key={damageBurst.key} className={css.damageBurst}>-{damageBurst.amount}</strong>}
+          {lastLog?.kind === 'combo' && <strong className={css.comboBurst}>CHAIN ×{lastLog.amount ?? 1}</strong>}
         </div>
 
         <div className={css.matchBattleLayout}>
+          <div className={css.partyColumn}>
+            <div className={css.partyBattleList} key={`party-${partyHitKey}-${battle.activeIndex}`}>
+              {battle.party.map((member, index) => {
+                const creature = creatureById(member.creatureId)
+                const skill = skillByCreatureId(member.creatureId)
+                if (creature === undefined || skill === undefined) return null
+                const isActive = index === battle.activeIndex
+                const canCast = isActive && member.hp > 0 && member.energy >= skill.energyCost && !member.skillUsedStage
+                return (
+                  <article
+                    key={member.instanceId}
+                    className={`${css.partyCombatant} ${isActive ? css.partyCombatantActive : ''} ${member.hp <= 0 ? css.partyCombatantDown : ''}`}
+                    title={`${props.t('passiveSkill')} · ${props.zh ? skill.passiveNameZh : skill.passiveNameEn}\n${props.zh ? skill.passiveDescriptionZh : skill.passiveDescriptionEn}`}
+                  >
+                    <span className={css.partySlot}>{index + 1}</span>
+                    <CreatureSprite creature={creature} size="small" />
+                    <div className={css.partyCombatantBody}>
+                      <div className={css.fighterName}>
+                        <strong>{creatureName(creature, props.zh)}</strong>
+                        <span>{props.t(CORE_KEYS[member.quality])}</span>
+                      </div>
+                      <div className={css.hpBar}><i style={{ width: `${percent(member.hp, member.maxHp)}%` }} /></div>
+                      <div className={css.energyBar}><i style={{ width: `${percent(member.energy, skill.energyCost)}%` }} /></div>
+                      <small>{member.hp}/{member.maxHp} · {props.t('energy')} {member.energy}/{skill.energyCost}</small>
+                      <button
+                        type="button"
+                        className={css.skillButton}
+                        disabled={locked || !canCast}
+                        onClick={() => { void props.act({ type: 'battle-cast', creatureInstanceId: member.instanceId }) }}
+                        title={props.zh ? skill.activeDescriptionZh : skill.activeDescriptionEn}
+                      >
+                        {props.zh ? skill.activeNameZh : skill.activeNameEn}
+                      </button>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          </div>
+
           <div className={css.boardColumn}>
             <div className={css.turnSummary}>
               <span className={`${css.ecologyPip} ${css[`pip_${activeDefinition.ecology}`]}`}>{TILE_SYMBOLS[activeDefinition.ecology]}</span>
@@ -563,104 +709,94 @@ function BattleView(props: {
                 {[0, 1, 2].map(index => <i key={index} className={index < battle.actionsRemaining ? css.actionDotActive : ''} />)}
               </span>
             </div>
-            <div className={css.matchBoard} role="grid" aria-label={props.t('boardHelp')} aria-busy={props.busy}>
-              {battle.board.map((tile, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  role="gridcell"
-                  draggable={!props.busy}
-                  className={`${css.matchTile} ${css[`tile_${tile.ecology}`]} ${selectedTile === index ? css.matchTileSelected : ''} ${tile.special !== 'none' ? css.matchTileSpecial : ''}`}
-                  aria-label={tileLabel(tile, index, props.t)}
-                  disabled={props.busy}
-                  onClick={() => { select(index) }}
-                  onDragStart={(event) => { event.dataTransfer.setData('text/plain', String(index)) }}
-                  onDragOver={(event) => { event.preventDefault() }}
-                  onDrop={(event) => {
-                    event.preventDefault()
-                    const from = Number(event.dataTransfer.getData('text/plain'))
-                    if (Number.isSafeInteger(from)) swap(from, index)
-                  }}
-                >
-                  <span aria-hidden="true">{TILE_SYMBOLS[tile.ecology]}</span>
-                  {tile.special !== 'none' && <b aria-hidden="true">{tile.special === 'origin' ? '◎' : tile.special === 'burst' ? '✣' : tile.special === 'row' ? '↔' : '↕'}</b>}
-                </button>
-              ))}
+            <div
+              key={`${battle.id}-${battle.turn}-${battle.actionsRemaining}-${battle.wildHp}-${battle.log.length}`}
+              className={css.matchBoard}
+              role="grid"
+              aria-label={props.t('boardHelp')}
+              aria-busy={locked}
+            >
+              {battle.board.map((tile, index) => {
+                const dragging = gesture?.index === index
+                const tileStyle = {
+                  '--tile-row': Math.floor(index / 7),
+                  '--drag-x': `${dragging ? gesture.offsetX : 0}px`,
+                  '--drag-y': `${dragging ? gesture.offsetY : 0}px`,
+                } as CSSProperties
+                return (
+                  <button
+                    key={index}
+                    type="button"
+                    role="gridcell"
+                    draggable={false}
+                    style={tileStyle}
+                    className={`${css.matchTile} ${css[`tile_${tile.ecology}`]} ${selectedTile === index ? css.matchTileSelected : ''} ${dragging ? css.matchTileDragging : ''} ${tile.special !== 'none' ? css.matchTileSpecial : ''} ${swapMotionClass(index, swapMotion)}`}
+                    aria-label={tileLabel(tile, index, props.t)}
+                    disabled={locked}
+                    onClick={() => {
+                      if (suppressClick.current) {
+                        suppressClick.current = false
+                        return
+                      }
+                      select(index)
+                    }}
+                    onDragStart={(event) => { event.preventDefault() }}
+                    onPointerDown={(event) => {
+                      if (locked) return
+                      event.currentTarget.setPointerCapture(event.pointerId)
+                      setGesture({ index, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, offsetX: 0, offsetY: 0 })
+                    }}
+                    onPointerMove={(event) => {
+                      if (gesture?.pointerId !== event.pointerId) return
+                      event.preventDefault()
+                      moveGesture(index, event.clientX, event.clientY, event.currentTarget.clientWidth)
+                    }}
+                    onPointerUp={(event) => {
+                      if (gesture?.pointerId !== event.pointerId) return
+                      if (Math.max(Math.abs(gesture.offsetX), Math.abs(gesture.offsetY)) > 6) {
+                        suppressClick.current = true
+                        window.setTimeout(() => { suppressClick.current = false }, 250)
+                      }
+                      setGesture(undefined)
+                    }}
+                    onPointerCancel={() => { setGesture(undefined) }}
+                  >
+                    <span aria-hidden="true">{TILE_SYMBOLS[tile.ecology]}</span>
+                    {tile.special !== 'none' && <b aria-hidden="true">{tile.special === 'origin' ? '◎' : tile.special === 'burst' ? '✣' : tile.special === 'row' ? '↔' : '↕'}</b>}
+                  </button>
+                )
+              })}
             </div>
             <p className={css.boardHelp}>{props.t('boardHelp')}</p>
           </div>
 
-          <div className={css.partyColumn}>
-            <div className={css.partyBattleList}>
-              {battle.party.map((member, index) => {
-                const creature = creatureById(member.creatureId)
-                const skill = skillByCreatureId(member.creatureId)
-                if (creature === undefined || skill === undefined) return null
-                const isActive = index === battle.activeIndex
-                const canCast = isActive && member.hp > 0 && member.energy >= skill.energyCost && !member.skillUsedStage
-                return (
-                  <article key={member.instanceId} className={`${css.partyCombatant} ${isActive ? css.partyCombatantActive : ''} ${member.hp <= 0 ? css.partyCombatantDown : ''}`}>
-                    <CreatureSprite creature={creature} size="small" />
-                    <div className={css.partyCombatantBody}>
-                      <div className={css.fighterName}>
-                        <strong>{creatureName(creature, props.zh)}</strong>
-                        <span>{props.t(CORE_KEYS[member.quality])} · Lv.{member.level}</span>
-                      </div>
-                      <div className={css.hpBar}><i style={{ width: `${percent(member.hp, member.maxHp)}%` }} /></div>
-                      <small>{props.t('health')} {member.hp}/{member.maxHp} · {props.t('shield')} {member.shield}</small>
-                      <div className={css.energyBar}><i style={{ width: `${percent(member.energy, skill.energyCost)}%` }} /></div>
-                      <small>{props.t('energy')} {member.energy}/{skill.energyCost}</small>
-                      <div className={css.skillSummary}>
-                        <span title={props.zh ? skill.passiveDescriptionZh : skill.passiveDescriptionEn}>
-                          {props.t('passiveSkill')} · {props.zh ? skill.passiveNameZh : skill.passiveNameEn}
-                        </span>
-                        <span title={props.zh ? skill.activeDescriptionZh : skill.activeDescriptionEn}>
-                          {props.t('activeSkill')} · {props.zh ? skill.activeNameZh : skill.activeNameEn}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className={css.skillButton}
-                        disabled={props.busy || !canCast}
-                        onClick={() => { void props.act({ type: 'battle-cast', creatureInstanceId: member.instanceId }) }}
-                        title={props.zh ? skill.activeDescriptionZh : skill.activeDescriptionEn}
-                      >
-                        {member.skillUsedStage ? props.t('skillSpent') : canCast ? props.t('castSkill') : props.t('skillCharging')}
-                      </button>
-                    </div>
-                  </article>
-                )
-              })}
+          <div className={`${css.capturePanel} ${captureReady ? css.capturePanelReady : ''}`}>
+            <div>
+              <strong>{props.t('capture')}</strong>
+              <span>{captureReady ? props.t('captureReady') : props.t('captureLocked')}</span>
             </div>
+            {availableCores.length === 0 && <p>{props.t('noCores')}</p>}
+            <div className={css.captureButtons}>
+              {availableCores.map(quality => (
+                <button
+                  key={quality}
+                  type="button"
+                  className={css[`core_${quality}`]}
+                  disabled={locked || !captureReady}
+                  onClick={() => { void props.act({ type: 'capture', quality }) }}
+                  aria-label={`${props.t(CORE_KEYS[quality])} · ${props.state.cores[quality]}`}
+                >
+                  <i /><span>{props.t(CORE_KEYS[quality])}</span><b>{props.state.cores[quality]}</b>
+                </button>
+              ))}
+            </div>
+          </div>
 
-            <div className={`${css.capturePanel} ${captureReady ? css.capturePanelReady : ''}`}>
-              <div>
-                <strong>{props.t('capture')}</strong>
-                <span>{captureReady ? props.t('captureReady') : props.t('captureLocked')}</span>
-              </div>
-              {availableCores.length === 0 && <p>{props.t('noCores')}</p>}
-              <div className={css.captureButtons}>
-                {availableCores.map(quality => (
-                  <button
-                    key={quality}
-                    type="button"
-                    className={css[`core_${quality}`]}
-                    disabled={props.busy || !captureReady}
-                    onClick={() => { void props.act({ type: 'capture', quality }) }}
-                    aria-label={`${props.t(CORE_KEYS[quality])} · ${props.state.cores[quality]}`}
-                  >
-                    <i /><span>{props.t(CORE_KEYS[quality])}</span><b>{props.state.cores[quality]}</b>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className={css.battleFooterArea}>
-              <p>{props.t('battleHint')}</p>
-              <ol className={css.battleLog}>{battle.log.map((row, index) => (
-                <li key={`${row.turn}-${row.kind}-${index}`}>{battleLogText(row, props.t, props.zh)}</li>
-              ))}</ol>
-            </div>
+          <div className={css.battleFooterArea}>
+            <p>{props.t('battleHint')}</p>
+            <ol className={css.battleLog}>{latestLog.map((row, index) => (
+              <li key={`${row.turn}-${row.kind}-${index}`}>{battleLogText(row, props.t, props.zh)}</li>
+            ))}</ol>
           </div>
         </div>
       </section>

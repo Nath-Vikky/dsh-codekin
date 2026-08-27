@@ -1,7 +1,7 @@
 {
   "name": "@nath-vikky/dsh-tracewild",
   "description": "Event-driven pixel creature collection and battle game for DeepSeek Harness",
-  "version": "0.1.0-alpha.1",
+  "version": "0.2.0-alpha.1",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.7.0",
@@ -62,7 +62,7 @@
     "vitest": "4.1.11"
   },
   "repository": { "type": "git", "url": "https://github.com/Nath-Vikky/dsh-tracewild.git" },
-  "keywords": ["deepseek-harness", "dsh-plugin", "pixel-art", "creature-collector"],
+  "keywords": ["deepseek-harness", "dsh-plugin", "pixel-art", "creature-collector", "match-3"],
   "license": "MIT",
   "files": [
     "lib/index.js", "lib/index.js.map", "lib/client.js", "lib/client.js.map",

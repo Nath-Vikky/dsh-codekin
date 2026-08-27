@@ -1,19 +1,16 @@
 import { CAPTURE_CORE_QUALITIES } from './catalog.ts'
-import type { BattleMove, CaptureCoreQuality, TraceWildAction } from './types.ts'
+import { MATCH_BOARD_CELLS } from './match3.ts'
+import type { CaptureCoreQuality, TraceWildAction } from './types.ts'
 
 function plainRecord(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)
-    || Object.getPrototypeOf(value) !== Object.prototype) {
-    throw new TypeError('invalid action')
-  }
+    || Object.getPrototypeOf(value) !== Object.prototype) throw new TypeError('invalid action')
   return value as Record<string, unknown>
 }
 
 function exactKeys(record: Record<string, unknown>, keys: readonly string[]): void {
   const actual = Object.keys(record)
-  if (actual.length !== keys.length || actual.some(key => !keys.includes(key))) {
-    throw new TypeError('invalid action')
-  }
+  if (actual.length !== keys.length || actual.some(key => !keys.includes(key))) throw new TypeError('invalid action')
 }
 
 function safeId(value: unknown, prefix?: string): string {
@@ -22,6 +19,13 @@ function safeId(value: unknown, prefix?: string): string {
     throw new TypeError('invalid action')
   }
   return value
+}
+
+function boardIndex(value: unknown): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 0 || (value as number) >= MATCH_BOARD_CELLS) {
+    throw new TypeError('invalid action')
+  }
+  return value as number
 }
 
 export function normalizeTraceWildAction(value: unknown): TraceWildAction {
@@ -33,12 +37,12 @@ export function normalizeTraceWildAction(value: unknown): TraceWildAction {
     case 'start-battle':
       exactKeys(row, ['type', 'encounterId'])
       return { type: 'start-battle', encounterId: safeId(row.encounterId, 'wild_') }
-    case 'battle-move': {
-      exactKeys(row, ['type', 'move'])
-      const move = row.move
-      if (move !== 'strike' && move !== 'scan' && move !== 'guard') throw new TypeError('invalid action')
-      return { type: 'battle-move', move: move as BattleMove }
-    }
+    case 'battle-swap':
+      exactKeys(row, ['type', 'from', 'to'])
+      return { type: 'battle-swap', from: boardIndex(row.from), to: boardIndex(row.to) }
+    case 'battle-cast':
+      exactKeys(row, ['type', 'creatureInstanceId'])
+      return { type: 'battle-cast', creatureInstanceId: safeId(row.creatureInstanceId, 'pet_') }
     case 'capture':
       exactKeys(row, ['type', 'quality'])
       if (!CAPTURE_CORE_QUALITIES.includes(row.quality as never)) throw new TypeError('invalid action')

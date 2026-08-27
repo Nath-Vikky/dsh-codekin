@@ -6,11 +6,17 @@ import type {
 
 const API = '/api/tracewild'
 
+export class TraceWildConnectionError extends Error {
+  constructor(readonly code: 'invalid-action' | 'conflict' | 'unavailable') {
+    super(code)
+  }
+}
+
 function snapshot(value: unknown): TraceWildSnapshot {
   if (typeof value !== 'object' || value === null) throw new TypeError('invalid snapshot')
   const row = value as Partial<TraceWildSnapshot>
-  if (row.schemaVersion !== 1 || typeof row.serverTime !== 'number'
-    || typeof row.state !== 'object' || row.state === null || row.state.schemaVersion !== 1
+  if (row.schemaVersion !== 2 || typeof row.serverTime !== 'number'
+    || typeof row.state !== 'object' || row.state === null || row.state.schemaVersion !== 2
     || !Array.isArray(row.state.creatures) || !Array.isArray(row.state.encounters)
     || !Array.isArray(row.state.dex) || !Array.isArray(row.state.squad)) {
     throw new TypeError('invalid snapshot')
@@ -33,7 +39,7 @@ export function createTraceWildConnection(): TraceWildConnection {
         cache: 'no-store',
         ...(signal === undefined ? {} : { signal }),
       })
-      if (!response.ok) throw new Error('state unavailable')
+      if (!response.ok) throw new TraceWildConnectionError('unavailable')
       return snapshot(await response.json())
     },
 
@@ -46,7 +52,22 @@ export function createTraceWildConnection(): TraceWildConnection {
         body: JSON.stringify(action),
         ...(signal === undefined ? {} : { signal }),
       })
-      if (!response.ok) throw new Error(response.status === 409 ? 'conflict' : 'action unavailable')
+      if (!response.ok) {
+        let code: 'invalid-action' | 'conflict' | 'unavailable' = response.status === 409
+          ? 'conflict'
+          : response.status >= 500
+            ? 'unavailable'
+            : 'invalid-action'
+        try {
+          const failure = await response.json() as { error?: unknown }
+          if (failure.error === 'invalid-action' || failure.error === 'conflict' || failure.error === 'unavailable') {
+            code = failure.error
+          }
+        } catch {
+          // Status code remains the closed fallback.
+        }
+        throw new TraceWildConnectionError(code)
+      }
       const raw = await response.json() as unknown
       const parsed = snapshot(raw)
       const row = raw as Partial<TraceWildActionResponse>

@@ -26,6 +26,7 @@ export interface CreatureDefinition {
 export interface CapturedCreature {
   instanceId: string
   creatureId: string
+  quality: CaptureCoreQuality
   level: number
   xp: number
   wins: number
@@ -52,33 +53,78 @@ export interface WildEncounter {
   mapY: number
 }
 
-export type BattleMove = 'strike' | 'scan' | 'guard'
+export type TileSpecial = 'none' | 'row' | 'column' | 'burst' | 'origin'
+
+export interface MatchTile {
+  ecology: TraceEcology
+  special: TileSpecial
+}
+
+export interface BattlePartyMember {
+  instanceId: string
+  creatureId: string
+  quality: CaptureCoreQuality
+  level: number
+  hp: number
+  maxHp: number
+  shield: number
+  energy: number
+  skillUsedStage: boolean
+  passiveRound: number
+  passiveStage: number
+  passiveBattleUsed: boolean
+  reviveUsed: boolean
+  counterPower: number
+  overcharge: number
+}
+
+export type EnemyIntent = 'strike' | 'guard' | 'disrupt' | 'corrupt' | 'mark'
 
 export interface BattleLogEntry {
   turn: number
   kind:
     | 'start'
-    | 'hit'
+    | 'match'
+    | 'combo'
     | 'armor-break'
-    | 'scan'
-    | 'guard'
-    | 'counter'
+    | 'skill'
+    | 'heal'
+    | 'shield'
+    | 'enemy'
+    | 'enemy-shield'
+    | 'enemy-delay'
+    | 'switch'
     | 'capture-failed'
     | 'defeat'
   amount?: number
+  creatureId?: string
+  ecology?: TraceEcology
+  multiplier?: number
 }
 
 export interface BattleState {
   id: string
   encounterId: string
-  playerInstanceId: string
+  wildCreatureId: string
+  board: MatchTile[]
+  party: BattlePartyMember[]
+  activeIndex: number
+  actionsRemaining: number
+  stage: number
+  round: number
   wildHp: number
   wildMaxHp: number
   wildArmor: number
-  playerHp: number
-  playerMaxHp: number
-  playerShield: number
-  focus: number
+  wildShield: number
+  wildDefense: number
+  enemyIntent: EnemyIntent
+  enemyMarks: number
+  enemyBurn: number
+  enemyDelayed: number
+  affinityFloorActions: number
+  boardLockActions: number
+  repeatPower: number
+  lastPlayerDamage: number
   turn: number
   log: BattleLogEntry[]
 }
@@ -103,7 +149,7 @@ export interface TraceLogEntry {
 }
 
 export interface TraceWildState {
-  schemaVersion: 1
+  schemaVersion: 2
   revision: number
   createdAt: number
   updatedAt: number
@@ -132,20 +178,21 @@ export interface TraceSignal {
 export type TraceWildAction =
   | { type: 'choose-starter'; creatureId: string }
   | { type: 'start-battle'; encounterId: string }
-  | { type: 'battle-move'; move: BattleMove }
+  | { type: 'battle-swap'; from: number; to: number }
+  | { type: 'battle-cast'; creatureInstanceId: string }
   | { type: 'capture'; quality: CaptureCoreQuality }
   | { type: 'flee' }
   | { type: 'set-squad'; instanceIds: string[] }
 
 export interface TraceWildSnapshot {
-  schemaVersion: 1
+  schemaVersion: 2
   state: TraceWildState
   serverTime: number
 }
 
 export interface TraceWildActionResponse extends TraceWildSnapshot {
   ok: true
-  notice?: 'capture-success' | 'capture-failed' | 'battle-lost'
+  notice?: 'capture-success' | 'capture-failed' | 'battle-lost' | 'skill-cast'
 }
 
 export interface TraceWildFailureResponse {

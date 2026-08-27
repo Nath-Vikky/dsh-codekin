@@ -36,7 +36,7 @@ export class TraceWildService {
   }
 
   snapshot(): TraceWildSnapshot {
-    return { schemaVersion: 1, state: structuredClone(this.stateValue), serverTime: this.now() }
+    return { schemaVersion: 2, state: structuredClone(this.stateValue), serverTime: this.now() }
   }
 
   subscribe(listener: (snapshot: TraceWildSnapshot) => void): () => void {

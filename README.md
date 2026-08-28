@@ -1,12 +1,36 @@
 # Codekin
 
-[简体中文](README.zh-CN.md)
+[简体中文](README.zh-CN.md) · [npm](https://www.npmjs.com/package/@nath-vikky/dsh-codekin) · [Releases](https://github.com/Nath-Vikky/dsh-codekin/releases)
 
 Codekin is a creature-collection and match-three battle plugin for DeepSeek Harness Web. It turns
 high-level DSH runtime outcomes into local game events without changing prompts, tools, model
 requests, or agent behavior.
 
 ![The first 25 Codekin](assets/creatures/sprite-gallery-v1.png)
+
+## Install and enable
+
+Install or update the stable release through the DSH profile manager:
+
+```sh
+dsh plugin --profile web add @nath-vikky/dsh-codekin@latest
+```
+
+Restart DSH Web after installation, then open **DSH Settings → Codekin** and enable the plugin.
+The launcher is draggable and toggles the compact portrait game window. When idle supplies are
+ready, the launcher changes into a gently animated gift reminder.
+
+Users upgrading from a prerelease should keep the explicit `@latest` suffix once so that a cached
+`next` resolution cannot retain an older release candidate. Release notes and the matching
+prebuilt `.tgz` are also available on the [GitHub Releases page](https://github.com/Nath-Vikky/dsh-codekin/releases/latest).
+
+## Core loop
+
+Use DSH normally. Completed activity can award one capture core and create at most one encounter.
+Open Codekin to collect idle supplies, inspect the regional map, choose a wild target, arrange a
+three-member squad, and enter a 7×7 command match battle. Winning yields growth material; weakening
+a target opens a capture decision whose odds combine remaining runtime with capture-core quality.
+Progress, encounters, inventory, squads, and tower state remain local to the plugin.
 
 ## What it includes
 
@@ -17,6 +41,7 @@ requests, or agent behavior.
 - Mixed DSH activity replenishes the least represented matching region; after one region grows beyond five residents, repeated single-attribute activity is diverted to a scarcer region.
 - Ordinary wild levels stay between the lowest and highest levels in the complete roster; Nova and Origin appear as over-level special challenges.
 - A 2D region map, 7×7 match-three battles, capture, a three-Codekin squad, and a creature index.
+- An Endless Stack Tower with increasingly strong Boss levels, qualities, mechanics, and per-floor growth rewards.
 - Five attribute tiles arranged in a closed advantage loop, with strong and resisted damage.
 - Level 1–100 progression, five qualities of growth material, idle supplies, and local persistence.
 - A compact growth target selector keeps training usable even with a large roster.
@@ -29,41 +54,31 @@ requests, or agent behavior.
   tile locks, freezes, and phase shields according to their level and quality.
 - Matching a Codekin's attribute builds command points, and every Codekin has one passive plus one active ability.
 - Match-four, match-five, and intersecting clears create row, column, burst, and origin tiles.
+- Reward popups, item details, visible material experience values, and explicit confirmations for irreversible roster actions.
 - Host-validated game actions and atomic local persistence.
 
-## How it works
+## Battle and encounter rules
 
-Use DSH normally. Completed activity can award a capture core and create an encounter. Open the
-Codekin launcher to explore the map, build a squad, and enter a command match encounter. Swap
-adjacent tiles to queue compute damage and charge matching squad members; after all three squad stages, a
-single team strike resolves against the Boss. Defeating wild Codekin drops growth materials. A
-capture decision appears after a qualifying team strike, with odds based on remaining runtime and the
-capture-core quality. Encounter level and quality reflect effective activity time in the current session.
-Codekin does not submit prompts, invoke tools, or alter
-conversations.
-
-## Installation
-
-Install the prebuilt npm release through the DSH profile manager:
-
-```sh
-dsh plugin --profile web add @nath-vikky/dsh-codekin@next
-```
-
-Release tarballs contain the same prebuilt Host and Client entries and can be passed to the command
-as a local file. Direct installation from a GitHub source URL is not supported; cloning the repository
-is a development workflow and requires a compatible DeepSeek Harness checkout before building.
+Swap adjacent tiles to queue compute damage and charge matching squad members. Each squad member
+normally contributes three actions; a direct match-four refunds an action and a match-five grants an
+extra action. The three squad stages are displayed separately, then resolve as one team strike. Wild
+Bosses have their own multi-action cycle and may use single-target or party-wide attacks, locks,
+freezes, shields, and quality-dependent mechanics. A player may end the current stage early to avoid
+defeating a weakened capture target. Encounter duration, level, and quality respond to effective DSH
+activity while map population and regional balancing prevent one activity type from occupying every
+spawn slot.
 
 ## Data behavior
 
 Game progress is stored locally by the plugin. Codekin records bounded game events and aggregate
 runtime outcomes; it does not store prompt text, assistant responses, tool arguments, commands,
-workspace paths, or raw error bodies.
+workspace paths, or raw error bodies. It does not submit prompts, invoke tools, alter model requests,
+or modify conversations.
 
 ## Compatibility and status
 
-This repository contains the stable `0.2.0` release for DeepSeek Harness Web `0.1.0-rc.5`.
-Stable packages are published on the npm `latest` tag; future preview builds use `next`.
+The current stable release is `0.2.0` for DeepSeek Harness Web `0.1.0-rc.5`.
+Stable packages use the npm `latest` tag; future preview builds use `next`.
 
 ## License
 

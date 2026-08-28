@@ -6,6 +6,7 @@ import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-setti
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { TraceWildOverlay } from './components/TraceWildOverlay.tsx'
 import { TraceWildSettings } from './components/TraceWildSettings.tsx'
+import { styleId, styleText } from './components/tracewild.module.css'
 import { en, NS, zh } from './locales.ts'
 
 // rc.5 re-exports the owner type but does not retain its SlotMap augmentation
@@ -19,7 +20,22 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 export const inject = ['slots', 'locale']
 
+function installStyles(): () => void {
+  if (typeof document === 'undefined') return () => undefined
+  const existing = [...document.querySelectorAll<HTMLStyleElement>('style[data-plugin-css]')]
+    .find(tag => tag.dataset.pluginCss === styleId)
+  const tag = existing ?? document.createElement('style')
+  tag.dataset.plugin = '@nath-vikky/dsh-codekin'
+  tag.dataset.pluginCss = styleId
+  tag.textContent = styleText
+  if (existing === undefined) document.head.appendChild(tag)
+  return () => {
+    if (tag.dataset.pluginCss === styleId) tag.remove()
+  }
+}
+
 export function apply(ctx: ClientContext): void {
+  ctx.effect(installStyles, 'tracewild: styles')
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'tracewild: dictionaries')
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay',

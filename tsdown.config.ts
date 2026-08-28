@@ -110,10 +110,7 @@ const client: UserConfig = {
       return [
         `const css=${JSON.stringify(result.code.toString())};`,
         `const tagId=${JSON.stringify(tagId)};`,
-        'if(typeof document!=="undefined"&&document.querySelector(`style[data-plugin-css="${tagId}"]`)===null){',
-        'const tag=document.createElement("style");',
-        `tag.dataset.plugin=${JSON.stringify(PACKAGE_ID)};`,
-        'tag.dataset.pluginCss=tagId;tag.textContent=css;document.head.appendChild(tag);}',
+        'export {tagId as styleId,css as styleText};',
         `export default ${JSON.stringify(classes)};`,
       ].join('\n')
     },

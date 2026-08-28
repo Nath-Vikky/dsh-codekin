@@ -439,6 +439,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   const launcherElement = useRef<HTMLButtonElement>(null)
   const launcherDrag = useRef<WindowDragState>()
   const launcherWasDragged = useRef(false)
+  const pulseTimer = useRef<number>()
   const zh = t('title') === '码灵'
 
   const adoptSnapshot = useCallback((value: TraceWildSnapshot): void => {
@@ -451,7 +452,11 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
       if (acquired.length > 0) setRewardQueue(queue => [...queue, acquired].slice(-8))
       if (value.state.encounters.length > previous.state.encounters.length) {
         setPulse(true)
-        window.setTimeout(() => { setPulse(false) }, 1800)
+        if (pulseTimer.current !== undefined) window.clearTimeout(pulseTimer.current)
+        pulseTimer.current = window.setTimeout(() => {
+          pulseTimer.current = undefined
+          setPulse(false)
+        }, 1800)
       }
     }
     latestSnapshot.current = value
@@ -482,6 +487,10 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
       unsubscribe()
     }
   }, [adoptSnapshot, connection, refresh])
+
+  useEffect(() => () => {
+    if (pulseTimer.current !== undefined) window.clearTimeout(pulseTimer.current)
+  }, [])
 
   useEffect(() => {
     if (snapshot !== undefined) setSquadDraft([...snapshot.state.squad])
@@ -1420,6 +1429,7 @@ function BattleView(props: {
   const motionTimers = useRef(new Set<number>())
   const animationEpoch = useRef(0)
   const suppressClick = useRef(false)
+  const suppressClickTimer = useRef<number>()
   const previousBattle = useRef({ id: battle.id, wildHp: battle.wildHp, partyHp: battle.party.reduce((sum, row) => sum + row.hp, 0) })
   const encounter = props.state.encounters.find(row => row.id === battle.encounterId)
   const wild = creatureById(battle.wildCreatureId)
@@ -1464,9 +1474,19 @@ function BattleView(props: {
     animationEpoch.current += 1
     if (bossActionTimer.current !== undefined) window.clearTimeout(bossActionTimer.current)
     if (swapTimer.current !== undefined) window.clearTimeout(swapTimer.current)
+    if (suppressClickTimer.current !== undefined) window.clearTimeout(suppressClickTimer.current)
     for (const timer of motionTimers.current) window.clearTimeout(timer)
     motionTimers.current.clear()
   }, [])
+
+  const suppressNextClick = (duration: number): void => {
+    suppressClick.current = true
+    if (suppressClickTimer.current !== undefined) window.clearTimeout(suppressClickTimer.current)
+    suppressClickTimer.current = window.setTimeout(() => {
+      suppressClickTimer.current = undefined
+      suppressClick.current = false
+    }, duration)
+  }
 
   const pause = (duration: number): Promise<void> => new Promise(resolve => {
     const timer = window.setTimeout(() => {
@@ -1633,8 +1653,7 @@ function BattleView(props: {
     const target = swipeTarget(index, offsetX, offsetY)
     if (target === undefined) return
     gestureRef.current = undefined
-    suppressClick.current = true
-    window.setTimeout(() => { suppressClick.current = false }, 350)
+    suppressNextClick(350)
     swap(index, target)
   }
 
@@ -1800,8 +1819,7 @@ function BattleView(props: {
                         ? swipeTarget(index, offsetX, offsetY)
                         : undefined
                       if (Math.max(Math.abs(offsetX), Math.abs(offsetY)) > 6) {
-                        suppressClick.current = true
-                        window.setTimeout(() => { suppressClick.current = false }, 250)
+                        suppressNextClick(250)
                       }
                       gestureRef.current = undefined
                       setGesture(undefined)

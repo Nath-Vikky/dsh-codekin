@@ -1,8 +1,7 @@
 {
   "name": "@nath-vikky/dsh-codekin",
   "description": "Codekin creature collection and match-three RPG for DeepSeek Harness Web",
-  "version": "0.2.0-rc.4",
-  "private": true,
+  "version": "0.2.0-rc.5",
   "type": "module",
   "packageManager": "pnpm@11.7.0",
   "engines": { "node": "^22.19.0 || >=24.0.0" },
@@ -11,7 +10,8 @@
     "clean": "node --eval \"import('node:fs/promises').then(({rm}) => rm('lib', { recursive: true, force: true }))\"",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit --pretty false && tsc -p tsconfig.vitest.json --noEmit --pretty false",
-    "check": "node --run typecheck && node --run test && node --run build"
+    "check": "node --run typecheck && node --run test && node --run build",
+    "prepack": "node --run check"
   },
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -45,6 +45,18 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": { "optional": true },
+    "@deepseek-ai/dsh-client-locale": { "optional": true },
+    "@deepseek-ai/dsh-client-runtime": { "optional": true },
+    "@deepseek-ai/dsh-client-ui-layout": { "optional": true },
+    "@deepseek-ai/dsh-client-ui-settings": { "optional": true },
+    "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+    "@deepseek-ai/dsh-host-webserver": { "optional": true },
+    "@deepseek-ai/dsh-session": { "optional": true },
+    "react": { "optional": true },
+    "react-dom": { "optional": true }
+  },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.1",
     "@deepseek-ai/dsh-client-locale": "link:../deepseek-harness/packages/client/locale",
@@ -64,7 +76,8 @@
     "typescript": "6.0.3",
     "vitest": "4.1.11"
   },
-  "repository": { "type": "git", "url": "https://github.com/Nath-Vikky/dsh-codekin.git" },
+  "repository": { "type": "git", "url": "git+https://github.com/Nath-Vikky/dsh-codekin.git" },
+  "publishConfig": { "access": "public", "tag": "next" },
   "keywords": ["deepseek-harness", "dsh-plugin", "codekin", "creature-collector", "match-3", "game"],
   "license": "MIT",
   "files": [

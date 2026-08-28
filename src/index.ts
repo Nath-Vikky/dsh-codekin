@@ -31,9 +31,10 @@ export function apply(ctx: Context): void {
   const assetDirectory = fileURLToPath(new URL('../assets/creatures/', import.meta.url))
 
   ctx.effect(() => {
+    const routeGroup = createTraceWildRoutes(service, assetDirectory)
     const disposers: (() => void)[] = []
     try {
-      for (const route of createTraceWildRoutes(service, assetDirectory)) {
+      for (const route of routeGroup.routes) {
         disposers.push(ctx.webServer.register(route))
       }
       disposers.push(ctx.on('session/event', (session: Session, event: SessionEvent) => {
@@ -43,12 +44,16 @@ export function apply(ctx: Context): void {
         service.disposeSession(session)
       }))
     } catch (error) {
+      routeGroup.close()
       for (const dispose of disposers.reverse()) {
         try { dispose() } catch { /* best-effort startup rollback */ }
       }
       throw error
     }
     return () => {
+      // End long-lived responses before unregistering their route handlers so
+      // EventSource reconnects can only attach to the next Cordis instance.
+      routeGroup.close()
       for (const dispose of disposers.reverse()) {
         try { dispose() } catch { /* best-effort plugin teardown */ }
       }

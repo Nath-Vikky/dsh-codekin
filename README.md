@@ -42,6 +42,18 @@ capture-core quality. Encounter level and quality reflect effective activity tim
 Codekin does not submit prompts, invoke tools, or alter
 conversations.
 
+## Installation
+
+Install the prebuilt npm release through the DSH profile manager:
+
+```sh
+dsh plugin --profile web add @nath-vikky/dsh-codekin@next
+```
+
+Release tarballs contain the same prebuilt Host and Client entries and can be passed to the command
+as a local file. Direct installation from a GitHub source URL is not supported; cloning the repository
+is a development workflow and requires a compatible DeepSeek Harness checkout before building.
+
 ## Data behavior
 
 Game progress is stored locally by the plugin. Codekin records bounded game events and aggregate
@@ -50,8 +62,9 @@ workspace paths, or raw error bodies.
 
 ## Compatibility and status
 
-This repository currently contains the `0.2.0-rc.4` playtest build for DeepSeek Harness Web
-`0.1.0-rc.5`. The package remains private while gameplay and balance are being evaluated.
+This repository currently contains the `0.2.0-rc.5` release candidate for DeepSeek Harness Web
+`0.1.0-rc.5`. Prerelease packages are published on the npm `next` tag while gameplay and balance
+continue to be evaluated.
 
 ## License
 

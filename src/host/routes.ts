@@ -12,6 +12,45 @@ export const TRACEWILD_API_PREFIX = '/api/tracewild'
 const MAX_ACTION_BODY_BYTES = 4 * 1024
 const HEARTBEAT_MS = 15_000
 
+class TraceWildRoutesClosedError extends Error {}
+
+class TraceWildRouteLifecycle {
+  private readonly controller = new AbortController()
+  private readonly streams = new Map<ServerResponse, () => void>()
+
+  get signal(): AbortSignal {
+    return this.controller.signal
+  }
+
+  trackStream(res: ServerResponse, cleanup: () => void): void {
+    if (this.signal.aborted) {
+      cleanup()
+      if (!res.writableEnded && !res.destroyed) res.end()
+      return
+    }
+    this.streams.set(res, cleanup)
+  }
+
+  releaseStream(res: ServerResponse): void {
+    this.streams.delete(res)
+  }
+
+  close(): void {
+    if (this.signal.aborted) return
+    this.controller.abort()
+    for (const [res, cleanup] of [...this.streams]) {
+      cleanup()
+      if (!res.writableEnded && !res.destroyed) res.end()
+    }
+    this.streams.clear()
+  }
+}
+
+export interface TraceWildRouteGroup {
+  readonly routes: readonly WebRoute[]
+  close(): void
+}
+
 const ASSET_FILES = new Set([
   'sprites/codekin-launcher-v1.webp',
   ...CREATURE_CATALOG.map(creature => `sprites/${creature.id}.webp`),
@@ -54,40 +93,60 @@ function sameOrigin(req: IncomingMessage): boolean {
   }
 }
 
-function readBody(req: IncomingMessage): Promise<unknown> {
+function readBody(req: IncomingMessage, signal: AbortSignal): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let size = 0
     let settled = false
     const chunks: Buffer[] = []
-    req.on('data', (chunk: Buffer) => {
+    const cleanup = (): void => {
+      req.off('data', onData)
+      req.off('end', onEnd)
+      req.off('error', onError)
+      signal.removeEventListener('abort', onAbort)
+    }
+    const finish = (callback: () => void): void => {
+      if (settled) return
+      settled = true
+      cleanup()
+      callback()
+    }
+    const onData = (chunk: Buffer): void => {
       if (settled) return
       size += chunk.byteLength
       if (size > MAX_ACTION_BODY_BYTES) {
-        settled = true
-        reject(new TypeError('body too large'))
+        finish(() => { reject(new TypeError('body too large')) })
         queueMicrotask(() => req.destroy())
         return
       }
       chunks.push(chunk)
-    })
-    req.on('end', () => {
-      if (settled) return
-      settled = true
-      try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown)
-      } catch {
-        reject(new TypeError('invalid json'))
-      }
-    })
-    req.on('error', () => {
-      if (settled) return
-      settled = true
-      reject(new TypeError('request error'))
-    })
+    }
+    const onEnd = (): void => {
+      finish(() => {
+        try {
+          resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown)
+        } catch {
+          reject(new TypeError('invalid json'))
+        }
+      })
+    }
+    const onError = (): void => {
+      finish(() => { reject(new TypeError('request error')) })
+    }
+    const onAbort = (): void => {
+      finish(() => { reject(new TraceWildRoutesClosedError()) })
+    }
+    if (signal.aborted) {
+      onAbort()
+      return
+    }
+    req.on('data', onData)
+    req.on('end', onEnd)
+    req.on('error', onError)
+    signal.addEventListener('abort', onAbort, { once: true })
   })
 }
 
-function stateRoute(service: TraceWildService): WebRoute {
+function stateRoute(service: TraceWildService, lifecycle: TraceWildRouteLifecycle): WebRoute {
   return {
     kind: 'exact',
     path: `${TRACEWILD_API_PREFIX}/state`,
@@ -97,12 +156,16 @@ function stateRoute(service: TraceWildService): WebRoute {
         res.end()
         return
       }
+      if (lifecycle.signal.aborted) {
+        failure(res, 503, 'unavailable')
+        return
+      }
       sendJson(res, 200, service.snapshot())
     },
   }
 }
 
-function actionRoute(service: TraceWildService): WebRoute {
+function actionRoute(service: TraceWildService, lifecycle: TraceWildRouteLifecycle): WebRoute {
   return {
     kind: 'exact',
     path: `${TRACEWILD_API_PREFIX}/action`,
@@ -117,8 +180,14 @@ function actionRoute(service: TraceWildService): WebRoute {
         return
       }
       try {
-        sendJson(res, 200, service.act(normalizeTraceWildAction(await readBody(req))))
+        const action = normalizeTraceWildAction(await readBody(req, lifecycle.signal))
+        if (lifecycle.signal.aborted) throw new TraceWildRoutesClosedError()
+        sendJson(res, 200, service.act(action))
       } catch (error) {
+        if (error instanceof TraceWildRoutesClosedError || lifecycle.signal.aborted) {
+          failure(res, 503, 'unavailable')
+          return
+        }
         if (error instanceof TraceWildRuleError) {
           failure(res, error.code === 'conflict' ? 409 : 400, error.code)
           return
@@ -133,7 +202,7 @@ function actionRoute(service: TraceWildService): WebRoute {
   }
 }
 
-function eventsRoute(service: TraceWildService): WebRoute {
+function eventsRoute(service: TraceWildService, lifecycle: TraceWildRouteLifecycle): WebRoute {
   return {
     kind: 'exact',
     path: `${TRACEWILD_API_PREFIX}/events`,
@@ -141,6 +210,10 @@ function eventsRoute(service: TraceWildService): WebRoute {
       if (req.method !== 'GET') {
         res.writeHead(405, securityHeaders())
         res.end()
+        return
+      }
+      if (lifecycle.signal.aborted) {
+        failure(res, 503, 'unavailable')
         return
       }
       res.writeHead(200, {
@@ -152,7 +225,7 @@ function eventsRoute(service: TraceWildService): WebRoute {
       })
       res.flushHeaders?.()
       let closed = false
-      let unsubscribe = (): void => undefined
+      let unsubscribe: (() => void) | undefined
       const heartbeat = setInterval(() => {
         if (!closed) res.write(': tracewild\n\n')
       }, HEARTBEAT_MS)
@@ -161,9 +234,14 @@ function eventsRoute(service: TraceWildService): WebRoute {
         if (closed) return
         closed = true
         clearInterval(heartbeat)
-        unsubscribe()
+        req.off('close', close)
+        res.off('close', close)
+        lifecycle.releaseStream(res)
+        unsubscribe?.()
       }
       req.once('close', close)
+      res.once('close', close)
+      lifecycle.trackStream(res, close)
       unsubscribe = service.subscribe((snapshot) => {
         if (closed) return
         try {
@@ -172,11 +250,12 @@ function eventsRoute(service: TraceWildService): WebRoute {
           close()
         }
       })
+      if (closed) unsubscribe()
     },
   }
 }
 
-function assetRoute(assetDirectory: string): WebRoute {
+function assetRoute(assetDirectory: string, lifecycle: TraceWildRouteLifecycle): WebRoute {
   return {
     kind: 'prefix',
     path: `${TRACEWILD_API_PREFIX}/assets`,
@@ -184,6 +263,10 @@ function assetRoute(assetDirectory: string): WebRoute {
       if (req.method !== 'GET') {
         res.writeHead(405, securityHeaders())
         res.end()
+        return
+      }
+      if (lifecycle.signal.aborted) {
+        failure(res, 503, 'unavailable')
         return
       }
       const pathname = new URL(req.url ?? '/', 'http://tracewild.invalid').pathname
@@ -195,6 +278,10 @@ function assetRoute(assetDirectory: string): WebRoute {
       }
       try {
         const body = await readFile(join(assetDirectory, filename))
+        if (lifecycle.signal.aborted) {
+          failure(res, 503, 'unavailable')
+          return
+        }
         res.writeHead(200, {
           ...securityHeaders(),
           'cache-control': 'public, max-age=86400, immutable',
@@ -210,6 +297,15 @@ function assetRoute(assetDirectory: string): WebRoute {
   }
 }
 
-export function createTraceWildRoutes(service: TraceWildService, assetDirectory: string): readonly WebRoute[] {
-  return [stateRoute(service), actionRoute(service), eventsRoute(service), assetRoute(assetDirectory)]
+export function createTraceWildRoutes(service: TraceWildService, assetDirectory: string): TraceWildRouteGroup {
+  const lifecycle = new TraceWildRouteLifecycle()
+  return {
+    routes: [
+      stateRoute(service, lifecycle),
+      actionRoute(service, lifecycle),
+      eventsRoute(service, lifecycle),
+      assetRoute(assetDirectory, lifecycle),
+    ],
+    close: () => { lifecycle.close() },
+  }
 }

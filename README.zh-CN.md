@@ -55,8 +55,8 @@ DeepSeek Harness 源码环境。
 
 ## 兼容性与状态
 
-仓库当前为适配 DeepSeek Harness Web `0.1.0-rc.5` 的 `0.2.0-rc.5` 发布候选版本。
-在玩法和平衡性继续评估期间，预发布包会发布到 npm 的 `next` 标签。
+仓库当前为适配 DeepSeek Harness Web `0.1.0-rc.5` 的稳定版 `0.2.0`。
+稳定版本发布到 npm 的 `latest` 标签；后续预览版本使用 `next`。
 
 ## 许可证
 

@@ -62,9 +62,8 @@ workspace paths, or raw error bodies.
 
 ## Compatibility and status
 
-This repository currently contains the `0.2.0-rc.5` release candidate for DeepSeek Harness Web
-`0.1.0-rc.5`. Prerelease packages are published on the npm `next` tag while gameplay and balance
-continue to be evaluated.
+This repository contains the stable `0.2.0` release for DeepSeek Harness Web `0.1.0-rc.5`.
+Stable packages are published on the npm `latest` tag; future preview builds use `next`.
 
 ## License
 

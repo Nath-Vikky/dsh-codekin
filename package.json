@@ -1,7 +1,7 @@
 {
   "name": "@nath-vikky/dsh-codekin",
   "description": "Codekin creature collection and match-three RPG for DeepSeek Harness Web",
-  "version": "0.2.0-rc.5",
+  "version": "0.2.0",
   "type": "module",
   "packageManager": "pnpm@11.7.0",
   "engines": { "node": "^22.19.0 || >=24.0.0" },
@@ -77,7 +77,7 @@
     "vitest": "4.1.11"
   },
   "repository": { "type": "git", "url": "git+https://github.com/Nath-Vikky/dsh-codekin.git" },
-  "publishConfig": { "access": "public", "tag": "next" },
+  "publishConfig": { "access": "public", "tag": "latest" },
   "keywords": ["deepseek-harness", "dsh-plugin", "codekin", "creature-collector", "match-3", "game"],
   "license": "MIT",
   "files": [

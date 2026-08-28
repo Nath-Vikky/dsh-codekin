@@ -428,6 +428,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   const [launcherPosition, setLauncherPosition] = useState<WindowPosition>()
   const [draggingLauncher, setDraggingLauncher] = useState(false)
   const [squadDraft, setSquadDraft] = useState<string[]>([])
+  const [growthTarget, setGrowthTarget] = useState<string>()
   const [rewardQueue, setRewardQueue] = useState<AcquiredItem[][]>([])
   const [releaseCandidate, setReleaseCandidate] = useState<string>()
   const latestSnapshot = useRef<TraceWildSnapshot>()
@@ -485,6 +486,13 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   useEffect(() => {
     if (snapshot !== undefined) setSquadDraft([...snapshot.state.squad])
   }, [snapshot?.state.revision])
+
+  useEffect(() => {
+    if (snapshot === undefined) return
+    setGrowthTarget(current => snapshot.state.creatures.some(creature => creature.instanceId === current)
+      ? current
+      : snapshot.state.creatures[0]?.instanceId)
+  }, [snapshot?.state.createdAt, snapshot?.state.revision])
 
   useEffect(() => {
     if (releaseCandidate === undefined) return
@@ -822,7 +830,17 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
                   />
                 )}
                 {tab === 'dex' && <DexView state={state} t={t} zh={zh} />}
-                {tab === 'inventory' && <InventoryView state={state} t={t} zh={zh} busy={busy} act={act} />}
+                {tab === 'inventory' && (
+                  <InventoryView
+                    state={state}
+                    t={t}
+                    zh={zh}
+                    busy={busy}
+                    act={act}
+                    growthTarget={growthTarget}
+                    setGrowthTarget={setGrowthTarget}
+                  />
+                )}
               </main>
               <footer className={css.footer}>{t('privacy')}</footer>
               {state.battle !== undefined && (
@@ -1164,8 +1182,21 @@ function InventoryView(props: {
   zh: boolean
   busy: boolean
   act: (action: TraceWildAction) => Promise<TraceWildActionResponse | undefined>
+  growthTarget: string | undefined
+  setGrowthTarget: (instanceId: string) => void
 }) {
   const stats = props.state.stats
+  const selectedCaptured = props.state.creatures.find(captured => captured.instanceId === props.growthTarget)
+    ?? props.state.creatures[0]
+  const selectedCreature = selectedCaptured === undefined ? undefined : creatureById(selectedCaptured.creatureId)
+  const selectedLevelBaseXp = selectedCaptured === undefined
+    ? 0
+    : totalXpForLevel(selectedCaptured.level, selectedCaptured.quality)
+  const selectedProgress = selectedCaptured === undefined ? 0 : Math.max(0, selectedCaptured.xp - selectedLevelBaseXp)
+  const selectedNeeded = selectedCaptured === undefined || selectedCaptured.level >= MAX_PLAYER_LEVEL
+    ? 0
+    : xpToNextLevel(selectedCaptured.level, selectedCaptured.quality)
+  const selectedProgressPercent = selectedNeeded <= 0 ? 100 : Math.min(100, Math.round(selectedProgress / selectedNeeded * 100))
   return (
     <div className={css.inventoryLayout}>
       <section className={css.inventoryPanel}>
@@ -1209,39 +1240,64 @@ function InventoryView(props: {
           ))}
         </div>
         <h2>{props.t('growth')}</h2>
-        <div className={css.growthList}>
-          {props.state.creatures.map(captured => {
-            const creature = creatureById(captured.creatureId)
-            if (creature === undefined) return null
-            const levelBaseXp = totalXpForLevel(captured.level, captured.quality)
-            const progress = Math.max(0, captured.xp - levelBaseXp)
-            const needed = captured.level >= MAX_PLAYER_LEVEL ? 0 : xpToNextLevel(captured.level, captured.quality)
-            return (
-              <article key={captured.instanceId} className={css.growthRow}>
-                <CreatureSprite creature={creature} size="tiny" />
+        <div className={css.growthWorkbench}>
+          <label className={css.growthSelector}>
+            <span>{props.t('growthTarget')}</span>
+            <select
+              value={selectedCaptured?.instanceId ?? ''}
+              disabled={props.busy || props.state.creatures.length === 0}
+              onChange={(event) => { props.setGrowthTarget(event.currentTarget.value) }}
+            >
+              {props.state.creatures.map((captured) => {
+                const creature = creatureById(captured.creatureId)
+                if (creature === undefined) return null
+                return (
+                  <option key={captured.instanceId} value={captured.instanceId}>
+                    {creatureName(creature, props.zh)} · Lv.{captured.level} · {props.t(CORE_KEYS[captured.quality])}
+                  </option>
+                )
+              })}
+            </select>
+            <small>{props.t('growthTargetHint', { count: props.state.creatures.length })}</small>
+          </label>
+          {selectedCaptured !== undefined && selectedCreature !== undefined && (
+            <article className={css.growthSelected}>
+              <div className={css.growthSummary}>
+                <CreatureSprite creature={selectedCreature} size="small" />
                 <div>
-                  <strong>{creatureName(creature, props.zh)} · Lv.{captured.level}</strong>
-                  <small>{captured.level >= MAX_PLAYER_LEVEL ? props.t('levelCap') : `${props.t('xp')} ${progress}/${needed}`}</small>
+                  <strong>{creatureName(selectedCreature, props.zh)}</strong>
+                  <span>
+                    {props.t(ECOLOGY_KEYS[selectedCreature.ecology])} · {props.t('quality')} {props.t(CORE_KEYS[selectedCaptured.quality])} · Lv.{selectedCaptured.level}
+                  </span>
+                  <small>
+                    {selectedCaptured.level >= MAX_PLAYER_LEVEL
+                      ? props.t('levelCap')
+                      : `${props.t('xp')} ${selectedProgress}/${selectedNeeded}`}
+                  </small>
+                  <div className={css.growthXpTrack} aria-hidden="true">
+                    <i style={{ width: `${selectedProgressPercent}%` }} />
+                  </div>
                 </div>
-                <div className={css.growthActions}>
-                  {CAPTURE_CORE_QUALITIES.map(quality => (
-                    <button
-                      key={quality}
-                      type="button"
-                      className={css[`core_${quality}`]}
-                      disabled={props.busy || captured.level >= MAX_PLAYER_LEVEL || props.state.materials[quality] <= 0}
-                      onClick={() => { void props.act({ type: 'feed-material', creatureInstanceId: captured.instanceId, quality, count: 1 }) }}
-                      title={`${props.t('feed')} · ${materialItemName(props.t, quality)} · +${MATERIAL_XP[quality]} EXP`}
-                    >
-                      <i />
-                      <span>+{MATERIAL_XP[quality]}</span>
-                      <small>×{props.state.materials[quality]}</small>
-                    </button>
-                  ))}
-                </div>
-              </article>
-            )
-          })}
+              </div>
+              <div className={css.growthActions}>
+                {CAPTURE_CORE_QUALITIES.map(quality => (
+                  <button
+                    key={quality}
+                    type="button"
+                    className={css[`core_${quality}`]}
+                    disabled={props.busy || selectedCaptured.level >= MAX_PLAYER_LEVEL || props.state.materials[quality] <= 0}
+                    onClick={() => { void props.act({ type: 'feed-material', creatureInstanceId: selectedCaptured.instanceId, quality, count: 1 }) }}
+                    title={`${props.t('feed')} · ${materialItemName(props.t, quality)} · +${MATERIAL_XP[quality]} EXP`}
+                    aria-label={`${props.t('feed')} ${materialItemName(props.t, quality)} · +${MATERIAL_XP[quality]} EXP`}
+                  >
+                    <i />
+                    <span>+{MATERIAL_XP[quality]}</span>
+                    <small>×{props.state.materials[quality]}</small>
+                  </button>
+                ))}
+              </div>
+            </article>
+          )}
         </div>
         {props.state.idle.lastReward !== undefined && (
           <p className={css.idleReward}>

@@ -170,6 +170,19 @@
 .growthActions button i { display: block; width: 6px; height: 8px; margin: 0 auto 2px; clip-path: polygon(50% 0, 100% 38%, 72% 100%, 28% 100%, 0 38%); background: currentColor; }
 .growthActions button span { font-size: 6px; } .growthActions button small { color: #93a29e; font-size: 5.5px; }
 .growthActions button:disabled { opacity: .28; cursor: not-allowed; }
+.growthWorkbench { display: grid; gap: 7px; margin: 8px 0 11px; }
+.growthSelector { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 5px 9px; border: 1px solid var(--line); border-radius: 11px; background: #182127; padding: 8px; }
+.growthSelector > span { color: #d9e8e4; font-size: 8px; font-weight: 750; }
+.growthSelector select { min-width: 0; width: 100%; border: 1px solid #ffffff1c; border-radius: 8px; outline: 0; background: #111a20; color: #dce9e5; padding: 7px 25px 7px 8px; font: 700 8px/1.2 ui-sans-serif, system-ui, sans-serif; cursor: pointer; }
+.growthSelector select:focus { border-color: #73b9a5; box-shadow: 0 0 0 2px #73b9a51c; }
+.growthSelector > small { grid-column: 1 / -1; color: #7f9993; font-size: 6.5px; }
+.growthSelected { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 13px; background: #182127; padding: 8px; }
+.growthSummary { min-width: 0; display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; gap: 9px; }
+.growthSummary > div { min-width: 0; display: grid; gap: 3px; }
+.growthSummary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #d9e8e4; font-size: 11px; }
+.growthSummary span, .growthSummary small { color: #7f9993; font-size: 7px; }
+.growthXpTrack { height: 5px; overflow: hidden; border-radius: 999px; background: #0e161b; }
+.growthXpTrack i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #69b99f, #8bd2b9); transition: width .25s ease; }
 .idleReward { margin: 7px 0; border: 1px solid #a9c07b30; border-radius: 9px; background: #24271d; color: #b9c995; padding: 7px 9px; font-size: 8px; }
 .statsGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
 .statsGrid span { border: 1px solid #2c4252; border-radius: 8px; padding: 10px; color: #7996a5; font-size: 10px; display: flex; flex-direction: column; }
@@ -1097,6 +1110,12 @@
 .growthRow strong { color: #38504f; } .growthRow small { color: #738783; }
 .growthActions button { background: #f5f7f4; box-shadow: inset 0 1px #fff; }
 .growthActions button small { color: #778783; }
+.growthSelector, .growthSelected { border-color: #ffffffc7; background: #ffffffad; box-shadow: inset 0 1px #fff; }
+.growthSelector > span, .growthSummary strong { color: #38504f; }
+.growthSelector > small, .growthSummary span, .growthSummary small { color: #738783; }
+.growthSelector select { border-color: #668b8026; background: #f5f9f7; color: #38504f; box-shadow: inset 0 1px #fff; }
+.growthSelector select:focus { border-color: #6aab9870; box-shadow: 0 0 0 2px #6aab9818; }
+.growthXpTrack { background: #dfeae5; }
 .idleReward { border-color: #c3aa5a38; background: #fff8dcb8; color: #837334; }
 .statsGrid span { border-color: #ffffffc4; background: #ffffffa8; color: #748783; box-shadow: inset 0 1px #fff; }
 .statsGrid b { color: #344d4d; }

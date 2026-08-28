@@ -71,6 +71,9 @@ export function normalizeTraceWildAction(value: unknown): TraceWildAction {
         quality: row.quality as CaptureCoreQuality,
         count: row.count as number,
       }
+    case 'release-creature':
+      exactKeys(row, ['type', 'creatureInstanceId'])
+      return { type: 'release-creature', creatureInstanceId: safeId(row.creatureInstanceId, 'pet_') }
     case 'flee':
       exactKeys(row, ['type'])
       return { type: 'flee' }
@@ -81,6 +84,10 @@ export function normalizeTraceWildAction(value: unknown): TraceWildAction {
       }
       return { type: 'set-squad', instanceIds: row.instanceIds.map(id => safeId(id, 'pet_')) }
     }
+    case 'set-enabled':
+      exactKeys(row, ['type', 'enabled'])
+      if (typeof row.enabled !== 'boolean') throw new TypeError('invalid action')
+      return { type: 'set-enabled', enabled: row.enabled }
     default:
       throw new TypeError('invalid action')
   }

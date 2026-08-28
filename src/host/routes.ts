@@ -13,8 +13,8 @@ const MAX_ACTION_BODY_BYTES = 4 * 1024
 const HEARTBEAT_MS = 15_000
 
 const ASSET_FILES = new Set([
-  'sprites/codekin-launcher-v1.png',
-  ...CREATURE_CATALOG.map(creature => `sprites/${creature.id}.png`),
+  'sprites/codekin-launcher-v1.webp',
+  ...CREATURE_CATALOG.map(creature => `sprites/${creature.id}.webp`),
 ])
 
 function securityHeaders(): Record<string, string> {
@@ -198,7 +198,7 @@ function assetRoute(assetDirectory: string): WebRoute {
         res.writeHead(200, {
           ...securityHeaders(),
           'cache-control': 'public, max-age=86400, immutable',
-          'content-type': 'image/png',
+          'content-type': 'image/webp',
           'content-length': String(body.byteLength),
         })
         res.end(body)

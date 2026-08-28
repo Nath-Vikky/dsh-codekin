@@ -310,4 +310,48 @@ describe('TraceWild match battle', () => {
     expect(restored.creatures[0]?.level).toBe(22)
     expect(restored.creatures[0]?.xp).toBe(totalXpForLevel(22, 'origin'))
   })
+
+  it('pauses event rewards while disabled and resumes from a fresh idle watermark', () => {
+    const initial = createInitialTraceWildState(100)
+    const disabled = applyTraceWildAction(initial, { type: 'set-enabled', enabled: false }, low, 200).state
+    expect(disabled).toMatchObject({ enabled: false, idle: { lastSettlementAt: 200 } })
+    expect(applyTraceSignal(disabled, {
+      id: 'turn-disabled', at: 3_600_200, ecology: 'lumen', outcome: 'completed', intensity: 5,
+      activeMinutes: 60, enhanced: true,
+    }, low)).toBe(disabled)
+    const enabled = applyTraceWildAction(disabled, { type: 'set-enabled', enabled: true }, low, 3_600_300).state
+    expect(enabled).toMatchObject({ enabled: true, idle: { lastSettlementAt: 3_600_300 } })
+    expect(enabled.cores.pebble).toBe(0)
+  })
+
+  it('releases a non-final Codekin for one same-quality material regardless of level', () => {
+    let state = applyTraceWildAction(
+      createInitialTraceWildState(100),
+      { type: 'choose-starter', creatureId: 'aegis-veribud' },
+      low,
+      110,
+    ).state
+    state.creatures.push({
+      instanceId: 'pet_release_nova_00000001', creatureId: 'glitch-crashfox', quality: 'nova',
+      level: 100, xp: totalXpForLevel(100, 'nova'), wins: 999, caughtAt: 120, firstSignal: 'glitch',
+    })
+    state.squad.push('pet_release_nova_00000001')
+    const released = applyTraceWildAction(
+      state,
+      { type: 'release-creature', creatureInstanceId: 'pet_release_nova_00000001' },
+      low,
+      130,
+    )
+    expect(released.notice).toBe('creature-released')
+    expect(released.state.materials.nova).toBe(1)
+    expect(released.state.creatures).toHaveLength(1)
+    expect(released.state.squad).toEqual([released.state.creatures[0]!.instanceId])
+    expect(released.state.log[0]).toMatchObject({ kind: 'release', quality: 'nova' })
+    expect(() => applyTraceWildAction(
+      released.state,
+      { type: 'release-creature', creatureInstanceId: released.state.creatures[0]!.instanceId },
+      low,
+      140,
+    )).toThrowError('conflict')
+  })
 })

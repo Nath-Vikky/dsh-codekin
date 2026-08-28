@@ -28,7 +28,7 @@ export interface TraceWildServiceOptions {
 export class TraceWildService {
   private stateValue: TraceWildState
   private readonly listeners = new Set<(snapshot: TraceWildSnapshot) => void>()
-  private readonly classifier = new TraceWildEventClassifier()
+  private classifier = new TraceWildEventClassifier()
   private readonly persistence: TraceWildPersistence
   private readonly random: RandomSource
   private readonly now: () => number
@@ -63,6 +63,7 @@ export class TraceWildService {
   }
 
   observe(session: Session, event: SessionEvent): void {
+    if (!this.stateValue.enabled) return
     if (session.header.parentSession !== undefined || session.header.origin === 'subagent') {
       const root = this.rootSession(session)
       if (root !== undefined) this.classifier.observeRelatedActivity(root, event)
@@ -101,9 +102,11 @@ export class TraceWildService {
   }
 
   act(action: TraceWildAction): TraceWildActionResponse {
+    const previousEnabled = this.stateValue.enabled
     const result = applyTraceWildAction(this.stateValue, action, this.random, this.now())
     this.persistence.save(result.state)
     this.stateValue = result.state
+    if (result.state.enabled !== previousEnabled) this.classifier = new TraceWildEventClassifier()
     const snapshot = this.snapshot()
     this.publish(snapshot)
     return {

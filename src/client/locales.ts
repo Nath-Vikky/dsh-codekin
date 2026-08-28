@@ -2,6 +2,8 @@ export const NS = 'tracewild'
 
 export const zh = {
   title: '码灵', subtitle: '你的 DSH 活动正在生成一座码灵世界', open: '打开码灵', close: '关闭', dragWindow: '按住标题栏可拖动，双击归位', dragLauncher: '可拖动入口位置',
+  settingsTitle: '码灵', settingsDescription: '管理码灵玩法是否响应你的 DSH 会话事件。', settingsEnabled: '启用码灵', settingsEnabledHint: '关闭后入口会隐藏，并暂停事件奖励、野生码灵刷新和挂机计时；已有进度会保留。',
+  settingsOn: '已启用', settingsOff: '已停用', settingsLoading: '正在读取码灵设置…', settingsUnavailable: '码灵设置暂时不可用，请稍后重试。', settingsOnHint: '码灵正在监听不含正文的会话结果事件。', settingsOffHint: '码灵已暂停；你的编队与道具不会被删除。',
   map: '码灵地图', squad: '编队', dex: '图鉴', inventory: '核心与记录', loading: '正在连接码灵世界…',
   disconnected: '码灵暂时离线，正在等待 Host 恢复。', retry: '重试连接', newEncounter: '新的码灵出现了',
   starterTitle: '选择你的初始码灵', starterBody: '它会成为第一位出战伙伴。之后可随时调整三只码灵的编队。',
@@ -29,6 +31,7 @@ export const zh = {
   targetAll: '全体', targetSelf: '自身', targetSingle: '单体', lockedTile: '封锁中',
   specialRow: '横向指令', specialColumn: '纵向指令', specialBurst: '脉冲指令', specialOrigin: '核心指令',
   squadHelp: '最多选择 3 只，按顺序轮流行动；每只拥有连续 3 次交换。', saveSquad: '保存编队',
+  releaseCreature: '放生码灵', releaseConfirmTitle: '确认放生', releaseConfirmBody: '确定要放生“{name}”吗？此操作无法撤销，返还素材只取决于码灵品质。', releaseReward: '预计返还', releaseCancel: '再想想', releaseConfirm: '确认放生', releaseLastBlocked: '至少需要保留一只码灵', released: '码灵已放生，品质素材已返还。',
   level: '等级', levelCap: '满级', xp: '经验', feed: '使用', wins: '胜场', dexSeen: '已发现', dexCaught: '已收容', undiscovered: '未发现',
   totalTurns: '完成回合', failures: '异常事件', captureCount: '成功收容', streak: '当前连胜',
   eventLog: '最近属性事件', emptyLog: '还没有事件。',
@@ -43,6 +46,7 @@ export const zh = {
   growthMaterialDescription: '升级道具 · 使用后获得 {xp} 经验', creatureItemDescription: '{quality}品质 · {ecology}属性的新伙伴',
   logCore: '完成事件掉落了核心', logMaterial: '获得了升级素材', logIdle: '领取了挂机补给', logEncounter: '地图出现了新的码灵', logCapture: '收容了一只码灵',
   logStarter: '初始伙伴加入编队', logDefeat: '对战撤回',
+  logRelease: '放生码灵并回收了品质素材',
   wildDefeated: '野生码灵已被击败，掉落了升级素材。', materialUsed: '升级素材已使用。',
   battleStart: '遭遇开始', battleMatch: '三消输出 {amount} 点算力', battleCombo: '触发 {amount} 层连锁',
   battleArmor: '击破一层防火墙', battleSkill: '主动协议输出 {amount} 点算力',
@@ -60,6 +64,8 @@ export const zh = {
 
 export const en: Record<keyof typeof zh, string> = {
   title: 'Codekin', subtitle: 'Your DSH activity is growing a world of Codekin', open: 'Open Codekin', close: 'Close', dragWindow: 'Drag the title bar to move; double-click to center', dragLauncher: 'Drag to reposition',
+  settingsTitle: 'Codekin', settingsDescription: 'Control whether Codekin responds to your DSH session events.', settingsEnabled: 'Enable Codekin', settingsEnabledHint: 'Turning it off hides the launcher and pauses event rewards, wild spawns, and idle time. Existing progress is preserved.',
+  settingsOn: 'Enabled', settingsOff: 'Disabled', settingsLoading: 'Loading Codekin settings…', settingsUnavailable: 'Codekin settings are temporarily unavailable. Try again shortly.', settingsOnHint: 'Codekin is listening for content-free session outcome events.', settingsOffHint: 'Codekin is paused. Your squad and inventory remain intact.',
   map: 'Codekin Map', squad: 'Squad', dex: 'Dex', inventory: 'Cores & Log', loading: 'Connecting to Codekin…',
   disconnected: 'Codekin is offline. Waiting for the Host to recover.', retry: 'Reconnect', newEncounter: 'A new Codekin appeared',
   starterTitle: 'Choose your first Codekin', starterBody: 'It becomes your first combat partner. You can later build a squad of three.',
@@ -87,6 +93,7 @@ export const en: Record<keyof typeof zh, string> = {
   targetAll: 'All allies', targetSelf: 'Self', targetSingle: 'One ally', lockedTile: 'Locked',
   specialRow: 'Row command', specialColumn: 'Column command', specialBurst: 'Pulse command', specialOrigin: 'Core command',
   squadHelp: 'Select up to 3. They rotate in order with 3 consecutive swaps each.', saveSquad: 'Save squad',
+  releaseCreature: 'Release Codekin', releaseConfirmTitle: 'Confirm release', releaseConfirmBody: 'Release “{name}”? This cannot be undone. The returned material depends only on its quality.', releaseReward: 'Returned material', releaseCancel: 'Keep it', releaseConfirm: 'Release', releaseLastBlocked: 'You must keep at least one Codekin', released: 'Codekin released. Quality material returned.',
   level: 'Level', levelCap: 'MAX', xp: 'XP', feed: 'Use', wins: 'Wins', dexSeen: 'Seen', dexCaught: 'Captured', undiscovered: 'Undiscovered',
   totalTurns: 'Completed turns', failures: 'Anomalies', captureCount: 'Captures', streak: 'Current streak',
   eventLog: 'Recent attribute events', emptyLog: 'No events yet.',
@@ -101,6 +108,7 @@ export const en: Record<keyof typeof zh, string> = {
   growthMaterialDescription: 'Growth item · grants {xp} XP', creatureItemDescription: 'A new {quality} companion with the {ecology} attribute',
   logCore: 'A completed event dropped a core', logMaterial: 'Growth material obtained', logIdle: 'Idle supplies claimed', logEncounter: 'A new Codekin appeared', logCapture: 'A Codekin was captured',
   logStarter: 'Your starter joined the squad', logDefeat: 'Battle retreat',
+  logRelease: 'Released a Codekin and recovered quality material',
   wildDefeated: 'The wild Codekin was defeated and dropped growth materials.', materialUsed: 'Growth material used.',
   battleStart: 'Encounter started', battleMatch: 'Matched for {amount} compute damage', battleCombo: 'Triggered a {amount}-stage cascade',
   battleArmor: 'Broke one firewall layer', battleSkill: 'Active protocol produced {amount} compute damage',

@@ -110,7 +110,7 @@ function CreatureSprite(props: {
   return (
     <img
       className={`${css.sprite} ${css[`sprite_${props.size ?? 'medium'}`]} ${props.unknown ? css.spriteUnknown : ''}`}
-      src={`/api/tracewild/assets/sprites/${props.creature.id}.png?v=soft-chibi-v2`}
+      src={`/api/tracewild/assets/sprites/${props.creature.id}.webp?v=soft-chibi-v3`}
       alt=""
       draggable={false}
     />
@@ -269,6 +269,59 @@ function AcquiredItemsModal(props: {
   )
 }
 
+function ReleaseCreatureModal(props: {
+  captured: TraceWildSnapshot['state']['creatures'][number]
+  creature: CreatureDefinition
+  t: TraceWildOverlayProps['t']
+  zh: boolean
+  busy: boolean
+  dismiss: () => void
+  confirm: () => void
+}) {
+  return (
+    <div
+      className={css.modalBackdrop}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !props.busy) props.dismiss()
+      }}
+    >
+      <section
+        className={css.releaseModal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="codekin-release-title"
+        onMouseDown={(event) => { event.stopPropagation() }}
+      >
+        <header>
+          <CreatureSprite creature={props.creature} size="medium" />
+          <div>
+            <p>RELEASE</p>
+            <h2 id="codekin-release-title">{props.t('releaseConfirmTitle')}</h2>
+            <strong>{creatureName(props.creature, props.zh)}</strong>
+          </div>
+        </header>
+        <p>{props.t('releaseConfirmBody', { name: creatureName(props.creature, props.zh) })}</p>
+        <div className={css.releaseReward}>
+          <span>{props.t('releaseReward')}</span>
+          <RewardItemTile
+            item={{ kind: 'material', quality: props.captured.quality, quantity: 1 }}
+            t={props.t}
+            zh={props.zh}
+            compact
+          />
+          <small>+{MATERIAL_XP[props.captured.quality]} EXP</small>
+        </div>
+        <div className={css.releaseActions}>
+          <button type="button" disabled={props.busy} onClick={props.dismiss}>{props.t('releaseCancel')}</button>
+          <button type="button" className={css.releaseDanger} disabled={props.busy} onClick={props.confirm}>
+            {props.t('releaseConfirm')}
+          </button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
 function percent(value: number, max: number): number {
   return max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100))
 }
@@ -314,7 +367,9 @@ function logText(
           ? 'wildDefeated'
           : entry.kind === 'tower-clear'
             ? 'towerLog'
-        : 'logDefeat'
+        : entry.kind === 'release'
+          ? 'logRelease'
+          : 'logDefeat'
   const creature = entry.creatureId === undefined ? undefined : creatureById(entry.creatureId)
   const suffix = creature === undefined ? '' : ` · ${creatureName(creature, zh)}`
   const quality = entry.quality === undefined ? '' : ` · ${t(CORE_KEYS[entry.quality])}`
@@ -374,6 +429,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   const [draggingLauncher, setDraggingLauncher] = useState(false)
   const [squadDraft, setSquadDraft] = useState<string[]>([])
   const [rewardQueue, setRewardQueue] = useState<AcquiredItem[][]>([])
+  const [releaseCandidate, setReleaseCandidate] = useState<string>()
   const latestSnapshot = useRef<TraceWildSnapshot>()
   const actionInFlight = useRef(false)
   const pendingSnapshot = useRef<TraceWildSnapshot>()
@@ -431,6 +487,13 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   }, [snapshot?.state.revision])
 
   useEffect(() => {
+    if (releaseCandidate === undefined) return
+    if (snapshot?.state.creatures.some(creature => creature.instanceId === releaseCandidate) !== true) {
+      setReleaseCandidate(undefined)
+    }
+  }, [releaseCandidate, snapshot?.state.revision])
+
+  useEffect(() => {
     if (notice === undefined) return
     const timer = window.setTimeout(() => { setNotice(undefined) }, 2_800)
     return () => { window.clearTimeout(timer) }
@@ -470,11 +533,12 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return
       if (rewardQueue.length > 0) setRewardQueue(queue => queue.slice(1))
+      else if (releaseCandidate !== undefined) setReleaseCandidate(undefined)
       else if (snapshot?.state.battle === undefined) setOpen(false)
     }
     window.addEventListener('keydown', onKey)
     return () => { window.removeEventListener('keydown', onKey) }
-  }, [open, rewardQueue.length, snapshot?.state.battle])
+  }, [open, releaseCandidate, rewardQueue.length, snapshot?.state.battle])
 
   useEffect(() => {
     const clampCurrentPosition = (): void => {
@@ -587,6 +651,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
       if (response.notice === 'skill-cast') setNotice(t('skillReleased'))
       if (response.notice === 'material-used') setNotice(t('materialUsed'))
       if (response.notice === 'idle-claimed') setNotice(t('idleClaimed'))
+      if (response.notice === 'creature-released') setNotice(t('released'))
       return response
     } catch (error) {
       if (error instanceof TraceWildConnectionError && error.code === 'invalid-action') {
@@ -615,6 +680,8 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
     void act({ type: 'claim-idle-reward' })
   }
 
+  if (state?.enabled === false) return null
+
   const launcher = (
     <button
       ref={launcherElement}
@@ -641,7 +708,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
       {pendingIdleReward === undefined
         ? <img
             className={css.launcherAvatar}
-            src="/api/tracewild/assets/sprites/codekin-launcher-v1.png"
+            src="/api/tracewild/assets/sprites/codekin-launcher-v1.webp"
             alt=""
             aria-hidden="true"
             draggable={false}
@@ -751,6 +818,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
                     setDraft={setSquadDraft}
                     busy={busy}
                     save={() => act({ type: 'set-squad', instanceIds: squadDraft })}
+                    release={setReleaseCandidate}
                   />
                 )}
                 {tab === 'dex' && <DexView state={state} t={t} zh={zh} />}
@@ -775,6 +843,26 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
                   dismiss={() => { setRewardQueue(queue => queue.slice(1)) }}
                 />
               )}
+              {releaseCandidate !== undefined && (() => {
+                const captured = state.creatures.find(row => row.instanceId === releaseCandidate)
+                const creature = captured === undefined ? undefined : creatureById(captured.creatureId)
+                if (captured === undefined || creature === undefined) return null
+                return (
+                  <ReleaseCreatureModal
+                    captured={captured}
+                    creature={creature}
+                    t={t}
+                    zh={zh}
+                    busy={busy}
+                    dismiss={() => { setReleaseCandidate(undefined) }}
+                    confirm={() => {
+                      void act({ type: 'release-creature', creatureInstanceId: captured.instanceId }).then((response) => {
+                        if (response !== undefined) setReleaseCandidate(undefined)
+                      })
+                    }}
+                  />
+                )
+              })()}
             </>
           )}
       </section>
@@ -979,6 +1067,7 @@ function SquadView(props: {
   setDraft: (value: string[]) => void
   busy: boolean
   save: () => void
+  release: (instanceId: string) => void
 }) {
   const toggle = (instanceId: string): void => {
     if (props.draft.includes(instanceId)) {
@@ -1000,24 +1089,38 @@ function SquadView(props: {
           const position = props.draft.indexOf(captured.instanceId)
           const stats = playerStats(creature.stats, captured.level, captured.quality)
           return (
-            <button
+            <article
               key={captured.instanceId}
-              type="button"
               className={`${css.creatureCard} ${position >= 0 ? css.creatureSelected : ''}`}
-              onClick={() => { toggle(captured.instanceId) }}
             >
               {position >= 0 && <span className={css.partyIndex}>{position + 1}</span>}
-              <CreatureSprite creature={creature} size="medium" />
-              <strong>{creatureName(creature, props.zh)}</strong>
-              <span>{props.t(ECOLOGY_KEYS[creature.ecology])} · {props.t(RARITY_KEYS[creature.rarity])}</span>
-              <small>{props.t('level')} {captured.level} · {props.t('quality')} {props.t(CORE_KEYS[captured.quality])} · {props.t('wins')} {captured.wins}</small>
-              <span className={css.creatureStats}>
-                <span><b>{stats.hp}</b>{props.t('statRuntime')}</span>
-                <span><b>{stats.attack}</b>{props.t('statCompute')}</span>
-                <span><b>{stats.defense}</b>{props.t('statGuard')}</span>
-                <span><b>{stats.speed}</b>{props.t('statResponse')}</span>
-              </span>
-            </button>
+              <button
+                type="button"
+                className={css.releaseButton}
+                disabled={props.busy || props.state.creatures.length <= 1}
+                title={props.state.creatures.length <= 1 ? props.t('releaseLastBlocked') : props.t('releaseCreature')}
+                aria-label={`${props.t('releaseCreature')} · ${creatureName(creature, props.zh)}`}
+                onClick={() => { props.release(captured.instanceId) }}
+              >
+                <span aria-hidden="true">↗</span>
+              </button>
+              <button
+                type="button"
+                className={css.creatureSelect}
+                onClick={() => { toggle(captured.instanceId) }}
+              >
+                <CreatureSprite creature={creature} size="medium" />
+                <strong>{creatureName(creature, props.zh)}</strong>
+                <span>{props.t(ECOLOGY_KEYS[creature.ecology])} · {props.t(RARITY_KEYS[creature.rarity])}</span>
+                <small>{props.t('level')} {captured.level} · {props.t('quality')} {props.t(CORE_KEYS[captured.quality])} · {props.t('wins')} {captured.wins}</small>
+                <span className={css.creatureStats}>
+                  <span><b>{stats.hp}</b>{props.t('statRuntime')}</span>
+                  <span><b>{stats.attack}</b>{props.t('statCompute')}</span>
+                  <span><b>{stats.defense}</b>{props.t('statGuard')}</span>
+                  <span><b>{stats.speed}</b>{props.t('statResponse')}</span>
+                </span>
+              </button>
+            </article>
           )
         })}
       </div>

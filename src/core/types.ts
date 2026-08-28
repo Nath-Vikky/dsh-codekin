@@ -230,7 +230,7 @@ export interface TraceWildTowerState {
 export interface TraceLogEntry {
   id: string
   at: number
-  kind: 'core-drop' | 'material-drop' | 'idle-reward' | 'encounter' | 'capture' | 'starter' | 'wild-defeat' | 'tower-clear' | 'defeat'
+  kind: 'core-drop' | 'material-drop' | 'idle-reward' | 'encounter' | 'capture' | 'starter' | 'wild-defeat' | 'tower-clear' | 'defeat' | 'release'
   ecology?: TraceEcology
   creatureId?: string
   quality?: CaptureCoreQuality
@@ -259,6 +259,7 @@ export interface TraceWildState {
   revision: number
   createdAt: number
   updatedAt: number
+  enabled: boolean
   starterChosen: boolean
   cores: Record<CaptureCoreQuality, number>
   materials: Record<GrowthMaterialQuality, number>
@@ -297,8 +298,10 @@ export type TraceWildAction =
   | { type: 'capture'; quality: CaptureCoreQuality }
   | { type: 'claim-idle-reward' }
   | { type: 'feed-material'; creatureInstanceId: string; quality: GrowthMaterialQuality; count: number }
+  | { type: 'release-creature'; creatureInstanceId: string }
   | { type: 'flee' }
   | { type: 'set-squad'; instanceIds: string[] }
+  | { type: 'set-enabled'; enabled: boolean }
 
 export interface TraceWildSnapshot {
   schemaVersion: 3
@@ -308,7 +311,7 @@ export interface TraceWildSnapshot {
 
 export interface TraceWildActionResponse extends TraceWildSnapshot {
   ok: true
-  notice?: 'capture-success' | 'capture-failed' | 'battle-lost' | 'wild-defeated' | 'tower-cleared' | 'skill-cast' | 'material-used' | 'idle-claimed'
+  notice?: 'capture-success' | 'capture-failed' | 'battle-lost' | 'wild-defeated' | 'tower-cleared' | 'skill-cast' | 'material-used' | 'idle-claimed' | 'creature-released'
   animation?: TraceWildBattleAnimation
 }
 

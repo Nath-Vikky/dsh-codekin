@@ -106,6 +106,7 @@ export function createInitialTraceWildState(now = Date.now()): TraceWildState {
     revision: 0,
     createdAt: now,
     updatedAt: now,
+    enabled: true,
     starterChosen: false,
     cores: emptyCores(),
     materials: emptyCores(),
@@ -201,6 +202,7 @@ export function settleTraceWildIdleRewards(
   now: number,
   random: RandomSource,
 ): TraceWildState {
+  if (!current.enabled) return current
   if (!Number.isSafeInteger(now) || now < 0) return current
   const last = current.idle.lastSettlementAt
   if (!Number.isSafeInteger(last) || last < 0) {
@@ -307,6 +309,7 @@ export function expireTraceWildEncounters(current: TraceWildState, now: number):
 }
 
 export function applyTraceSignal(current: TraceWildState, signal: TraceSignal, random: RandomSource): TraceWildState {
+  if (!current.enabled) return current
   const settled = settleTraceWildIdleRewards(current, signal.at, random)
   if (settled.processedSignals.includes(signal.id)) return settled
   const next = structuredClone(settled)
@@ -1596,13 +1599,22 @@ export function applyTraceWildAction(
   now = Date.now(),
 ): {
   state: TraceWildState
-  notice?: 'capture-success' | 'capture-failed' | 'battle-lost' | 'wild-defeated' | 'tower-cleared' | 'skill-cast' | 'material-used' | 'idle-claimed'
+  notice?: 'capture-success' | 'capture-failed' | 'battle-lost' | 'wild-defeated' | 'tower-cleared' | 'skill-cast' | 'material-used' | 'idle-claimed' | 'creature-released'
   animation?: TraceWildBattleAnimation
 } {
+  if (action.type === 'set-enabled') {
+    if (current.enabled === action.enabled) return { state: current }
+    const next = structuredClone(current)
+    next.enabled = action.enabled
+    // Disabled wall time never turns into an idle reward after re-enabling.
+    next.idle.lastSettlementAt = now
+    return { state: commit(next, now) }
+  }
+  if (!current.enabled) throw new TraceWildRuleError('conflict')
   const settled = settleTraceWildIdleRewards(current, now, random)
   const next = structuredClone(settled)
   purgeExpiredEncounters(next, now)
-  let notice: 'capture-success' | 'capture-failed' | 'battle-lost' | 'wild-defeated' | 'tower-cleared' | 'skill-cast' | 'material-used' | 'idle-claimed' | undefined
+  let notice: 'capture-success' | 'capture-failed' | 'battle-lost' | 'wild-defeated' | 'tower-cleared' | 'skill-cast' | 'material-used' | 'idle-claimed' | 'creature-released' | undefined
   let animation: TraceWildBattleAnimation | undefined
   switch (action.type) {
     case 'choose-starter': {
@@ -1711,6 +1723,28 @@ export function applyTraceWildAction(
       )
       creature.level = levelForXp(creature.xp, creature.quality)
       notice = 'material-used'
+      break
+    }
+    case 'release-creature': {
+      if (next.battle !== undefined || next.creatures.length <= 1) throw new TraceWildRuleError('conflict')
+      const creatureIndex = next.creatures.findIndex(row => row.instanceId === action.creatureInstanceId)
+      const released = next.creatures[creatureIndex]
+      if (creatureIndex < 0 || released === undefined || next.materials[released.quality] >= 9999) {
+        throw new TraceWildRuleError('invalid-action')
+      }
+      next.creatures.splice(creatureIndex, 1)
+      next.squad = next.squad.filter(id => id !== released.instanceId)
+      if (next.squad.length === 0) next.squad = [next.creatures[0]!.instanceId]
+      next.materials[released.quality] += 1
+      next.stats.materialsEarned += 1
+      logEntry(next, {
+        at: now,
+        kind: 'release',
+        creatureId: released.creatureId,
+        ecology: released.firstSignal,
+        quality: released.quality,
+      }, random)
+      notice = 'creature-released'
       break
     }
     case 'set-squad': {
@@ -1941,6 +1975,7 @@ export function restoreTraceWildState(value: unknown, now = Date.now()): TraceWi
   const root = record(value)
   if (root?.schemaVersion !== 1 && root?.schemaVersion !== 2 && root?.schemaVersion !== 3) return createInitialTraceWildState(now)
   const next = createInitialTraceWildState(now)
+  next.enabled = root.enabled !== false
   next.revision = safeInt(root.revision, 0)
   next.createdAt = safeInt(root.createdAt, now)
   next.updatedAt = safeInt(root.updatedAt, next.createdAt)

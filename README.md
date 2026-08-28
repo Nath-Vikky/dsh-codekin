@@ -18,6 +18,8 @@ requests, or agent behavior.
 - A 2D region map, 7×7 match-three battles, capture, a three-Codekin squad, and a creature index.
 - Five attribute tiles arranged in a closed advantage loop, with strong and resisted damage.
 - Level 1–100 progression, five qualities of growth material, idle supplies, and local persistence.
+- A persisted enable switch under DSH Settings → Codekin; disabling pauses event rewards and idle time without deleting progress.
+- A two-step release flow in Squad that returns one same-quality growth material regardless of the Codekin's level.
 - Three base actions per active Codekin; direct match-four refunds an action and match-five adds one.
 - A wild-battle turn may be ended early to preserve a low-runtime capture target.
 - Damage from all three squad stages is queued and resolved as one team strike at the end of the cycle.
@@ -46,7 +48,7 @@ workspace paths, or raw error bodies.
 
 ## Compatibility and status
 
-This repository currently contains the `0.2.0-alpha.1` playtest build for DeepSeek Harness Web
+This repository currently contains the `0.2.0-rc.2` playtest build for DeepSeek Harness Web
 `0.1.0-rc.5`. The package remains private while gameplay and balance are being evaluated.
 
 ## License

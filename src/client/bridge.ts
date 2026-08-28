@@ -85,6 +85,7 @@ function snapshot(value: unknown): TraceWildSnapshot {
   const row = value as Partial<TraceWildSnapshot>
   if (row.schemaVersion !== 3 || typeof row.serverTime !== 'number'
     || typeof row.state !== 'object' || row.state === null || row.state.schemaVersion !== 3
+    || typeof row.state.enabled !== 'boolean'
     || !Array.isArray(row.state.creatures) || !Array.isArray(row.state.encounters)
     || !Array.isArray(row.state.dex) || !Array.isArray(row.state.squad)) {
     throw new TypeError('invalid snapshot')

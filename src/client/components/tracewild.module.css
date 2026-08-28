@@ -1263,3 +1263,80 @@
 @media (prefers-reduced-motion: reduce) {
   .launcherReward, .launcherGift { animation: none; }
 }
+
+/* DSH settings section */
+.settingsPage {
+  width: min(720px, 100%); margin: 0 auto; padding: 12px 4px 40px; color: #2f4143;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.settingsHero {
+  display: flex; align-items: center; gap: 18px; margin-bottom: 22px; padding: 22px;
+  border: 1px solid #78a9982b; border-radius: 24px;
+  background: linear-gradient(145deg, #fff, #edf7f3 62%, #f7f1ff); box-shadow: 0 18px 48px #527f7117;
+}
+.settingsHero img { width: 74px; height: 74px; border-radius: 22px; object-fit: cover; box-shadow: 0 12px 26px #4e6f6b26; }
+.settingsHero p { margin: 0 0 3px; color: #6e988c; font-size: 11px; font-weight: 800; letter-spacing: .18em; }
+.settingsHero h2 { margin: 0; color: #2d4546; font-size: 26px; line-height: 1.1; }
+.settingsHero span { display: block; margin-top: 7px; color: #70817f; font-size: 13px; line-height: 1.55; }
+.settingsCard {
+  display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px 22px;
+  border: 1px solid #769e9226; border-radius: 20px; background: #ffffffdb; box-shadow: 0 10px 30px #526f6810;
+}
+.settingsCard > div { display: grid; gap: 6px; }
+.settingsCard strong { color: #304a4b; font-size: 15px; }
+.settingsCard > div > span { max-width: 470px; color: #788885; font-size: 12px; line-height: 1.55; }
+.settingsSwitch {
+  flex: 0 0 auto; position: relative; width: 96px; height: 40px; border: 1px solid #aabbb6;
+  border-radius: 999px; background: #e9efed; color: #667974; cursor: pointer; padding: 0 12px 0 39px;
+  font: 700 11px/1 ui-sans-serif, system-ui, sans-serif; transition: background .2s ease, border-color .2s ease, color .2s ease;
+}
+.settingsSwitch i { position: absolute; left: 4px; top: 4px; width: 30px; height: 30px; border-radius: 50%; background: #fff; box-shadow: 0 3px 10px #52645f35; transition: transform .22s cubic-bezier(.22,1,.36,1); }
+.settingsSwitchOn { border-color: #66a895; background: #74b9a5; color: #fff; padding: 0 39px 0 12px; }
+.settingsSwitchOn i { transform: translateX(56px); }
+.settingsSwitch:disabled { cursor: wait; opacity: .58; }
+.settingsStatus, .settingsError { margin: 12px 5px 0; font-size: 12px; line-height: 1.5; }
+.settingsStatus { color: #668078; } .settingsError { color: #a35f69; }
+
+/* Squad release control and confirmation */
+.creatureCard { padding: 0; cursor: default; overflow: hidden; }
+.creatureCard:hover { transform: translateY(-2px); }
+.creatureSelect {
+  width: 100%; min-height: 172px; border: 0; background: transparent; color: inherit; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; padding: 8px; font: inherit;
+}
+.creatureSelect > strong { color: #2e4345; font-size: 14px; }
+.creatureSelect > span:not(.creatureStats), .creatureSelect > small { margin-top: 4px; color: #708682; font-size: 10px; }
+.creatureSelect > small { margin-top: 7px; text-align: center; }
+.creatureSelect > .creatureStats { width: 100%; margin-top: 7px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; }
+.creatureSelect > .creatureStats > span { min-width: 0; margin: 0; border: 1px solid #6e9b8c20; border-radius: 7px; background: #f2f8f5b8; padding: 4px 2px; display: grid; gap: 2px; place-items: center; color: #708682; font-size: 8px; line-height: 1; }
+.releaseButton {
+  position: absolute; z-index: 5; right: 8px; top: 8px; width: 29px; height: 29px; border: 1px solid #c79ba036;
+  border-radius: 10px; background: #fff5f5dc; color: #a3666e; cursor: pointer; display: grid; place-items: center; padding: 0;
+  box-shadow: 0 5px 13px #8c5e6615; transition: transform .16s ease, background .16s ease, border-color .16s ease;
+}
+.releaseButton span { margin: 0; font: 700 15px/1 system-ui, sans-serif; transform: rotate(45deg); }
+.releaseButton:hover:not(:disabled) { transform: translateY(-1px); background: #fff; border-color: #bc747f70; }
+.releaseButton:disabled { cursor: not-allowed; opacity: .34; }
+.releaseModal {
+  width: min(330px, 100%); border: 1px solid #c9aaa74a; border-radius: 25px; background: #fffdfcf5; color: #3d4b4a;
+  padding: 22px; box-shadow: 0 28px 80px #65565a33; animation: rewardModalIn .24s cubic-bezier(.22,1,.36,1) both;
+}
+.releaseModal > header { display: flex; align-items: center; gap: 14px; }
+.releaseModal > header .sprite { flex: 0 0 auto; width: 84px; height: 84px; }
+.releaseModal > header p { margin: 0 0 3px; color: #b06d75; font-size: 9px; font-weight: 800; letter-spacing: .18em; }
+.releaseModal h2 { margin: 0; color: #4a4145; font-size: 21px; }
+.releaseModal header strong { display: block; margin-top: 3px; color: #7b676a; font-size: 12px; }
+.releaseModal > p { margin: 15px 0; color: #746a6c; font-size: 12px; line-height: 1.6; }
+.releaseReward { display: flex; align-items: center; gap: 10px; border: 1px solid #d5b26f35; border-radius: 17px; background: #fff9e9; padding: 10px 12px; }
+.releaseReward > span { color: #8b744d; font-size: 11px; font-weight: 700; }
+.releaseReward > small { margin-left: auto; color: #977842; font-size: 10px; font-weight: 800; }
+.releaseActions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 17px; }
+.releaseActions button { height: 39px; border: 1px solid #80999135; border-radius: 13px; background: #f4f7f5; color: #526662; cursor: pointer; font-weight: 750; }
+.releaseActions .releaseDanger { border-color: #bc7a8345; background: #aa6670; color: #fff; }
+.releaseActions button:disabled { cursor: wait; opacity: .55; }
+
+@media (max-width: 520px) {
+  .settingsHero { padding: 17px; }
+  .settingsHero img { width: 62px; height: 62px; border-radius: 18px; }
+  .settingsCard { align-items: flex-start; flex-direction: column; }
+}

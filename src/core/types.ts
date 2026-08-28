@@ -280,6 +280,8 @@ export interface TraceSignal {
   id: string
   at: number
   ecology: TraceEcology
+  /** All ecologies observed in this turn. The map still creates at most one encounter. */
+  ecologyCandidates?: TraceEcology[]
   outcome: 'completed' | 'failed'
   intensity: number
   activeMinutes: number

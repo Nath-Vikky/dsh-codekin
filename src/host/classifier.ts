@@ -7,6 +7,7 @@ interface TurnTrace {
   lumen: number
   forge: number
   relay: number
+  aegis: number
   failedTools: number
   toolCount: number
   callEcology: Map<string, TraceEcology>
@@ -18,7 +19,7 @@ interface SessionActivityClock {
 }
 
 function fresh(turn: number): TurnTrace {
-  return { turn, lumen: 0, forge: 0, relay: 0, failedTools: 0, toolCount: 0, callEcology: new Map() }
+  return { turn, lumen: 0, forge: 0, relay: 0, aegis: 0, failedTools: 0, toolCount: 0, callEcology: new Map() }
 }
 
 function classifyTool(name: string): TraceEcology {
@@ -67,6 +68,7 @@ export class TraceWildEventClassifier {
         if (ecology === 'lumen') trace.lumen += 1
         if (ecology === 'forge') trace.forge += 1
         if (ecology === 'relay') trace.relay += 1
+        if (ecology === 'aegis') trace.aegis += 1
         return undefined
       }
       case 'tool/result': {
@@ -85,6 +87,7 @@ export class TraceWildEventClassifier {
             id: signalId(session, event),
             at: event.time,
             ecology: 'glitch',
+            ecologyCandidates: ['glitch'],
             outcome: 'failed',
             intensity: Math.min(5, 1 + Math.floor(trace.toolCount / 2) + trace.failedTools),
             activeMinutes,
@@ -97,6 +100,7 @@ export class TraceWildEventClassifier {
           id: signalId(session, event),
           at: event.time,
           ecology,
+          ecologyCandidates: this.completedEcologyCandidates(trace),
           outcome: 'completed',
           intensity: Math.min(5, 1 + Math.floor(trace.toolCount / 3) + (trace.failedTools > 0 ? 2 : 0)),
           activeMinutes,
@@ -120,6 +124,7 @@ export class TraceWildEventClassifier {
       if (ecology === 'lumen') trace.lumen += 1
       if (ecology === 'forge') trace.forge += 1
       if (ecology === 'relay') trace.relay += 1
+      if (ecology === 'aegis') trace.aegis += 1
       return
     }
     if (event.type === 'tool/result') {
@@ -159,5 +164,14 @@ export class TraceWildEventClassifier {
     if (trace.forge > 0 && trace.forge >= trace.lumen) return 'forge'
     if (trace.lumen > 0) return 'lumen'
     return 'aegis'
+  }
+
+  private completedEcologyCandidates(trace: TurnTrace): TraceEcology[] {
+    const candidates: TraceEcology[] = []
+    if (trace.lumen > 0) candidates.push('lumen')
+    if (trace.forge > 0) candidates.push('forge')
+    if (trace.relay > 0) candidates.push('relay')
+    if (trace.aegis > 0 || trace.failedTools > 0) candidates.push('aegis')
+    return candidates.length > 0 ? candidates : ['aegis']
   }
 }

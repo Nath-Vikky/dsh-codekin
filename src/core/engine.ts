@@ -69,6 +69,7 @@ import type {
   TraceEcology,
   TraceLogEntry,
   TraceSignal,
+  WildEncounter,
   TraceWildAction,
   TraceWildBattleAnimation,
   TraceWildIdleReward,
@@ -264,15 +265,15 @@ function mapPoint(ecology: TraceEcology, random: RandomSource): { mapX: number; 
   }
 }
 
-function pickCreature(signal: TraceSignal, random: RandomSource): string {
-  if (signal.ecology === 'glitch' && signal.variant !== undefined && boundedRandom(random) < 0.78) {
+function pickCreature(signal: TraceSignal, ecology: TraceEcology, random: RandomSource): string {
+  if (ecology === 'glitch' && signal.variant !== undefined && boundedRandom(random) < 0.78) {
     return ({
       missing: 'glitch-null-nibbler', stack: 'glitch-stack-weaver', timeout: 'glitch-lagtoad',
       crash: 'glitch-crashfox', overflow: 'glitch-overflow-maw',
     } as const)[signal.variant]
   }
   const intensity = Math.min(5, Math.max(0, signal.intensity))
-  const candidates = creaturesInEcology(signal.ecology)
+  const candidates = creaturesInEcology(ecology)
   const weights = candidates.map((creature) => {
     switch (creature.rarity) {
       case 'common': return 38
@@ -287,6 +288,37 @@ function pickCreature(signal: TraceSignal, random: RandomSource): string {
     if (cursor < 0) return candidates[index]!.id
   }
   return candidates[0]!.id
+}
+
+const REGION_DIVERSITY_THRESHOLD = 5
+
+function chooseEncounterEcology(
+  encounters: readonly WildEncounter[],
+  signal: TraceSignal,
+  random: RandomSource,
+): TraceEcology {
+  const counts = Object.fromEntries(TRACE_ECOLOGIES.map(ecology => [ecology, 0])) as Record<TraceEcology, number>
+  for (const encounter of encounters) counts[encounter.ecology] += 1
+
+  const candidates = Array.from(new Set(
+    (signal.ecologyCandidates ?? [signal.ecology]).filter(ecology => TRACE_ECOLOGIES.includes(ecology)),
+  ))
+  if (candidates.length === 0) candidates.push(signal.ecology)
+
+  let pool: TraceEcology[]
+  if (candidates.length > 1) {
+    // A mixed turn still creates one encounter, weighted toward the scarcer observed ecology.
+    pool = candidates
+  } else if (counts[candidates[0]!] > REGION_DIVERSITY_THRESHOLD) {
+    // A single repeatedly observed ecology may reach six residents, then new activity diversifies the map.
+    pool = TRACE_ECOLOGIES.filter(ecology => ecology !== candidates[0])
+  } else {
+    return candidates[0]!
+  }
+
+  const leastResidents = Math.min(...pool.map(ecology => counts[ecology]))
+  const tied = pool.filter(ecology => counts[ecology] === leastResidents)
+  return tied[Math.floor(boundedRandom(random) * tied.length)] ?? tied[0]!
 }
 
 function purgeExpiredEncounters(state: TraceWildState, now: number): void {
@@ -328,14 +360,15 @@ export function applyTraceSignal(current: TraceWildState, signal: TraceSignal, r
     next.stats.currentSuccessStreak = 0
   }
   if (next.encounters.length < MAX_MAP_ENCOUNTERS) {
-    const creatureId = pickCreature(signal, random)
+    const encounterEcology = chooseEncounterEcology(next.encounters, signal, random)
+    const creatureId = pickCreature(signal, encounterEcology, random)
     const quality = chooseWildQuality(next, signal.activeMinutes, random)
     const level = wildLevelForRoster(next.creatures, signal.activeMinutes, quality, boundedRandom(random))
-    const point = mapPoint(signal.ecology, random)
+    const point = mapPoint(encounterEcology, random)
     next.encounters.push({
       id: randomId('wild', signal.at, random),
       creatureId,
-      ecology: signal.ecology,
+      ecology: encounterEcology,
       quality,
       level,
       captureAttempts: 0,
@@ -346,7 +379,7 @@ export function applyTraceSignal(current: TraceWildState, signal: TraceSignal, r
       ...point,
     })
     updateDex(next, creatureId, signal.at, false)
-    logEntry(next, { at: signal.at, kind: 'encounter', creatureId, ecology: signal.ecology, quality }, random)
+    logEntry(next, { at: signal.at, kind: 'encounter', creatureId, ecology: encounterEcology, quality }, random)
   } else {
     next.materials.pebble += 1
     next.stats.materialsEarned += 1

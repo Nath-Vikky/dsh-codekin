@@ -77,11 +77,39 @@ describe('TraceWild match battle', () => {
       }, low)
     }
     expect(state.encounters).toHaveLength(MAX_MAP_ENCOUNTERS)
+    expect(state.encounters.filter(encounter => encounter.ecology === 'lumen')).toHaveLength(6)
+    expect(state.encounters.some(encounter => encounter.ecology !== 'lumen')).toBe(true)
     expect(state.materials.pebble).toBe(1)
 
     const lastExpiry = Math.max(...state.encounters.map(encounter => encounter.expiresAt))
     const expired = expireTraceWildEncounters(state, lastExpiry)
     expect(expired.encounters).toHaveLength(0)
+  })
+
+  it('balances mixed turns toward the scarcer observed ecology and randomizes exact ties', () => {
+    let state = createInitialTraceWildState(100)
+    for (let index = 0; index < 2; index += 1) {
+      state = applyTraceSignal(state, {
+        id: `forge-seed-${index}`, at: 200 + index, ecology: 'forge', outcome: 'completed',
+        intensity: 1, activeMinutes: 0, enhanced: false,
+      }, low)
+    }
+    state = applyTraceSignal(state, {
+      id: 'lumen-seed', at: 210, ecology: 'lumen', outcome: 'completed',
+      intensity: 1, activeMinutes: 0, enhanced: false,
+    }, low)
+
+    state = applyTraceSignal(state, {
+      id: 'mixed-minority', at: 220, ecology: 'forge', ecologyCandidates: ['lumen', 'forge'],
+      outcome: 'completed', intensity: 2, activeMinutes: 0, enhanced: false,
+    }, low)
+    expect(state.encounters.at(-1)?.ecology).toBe('lumen')
+
+    state = applyTraceSignal(state, {
+      id: 'mixed-tie', at: 230, ecology: 'forge', ecologyCandidates: ['lumen', 'forge'],
+      outcome: 'completed', intensity: 2, activeMinutes: 0, enhanced: false,
+    }, () => 0.999)
+    expect(state.encounters.at(-1)?.ecology).toBe('forge')
   })
 
   it('derives ordinary wild levels from the whole roster and raises special qualities above its maximum', () => {

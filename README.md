@@ -14,6 +14,7 @@ requests, or agent behavior.
 - Five capture-core qualities earned through ordinary DSH use.
 - Event-driven encounters, including uncommon creatures associated with failed or recovered runs.
 - Up to seven wild map residents, with long-lived common finds and shorter windows for high-level rare encounters.
+- Mixed DSH activity replenishes the least represented matching region; after one region grows beyond five residents, repeated single-attribute activity is diverted to a scarcer region.
 - Ordinary wild levels stay between the lowest and highest levels in the complete roster; Nova and Origin appear as over-level special challenges.
 - A 2D region map, 7×7 match-three battles, capture, a three-Codekin squad, and a creature index.
 - Five attribute tiles arranged in a closed advantage loop, with strong and resisted damage.
@@ -48,7 +49,7 @@ workspace paths, or raw error bodies.
 
 ## Compatibility and status
 
-This repository currently contains the `0.2.0-rc.2` playtest build for DeepSeek Harness Web
+This repository currently contains the `0.2.0-rc.3` playtest build for DeepSeek Harness Web
 `0.1.0-rc.5`. The package remains private while gameplay and balance are being evaluated.
 
 ## License

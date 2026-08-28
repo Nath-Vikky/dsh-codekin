@@ -37,16 +37,40 @@ export function normalizeTraceWildAction(value: unknown): TraceWildAction {
     case 'start-battle':
       exactKeys(row, ['type', 'encounterId'])
       return { type: 'start-battle', encounterId: safeId(row.encounterId, 'wild_') }
+    case 'start-tower':
+      exactKeys(row, ['type'])
+      return { type: 'start-tower' }
     case 'battle-swap':
       exactKeys(row, ['type', 'from', 'to'])
       return { type: 'battle-swap', from: boardIndex(row.from), to: boardIndex(row.to) }
     case 'battle-cast':
       exactKeys(row, ['type', 'creatureInstanceId'])
       return { type: 'battle-cast', creatureInstanceId: safeId(row.creatureInstanceId, 'pet_') }
+    case 'battle-skip-stage':
+      exactKeys(row, ['type'])
+      return { type: 'battle-skip-stage' }
+    case 'battle-continue':
+      exactKeys(row, ['type'])
+      return { type: 'battle-continue' }
     case 'capture':
       exactKeys(row, ['type', 'quality'])
       if (!CAPTURE_CORE_QUALITIES.includes(row.quality as never)) throw new TypeError('invalid action')
       return { type: 'capture', quality: row.quality as CaptureCoreQuality }
+    case 'claim-idle-reward':
+      exactKeys(row, ['type'])
+      return { type: 'claim-idle-reward' }
+    case 'feed-material':
+      exactKeys(row, ['type', 'creatureInstanceId', 'quality', 'count'])
+      if (!CAPTURE_CORE_QUALITIES.includes(row.quality as never)
+        || !Number.isSafeInteger(row.count) || (row.count as number) < 1 || (row.count as number) > 99) {
+        throw new TypeError('invalid action')
+      }
+      return {
+        type: 'feed-material',
+        creatureInstanceId: safeId(row.creatureInstanceId, 'pet_'),
+        quality: row.quality as CaptureCoreQuality,
+        count: row.count as number,
+      }
     case 'flee':
       exactKeys(row, ['type'])
       return { type: 'flee' }

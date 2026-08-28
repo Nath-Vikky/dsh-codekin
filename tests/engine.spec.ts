@@ -1,13 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import { CREATURE_CATALOG } from '../src/core/catalog.ts'
 import {
+  MAX_MAP_ENCOUNTERS,
+  encounterLifetimeMs,
+  playerStats,
+  totalXpForLevel,
+  wildLevelForRoster,
+  wildStats,
+  xpToNextLevel,
+} from '../src/core/balance.ts'
+import {
   applyTraceSignal,
   applyTraceWildAction,
   createInitialTraceWildState,
+  expireTraceWildEncounters,
   restoreTraceWildState,
+  settleTraceWildIdleRewards,
 } from '../src/core/engine.ts'
 import { findFirstLegalBattleSwap } from '../src/core/match3.ts'
 import { CREATURE_SKILLS } from '../src/core/skills.ts'
+import { towerFloorProfile } from '../src/core/tower.ts'
 import type { TraceWildState } from '../src/core/types.ts'
 
 const low = (): number => 0
@@ -21,7 +33,7 @@ function battleState(): TraceWildState {
   ).state
   state = applyTraceSignal(state, {
     id: 'turn-3', at: 200, ecology: 'glitch', outcome: 'failed', intensity: 5,
-    enhanced: true, variant: 'missing',
+    activeMinutes: 0, enhanced: true, variant: 'missing',
   }, low)
   return applyTraceWildAction(state, { type: 'start-battle', encounterId: state.encounters[0]!.id }, low, 210).state
 }
@@ -38,31 +50,175 @@ describe('TraceWild match battle', () => {
   it('drops one core, spawns one encounter, and applies a signal idempotently', () => {
     const initial = createInitialTraceWildState(100)
     const signal = {
-      id: 'turn-1', at: 200, ecology: 'lumen', outcome: 'completed', intensity: 2, enhanced: false,
+      id: 'turn-1', at: 200, ecology: 'lumen', outcome: 'completed', intensity: 2, activeMinutes: 0, enhanced: false,
     } as const
     const next = applyTraceSignal(initial, signal, low)
-    expect(next.schemaVersion).toBe(2)
+    expect(next.schemaVersion).toBe(3)
     expect(next.cores.pebble).toBe(1)
     expect(next.encounters).toHaveLength(1)
+    expect(next.encounters[0]).toMatchObject({
+      quality: 'pebble', level: 1, captureAttempts: 0,
+      expiresAt: 200 + encounterLifetimeMs('pebble', 1),
+    })
     expect(applyTraceSignal(next, signal, low)).toBe(next)
   })
 
-  it('creates a playable 7x7 board and rotates after three valid swaps', () => {
+  it('caps the ecology map at seven residents and expires them by quality and level', () => {
+    expect(MAX_MAP_ENCOUNTERS).toBe(7)
+    expect(encounterLifetimeMs('pebble', 1)).toBe(24 * 60 * 60 * 1000)
+    expect(encounterLifetimeMs('origin', 100)).toBe(30 * 60 * 1000)
+    expect(encounterLifetimeMs('nova', 100)).toBe(40 * 60 * 1000)
+
+    let state = createInitialTraceWildState(100)
+    for (let index = 0; index < MAX_MAP_ENCOUNTERS + 1; index += 1) {
+      state = applyTraceSignal(state, {
+        id: `map-cap-${index}`, at: 200 + index, ecology: 'lumen', outcome: 'completed',
+        intensity: 1, activeMinutes: 0, enhanced: false,
+      }, low)
+    }
+    expect(state.encounters).toHaveLength(MAX_MAP_ENCOUNTERS)
+    expect(state.materials.pebble).toBe(1)
+
+    const lastExpiry = Math.max(...state.encounters.map(encounter => encounter.expiresAt))
+    const expired = expireTraceWildEncounters(state, lastExpiry)
+    expect(expired.encounters).toHaveLength(0)
+  })
+
+  it('derives ordinary wild levels from the whole roster and raises special qualities above its maximum', () => {
+    const lowHeavy = [{ level: 10 }, { level: 10 }, { level: 40 }]
+    const highHeavy = [{ level: 10 }, { level: 40 }, { level: 40 }]
+    const lowWeighted = wildLevelForRoster(lowHeavy, 0, 'pulse', 0.5)
+    const highWeighted = wildLevelForRoster(highHeavy, 0, 'pulse', 0.5)
+    expect(lowWeighted).toBeGreaterThanOrEqual(10)
+    expect(highWeighted).toBeLessThanOrEqual(40)
+    expect(highWeighted).toBeGreaterThan(lowWeighted)
+    expect(wildLevelForRoster(highHeavy, 30, 'nova', 0)).toBeGreaterThan(40)
+    expect(wildLevelForRoster(highHeavy, 30, 'origin', 0)).toBeGreaterThan(
+      wildLevelForRoster(highHeavy, 30, 'nova', 0),
+    )
+  })
+
+  it('protects an elapsed encounter only while its battle remains active', () => {
+    let state = applyTraceSignal(createInitialTraceWildState(100), {
+      id: 'timed-battle', at: 200, ecology: 'lumen', outcome: 'completed',
+      intensity: 1, activeMinutes: 0, enhanced: false,
+    }, low)
+    const expiresAt = state.encounters[0]!.expiresAt
+    state = applyTraceWildAction(
+      state,
+      { type: 'choose-starter', creatureId: 'aegis-veribud' },
+      low,
+      210,
+    ).state
+    state = applyTraceWildAction(state, { type: 'start-battle', encounterId: state.encounters[0]!.id }, low, 220).state
+    expect(expireTraceWildEncounters(state, expiresAt).encounters).toHaveLength(1)
+    expect(restoreTraceWildState(state, expiresAt)).toMatchObject({
+      encounters: [{ id: state.encounters[0]!.id }],
+      battle: { encounterId: state.encounters[0]!.id },
+    })
+
+    const fled = applyTraceWildAction(state, { type: 'flee' }, low, expiresAt + 1).state
+    expect(fled.battle).toBeUndefined()
+    expect(fled.encounters).toHaveLength(0)
+  })
+
+  it('keeps idle supplies pending until the player explicitly claims them', () => {
+    const pending = settleTraceWildIdleRewards(createInitialTraceWildState(100), 3_600_100, low)
+    expect(pending.cores.pebble).toBe(0)
+    expect(pending.materials.pebble).toBe(0)
+    expect(pending.idle.pendingReward).toMatchObject({
+      elapsedMinutes: 60,
+      coreQuality: 'pebble',
+      materials: { pebble: 1 },
+    })
+
+    const claimed = applyTraceWildAction(pending, { type: 'claim-idle-reward' }, low, 3_600_200)
+    expect(claimed.notice).toBe('idle-claimed')
+    expect(claimed.state.cores.pebble).toBe(1)
+    expect(claimed.state.materials.pebble).toBe(1)
+    expect(claimed.state.idle.pendingReward).toBeUndefined()
+    expect(claimed.state.idle.lastReward?.elapsedMinutes).toBe(60)
+  })
+
+  it('advances the endless tower one Host-derived floor and settles materials once', () => {
+    let state = applyTraceWildAction(
+      createInitialTraceWildState(100),
+      { type: 'choose-starter', creatureId: 'aegis-veribud' },
+      low,
+      150,
+    ).state
+    state = applyTraceWildAction(state, { type: 'start-tower' }, low, 200).state
+    expect(state.battle).toMatchObject({
+      mode: 'tower', towerFloor: 1, wildLevel: 2, wildQuality: 'pebble', bossSkillTier: 1,
+      captureWindow: false,
+    })
+    expect(restoreTraceWildState(state, 205).battle).toMatchObject({ mode: 'tower', towerFloor: 1 })
+    state.battle!.wildArmor = 0
+    state.battle!.wildHp = 1
+    let cleared: ReturnType<typeof applyTraceWildAction> | undefined
+    for (let move = 0; move < 8 && state.battle !== undefined; move += 1) {
+      const swap = findFirstLegalBattleSwap(state.battle.board)!
+      const result = applyTraceWildAction(state, { type: 'battle-swap', ...swap }, low, 210 + move)
+      state = result.state
+      if (result.notice === 'tower-cleared') cleared = result
+    }
+    expect(cleared).toBeDefined()
+    if (cleared === undefined) throw new Error('tower did not settle')
+    expect(cleared.notice).toBe('tower-cleared')
+    expect(cleared.state.battle).toBeUndefined()
+    expect(cleared.state.tower).toMatchObject({ highestClearedFloor: 1, attempts: 1, clears: 1 })
+    expect(Object.values(cleared.state.tower.lastReward!.materials).reduce((sum, count) => sum + count, 0)).toBe(1)
+    expect(Object.values(cleared.state.materials).reduce((sum, count) => sum + count, 0)).toBe(1)
+    expect(towerFloorProfile(10)).toMatchObject({ quality: 'pulse', skillTier: 2, milestoneMaterial: true })
+    expect(towerFloorProfile(80)).toMatchObject({ quality: 'origin', skillTier: 5, startingBossEnergy: 12 })
+  })
+
+  it('creates a playable 7x7 board and advances after the active creature spends its actions', () => {
     let state = battleState()
     expect(state.battle?.board).toHaveLength(49)
-    for (let move = 0; move < 3; move += 1) {
+    state.battle!.wildHp = 9999
+    state.battle!.wildMaxHp = 9999
+    let moves = 0
+    while (state.battle?.stage === 1 && state.battle.turnOwner === 'player' && moves < 20) {
       const swap = findFirstLegalBattleSwap(state.battle!.board)
       expect(swap).toBeDefined()
-      const result = applyTraceWildAction(state, { type: 'battle-swap', ...swap! }, low, 220 + move)
+      const result = applyTraceWildAction(state, { type: 'battle-swap', ...swap! }, low, 220 + moves)
       expect(result.animation?.frames[0]).toMatchObject({ chain: 1 })
       expect(result.animation?.frames[0]?.removed.length).toBeGreaterThanOrEqual(3)
       expect(result.animation?.frames[0]?.fallRows).toHaveLength(49)
       expect(Math.max(...(result.animation?.frames[0]?.fallRows ?? []))).toBeGreaterThan(0)
       state = result.state
+      moves += 1
     }
+    expect(moves).toBeGreaterThanOrEqual(3)
+    expect(state.battle?.turnOwner).toBe('boss')
+    expect(state.battle?.bossActionsRemaining).toBe(3)
+    let bossMoves = 0
+    while (state.battle?.turnOwner === 'boss' && bossMoves < 10) {
+      const result = applyTraceWildAction(state, { type: 'battle-continue' }, low, 260 + bossMoves)
+      expect(result.animation?.frames.length).toBeGreaterThan(0)
+      state = result.state
+      bossMoves += 1
+    }
+    expect(bossMoves).toBeGreaterThanOrEqual(3)
+    expect(bossMoves).toBeLessThanOrEqual(7)
     expect(state.battle?.actionsRemaining).toBe(3)
     expect(state.battle?.stage).toBe(2)
     expect(state.battle?.round).toBe(2)
+    expect(state.battle?.lastTeamStrike).toBeGreaterThan(0)
+    expect(state.battle?.lastBossAttack).toBeGreaterThan(0)
+    expect(state.battle?.log.some(row => row.kind === 'boss-match')).toBe(true)
+  })
+
+  it('lets a player end a wild Codekin stage without dealing more damage', () => {
+    const state = battleState()
+    state.battle!.wildArmor = 0
+    state.battle!.wildMaxHp = 100
+    state.battle!.wildHp = 40
+    state.battle!.pendingTeamDamage = 0
+    const result = applyTraceWildAction(state, { type: 'battle-skip-stage' }, low, 225)
+    expect(result.state.battle).toMatchObject({ captureWindow: true, wildHp: 40, actionsRemaining: 0 })
+    expect(result.state.battle?.log.at(-1)).toMatchObject({ kind: 'stage-skip' })
   })
 
   it('charges and casts the active creature skill without consuming a swap', () => {
@@ -81,11 +237,35 @@ describe('TraceWild match battle', () => {
     const state = battleState()
     state.battle!.wildArmor = 0
     state.battle!.wildHp = 1
+    state.battle!.captureWindow = true
     state.cores.origin = 1
     const result = applyTraceWildAction(state, { type: 'capture', quality: 'origin' }, low, 240)
     expect(result.notice).toBe('capture-success')
     expect(result.state.battle).toBeUndefined()
-    expect(result.state.creatures.at(-1)?.quality).toBe('origin')
+    expect(result.state.creatures.at(-1)?.quality).toBe('pebble')
+  })
+
+  it('applies a boss party sweep to every living squad member', () => {
+    let state = battleState()
+    const first = state.battle!.party[0]!
+    state.battle!.party.push(
+      { ...first, instanceId: 'pet_test_sweep_00000001' },
+      { ...first, instanceId: 'pet_test_sweep_00000002' },
+    )
+    state.battle!.enemyIntent = 'sweep'
+    state.battle!.enemyTargetScope = 'all'
+    delete state.battle!.enemyTargetIndex
+    state.battle!.captureWindow = true
+    state.battle!.wildAttack = 20
+    const before = state.battle!.party.map(member => member.hp)
+    state = applyTraceWildAction(state, { type: 'battle-continue' }, low, 245).state
+    let bossMoves = 0
+    while (state.battle?.turnOwner === 'boss' && bossMoves < 10) {
+      state = applyTraceWildAction(state, { type: 'battle-continue' }, low, 246 + bossMoves).state
+      bossMoves += 1
+    }
+    expect(state.battle?.party.every((member, index) => member.hp < before[index]!)).toBe(true)
+    expect(state.battle?.log.some(row => row.kind === 'enemy-sweep')).toBe(true)
   })
 
   it('migrates schema-v1 creatures to Prism quality and drops the legacy battle', () => {
@@ -95,8 +275,39 @@ describe('TraceWild match battle', () => {
     const creatures = legacy.creatures as Array<Record<string, unknown>>
     for (const creature of creatures) delete creature.quality
     const restored = restoreTraceWildState(legacy, 500)
-    expect(restored.schemaVersion).toBe(2)
+    expect(restored.schemaVersion).toBe(3)
     expect(restored.creatures.every(creature => creature.quality === 'prism')).toBe(true)
     expect(restored.battle).toBeUndefined()
+  })
+
+  it('makes quality affect base stats, growth, training cost, and over-level boss pressure', () => {
+    const creature = CREATURE_CATALOG.find(row => row.id === 'glitch-overflow-maw')!
+    const pebbleLevel1 = playerStats(creature.stats, 1, 'pebble')
+    const prismLevel1 = playerStats(creature.stats, 1, 'prism')
+    const originLevel1 = playerStats(creature.stats, 1, 'origin')
+    const pebbleLevel100 = playerStats(creature.stats, 100, 'pebble')
+    const originLevel100 = playerStats(creature.stats, 100, 'origin')
+    expect(pebbleLevel1.attack).toBeLessThan(prismLevel1.attack)
+    expect(prismLevel1.attack).toBeLessThan(originLevel1.attack)
+    expect(originLevel100.attack - originLevel1.attack).toBeGreaterThan(pebbleLevel100.attack - pebbleLevel1.attack)
+    expect(xpToNextLevel(50, 'origin')).toBeGreaterThan(xpToNextLevel(50, 'prism'))
+    expect(totalXpForLevel(100, 'origin')).toBeGreaterThan(totalXpForLevel(100, 'nova'))
+
+    const equalLevelBoss = wildStats(creature, 22, 'origin', 1, 22)
+    const overLevelBoss = wildStats(creature, 22, 'origin', 1, 1)
+    expect(overLevelBoss.hp).toBeGreaterThan(equalLevelBoss.hp * 1.3)
+    expect(overLevelBoss.attack).toBeGreaterThan(equalLevelBoss.attack)
+
+    const saved = createInitialTraceWildState(600)
+    saved.schemaVersion = 3
+    saved.creatures.push({
+      instanceId: 'pet_restore_origin_00000001', creatureId: creature.id, quality: 'origin',
+      level: 22, xp: 0, wins: 0, caughtAt: 600, firstSignal: creature.ecology,
+    })
+    saved.starterChosen = true
+    saved.squad = [saved.creatures[0]!.instanceId]
+    const restored = restoreTraceWildState(saved, 700)
+    expect(restored.creatures[0]?.level).toBe(22)
+    expect(restored.creatures[0]?.xp).toBe(totalXpForLevel(22, 'origin'))
   })
 })

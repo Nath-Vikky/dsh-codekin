@@ -1,7 +1,7 @@
 {
-  "name": "@nath-vikky/dsh-tracewild",
-  "description": "Event-driven pixel creature collection and battle game for DeepSeek Harness",
-  "version": "0.2.0-alpha.1",
+  "name": "@nath-vikky/dsh-codekin",
+  "description": "Codekin creature collection and match-three RPG for DeepSeek Harness Web",
+  "version": "0.2.0-rc.1",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.7.0",
@@ -61,13 +61,13 @@
     "typescript": "6.0.3",
     "vitest": "4.1.11"
   },
-  "repository": { "type": "git", "url": "https://github.com/Nath-Vikky/dsh-tracewild.git" },
-  "keywords": ["deepseek-harness", "dsh-plugin", "pixel-art", "creature-collector", "match-3"],
+  "repository": { "type": "git", "url": "https://github.com/Nath-Vikky/dsh-codekin.git" },
+  "keywords": ["deepseek-harness", "dsh-plugin", "codekin", "creature-collector", "match-3", "game"],
   "license": "MIT",
   "files": [
     "lib/index.js", "lib/index.js.map", "lib/client.js", "lib/client.js.map",
     "lib/types/**/*.d.ts", "lib/types/**/*.d.ts.map",
     "assets/creatures/sprite-gallery-v1.png", "assets/creatures/sprites",
-    "cordis.patch.yml", "README.md", "README.zh-CN.md"
+    "cordis.patch.yml", "LICENSE", "README.md", "README.zh-CN.md"
   ]
 }

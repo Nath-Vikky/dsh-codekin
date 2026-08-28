@@ -31,10 +31,10 @@ export const CORE_CAPTURE_MULTIPLIERS: Readonly<Record<CaptureCoreQuality, numbe
 })
 
 const RARITY_STATS: Readonly<Record<TraceRarity, CreatureStats>> = Object.freeze({
-  common: Object.freeze({ hp: 58, attack: 15, defense: 11, speed: 14 }),
-  uncommon: Object.freeze({ hp: 66, attack: 18, defense: 14, speed: 16 }),
-  rare: Object.freeze({ hp: 76, attack: 22, defense: 17, speed: 18 }),
-  apex: Object.freeze({ hp: 92, attack: 27, defense: 21, speed: 20 }),
+  common: Object.freeze({ hp: 36, attack: 7, defense: 5, speed: 10 }),
+  uncommon: Object.freeze({ hp: 39, attack: 8, defense: 6, speed: 11 }),
+  rare: Object.freeze({ hp: 42, attack: 9, defense: 7, speed: 12 }),
+  apex: Object.freeze({ hp: 46, attack: 10, defense: 8, speed: 13 }),
 })
 
 type CatalogRow = readonly [

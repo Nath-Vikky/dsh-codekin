@@ -13,6 +13,7 @@ const MAX_ACTION_BODY_BYTES = 4 * 1024
 const HEARTBEAT_MS = 15_000
 
 const ASSET_FILES = new Set([
+  'sprites/codekin-launcher-v1.png',
   ...CREATURE_CATALOG.map(creature => `sprites/${creature.id}.png`),
 ])
 

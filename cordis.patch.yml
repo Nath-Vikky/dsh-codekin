@@ -1,4 +1,4 @@
-# Mount TraceWild after the standard session and Web services.
+# Mount Codekin after the standard session and Web services.
 - insert:
-    - id: dsh-tracewild
-      name: '@nath-vikky/dsh-tracewild'
+    - id: dsh-codekin
+      name: '@nath-vikky/dsh-codekin'

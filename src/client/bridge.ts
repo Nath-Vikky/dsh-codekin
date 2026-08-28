@@ -26,10 +26,18 @@ function plainRecord(value: unknown): Record<string, unknown> {
 
 function matchTile(value: unknown): MatchTile {
   const row = plainRecord(value)
-  if (Object.keys(row).length !== 2 || !('ecology' in row) || !('special' in row)
+  const keys = Object.keys(row)
+  if ((keys.length !== 2 && keys.length !== 3) || !('ecology' in row) || !('special' in row)
+    || keys.some(key => key !== 'ecology' && key !== 'special' && key !== 'lockedActions')
     || !TRACE_ECOLOGIES.includes(row.ecology as never)
     || !TILE_SPECIALS.includes(row.special as never)) throw new TypeError('invalid animation')
-  return { ecology: row.ecology as MatchTile['ecology'], special: row.special as MatchTile['special'] }
+  if (row.lockedActions !== undefined && (!Number.isSafeInteger(row.lockedActions)
+    || (row.lockedActions as number) < 1 || (row.lockedActions as number) > 2)) throw new TypeError('invalid animation')
+  return {
+    ecology: row.ecology as MatchTile['ecology'],
+    special: row.special as MatchTile['special'],
+    ...(row.lockedActions === undefined ? {} : { lockedActions: row.lockedActions as number }),
+  }
 }
 
 function matchBoard(value: unknown): MatchTile[] {
@@ -75,8 +83,8 @@ function battleAnimation(value: unknown): TraceWildBattleAnimation {
 function snapshot(value: unknown): TraceWildSnapshot {
   if (typeof value !== 'object' || value === null) throw new TypeError('invalid snapshot')
   const row = value as Partial<TraceWildSnapshot>
-  if (row.schemaVersion !== 2 || typeof row.serverTime !== 'number'
-    || typeof row.state !== 'object' || row.state === null || row.state.schemaVersion !== 2
+  if (row.schemaVersion !== 3 || typeof row.serverTime !== 'number'
+    || typeof row.state !== 'object' || row.state === null || row.state.schemaVersion !== 3
     || !Array.isArray(row.state.creatures) || !Array.isArray(row.state.encounters)
     || !Array.isArray(row.state.dex) || !Array.isArray(row.state.squad)) {
     throw new TypeError('invalid snapshot')

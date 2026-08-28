@@ -1,37 +1,46 @@
-# TraceWild
+# Codekin
 
 [简体中文](README.zh-CN.md)
 
-TraceWild is a pixel-creature collection and battle plugin for DeepSeek Harness Web. It turns
+Codekin is a creature-collection and match-three battle plugin for DeepSeek Harness Web. It turns
 high-level DSH runtime outcomes into local game events without changing prompts, tools, model
 requests, or agent behavior.
 
-![The first 25 TraceWild creatures](assets/creatures/sprite-gallery-v1.png)
+![The first 25 Codekin](assets/creatures/sprite-gallery-v1.png)
 
 ## What it includes
 
-- Five creature habitats and 25 initial creatures.
+- Five clear computing attributes—Compute, Compile, Network, Guard, and Glitch—and 25 initial Codekin.
 - Five capture-core qualities earned through ordinary DSH use.
 - Event-driven encounters, including uncommon creatures associated with failed or recovered runs.
-- A 2D region map, 7×7 match-three battles, capture, a three-creature squad, and a creature index.
-- Five tile ecologies arranged in a closed advantage loop, with strong and resisted damage.
-- Three consecutive swaps per active creature, energy gained from matching its ecology, and one
-  passive plus one active ability for every creature.
+- Up to seven wild map residents, with long-lived common finds and shorter windows for high-level rare encounters.
+- Ordinary wild levels stay between the lowest and highest levels in the complete roster; Nova and Origin appear as over-level special challenges.
+- A 2D region map, 7×7 match-three battles, capture, a three-Codekin squad, and a creature index.
+- Five attribute tiles arranged in a closed advantage loop, with strong and resisted damage.
+- Level 1–100 progression, five qualities of growth material, idle supplies, and local persistence.
+- Three base actions per active Codekin; direct match-four refunds an action and match-five adds one.
+- A wild-battle turn may be ended early to preserve a low-runtime capture target.
+- Damage from all three squad stages is queued and resolved as one team strike at the end of the cycle.
+- Wild Codekin use separate Boss scaling and can telegraph single-target attacks, party-wide attacks,
+  tile locks, freezes, and phase shields according to their level and quality.
+- Matching a Codekin's attribute builds command points, and every Codekin has one passive plus one active ability.
 - Match-four, match-five, and intersecting clears create row, column, burst, and origin tiles.
 - Host-validated game actions and atomic local persistence.
 
 ## How it works
 
 Use DSH normally. Completed activity can award a capture core and create an encounter. Open the
-TraceWild launcher to explore the map, build a squad, and enter a match-three encounter. Swap
-adjacent tiles to attack and charge matching squad members; after each creature's three swaps, the
-next available member takes the field. Weaken and disarm a wild creature before choosing which
-capture-core quality to spend. TraceWild does not submit prompts, invoke tools, or alter
+Codekin launcher to explore the map, build a squad, and enter a command match encounter. Swap
+adjacent tiles to queue compute damage and charge matching squad members; after all three squad stages, a
+single team strike resolves against the Boss. Defeating wild Codekin drops growth materials. A
+capture decision appears after a qualifying team strike, with odds based on remaining runtime and the
+capture-core quality. Encounter level and quality reflect effective activity time in the current session.
+Codekin does not submit prompts, invoke tools, or alter
 conversations.
 
 ## Data behavior
 
-Game progress is stored locally by the plugin. TraceWild records bounded game events and aggregate
+Game progress is stored locally by the plugin. Codekin records bounded game events and aggregate
 runtime outcomes; it does not store prompt text, assistant responses, tool arguments, commands,
 workspace paths, or raw error bodies.
 

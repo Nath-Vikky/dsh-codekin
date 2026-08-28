@@ -1,7 +1,12 @@
 import { randomInt } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
-import { applyTraceSignal, applyTraceWildAction } from '../core/engine.ts'
+import {
+  applyTraceSignal,
+  applyTraceWildAction,
+  expireTraceWildEncounters,
+  settleTraceWildIdleRewards,
+} from '../core/engine.ts'
 import type {
   RandomSource,
   TraceWildAction,
@@ -33,10 +38,22 @@ export class TraceWildService {
     this.random = options.random ?? cryptoRandom
     this.now = options.now ?? Date.now
     this.stateValue = this.persistence.load(this.now())
+    const settled = settleTraceWildIdleRewards(this.stateValue, this.now(), this.random)
+    if (settled !== this.stateValue) {
+      this.persistence.save(settled)
+      this.stateValue = settled
+    }
   }
 
   snapshot(): TraceWildSnapshot {
-    return { schemaVersion: 2, state: structuredClone(this.stateValue), serverTime: this.now() }
+    const serverTime = this.now()
+    const expired = expireTraceWildEncounters(this.stateValue, serverTime)
+    const settled = settleTraceWildIdleRewards(expired, serverTime, this.random)
+    if (settled !== this.stateValue) {
+      this.persistence.save(settled)
+      this.stateValue = settled
+    }
+    return { schemaVersion: 3, state: structuredClone(this.stateValue), serverTime }
   }
 
   subscribe(listener: (snapshot: TraceWildSnapshot) => void): () => void {
@@ -46,6 +63,11 @@ export class TraceWildService {
   }
 
   observe(session: Session, event: SessionEvent): void {
+    if (session.header.parentSession !== undefined || session.header.origin === 'subagent') {
+      const root = this.rootSession(session)
+      if (root !== undefined) this.classifier.observeRelatedActivity(root, event)
+      return
+    }
     const signal = this.classifier.observe(session, event)
     if (signal === undefined) return
     try {
@@ -58,6 +80,20 @@ export class TraceWildService {
       this.ctx.logger.warn('tracewild: event reward could not be committed')
       this.ctx.logger.warn(error)
     }
+  }
+
+  private rootSession(session: Session): Session | undefined {
+    let current = session
+    const visited = new Set<string>()
+    for (let depth = 0; depth < 16 && current.header.parentSession !== undefined; depth += 1) {
+      const id = String(current.id)
+      if (visited.has(id)) return undefined
+      visited.add(id)
+      const parent = this.ctx.sessions.get(current.header.parentSession)
+      if (parent === undefined) return undefined
+      current = parent
+    }
+    return current.header.parentSession === undefined && current.header.origin !== 'subagent' ? current : undefined
   }
 
   disposeSession(session: Session): void {

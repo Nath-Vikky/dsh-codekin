@@ -1,15 +1,15 @@
-/** TraceWild Host plugin. */
+/** Codekin Host plugin. */
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
-import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
+import type { Session, SessionEvent, SessionStore } from '@deepseek-ai/dsh-session'
 import { createTraceWildRoutes } from './host/routes.ts'
 import { TraceWildService } from './host/service.ts'
 
 export * from './core/index.ts'
 export { TraceWildService } from './host/service.ts'
 
-export const name = 'dsh-tracewild'
+export const name = 'dsh-codekin'
 export const inject = ['sessions', 'webServer']
 
 // Local declarations keep development links and a normally installed package
@@ -18,6 +18,7 @@ export const inject = ['sessions', 'webServer']
 declare module '@deepseek-ai/cordis' {
   interface Context {
     webServer: WebServer
+    sessions: SessionStore
   }
   interface Events {
     'session/event'(session: Session, event: SessionEvent): void

@@ -62,12 +62,12 @@ function chooseEcology(random: RandomSource, allowed: (ecology: TraceEcology) =>
   return TRACE_ECOLOGIES[start]!
 }
 
-function tile(ecology: TraceEcology, special: TileSpecial = 'none'): MatchTile {
-  return { ecology, special }
+function tile(ecology: TraceEcology, special: TileSpecial = 'none', lockedActions = 0): MatchTile {
+  return lockedActions > 0 ? { ecology, special, lockedActions } : { ecology, special }
 }
 
 function cloneBoard(board: readonly MatchTile[]): MatchTile[] {
-  return board.map(item => tile(item.ecology, item.special))
+  return board.map(item => tile(item.ecology, item.special, item.lockedActions))
 }
 
 function groupsInBoard(board: readonly MatchTile[]): MatchGroup[] {
@@ -119,6 +119,7 @@ export function findFirstLegalBattleSwap(board: readonly MatchTile[]): MatchSwap
   for (let index = 0; index < MATCH_BOARD_CELLS; index += 1) {
     for (const next of [index + 1, index + MATCH_BOARD_SIZE]) {
       if (!areAdjacentTiles(index, next)) continue
+      if ((candidate[index]!.lockedActions ?? 0) > 0 || (candidate[next]!.lockedActions ?? 0) > 0) continue
       if (candidate[index]!.special === 'origin' || candidate[next]!.special === 'origin') {
         return { from: index, to: next }
       }
@@ -129,6 +130,69 @@ export function findFirstLegalBattleSwap(board: readonly MatchTile[]): MatchSwap
     }
   }
   return undefined
+}
+
+interface RankedBattleSwap {
+  swap: MatchSwap
+  score: number
+  weight: number
+}
+
+function rankedBattleSwaps(board: readonly MatchTile[], preferredEcology: TraceEcology): RankedBattleSwap[] {
+  if (board.length !== MATCH_BOARD_CELLS) return []
+  const candidate = cloneBoard(board)
+  const ranked: RankedBattleSwap[] = []
+  for (let index = 0; index < MATCH_BOARD_CELLS; index += 1) {
+    for (const next of [index + 1, index + MATCH_BOARD_SIZE]) {
+      if (!areAdjacentTiles(index, next)) continue
+      const first = candidate[index]!
+      const second = candidate[next]!
+      if ((first.lockedActions ?? 0) > 0 || (second.lockedActions ?? 0) > 0) continue
+      if (first.special === 'origin' || second.special === 'origin') {
+        const preferred = first.ecology === preferredEcology || second.ecology === preferredEcology ? 50 : 0
+        const score = (first.special === 'origin' && second.special === 'origin' ? 20_000 : 10_000) + preferred
+        ranked.push({ swap: { from: index, to: next }, score, weight: first.special === 'origin' && second.special === 'origin' ? 10 : 7 })
+        continue
+      }
+      rawSwap(candidate, index, next)
+      const groups = groupsInBoard(candidate)
+      rawSwap(candidate, index, next)
+      if (groups.length === 0) continue
+      const maximum = groups.reduce((value, group) => Math.max(value, group.indexes.length), 0)
+      const preferred = groups
+        .filter(group => group.ecology === preferredEcology)
+        .reduce((value, group) => value + group.indexes.length, 0)
+      const total = groups.reduce((value, group) => value + group.indexes.length, 0)
+      const score = maximum * 100 + preferred * 4 + total
+      ranked.push({
+        swap: { from: index, to: next },
+        score,
+        weight: 1 + preferred * 0.35 + Math.max(0, maximum - 3) * 1.5,
+      })
+    }
+  }
+  return ranked
+}
+
+export function findBestBattleSwap(board: readonly MatchTile[], preferredEcology: TraceEcology): MatchSwap | undefined {
+  return rankedBattleSwaps(board, preferredEcology)
+    .sort((left, right) => right.score - left.score)[0]?.swap
+}
+
+export function chooseBossBattleSwap(
+  board: readonly MatchTile[],
+  preferredEcology: TraceEcology,
+  random: RandomSource,
+): MatchSwap | undefined {
+  const ranked = rankedBattleSwaps(board, preferredEcology)
+  const total = ranked.reduce((sum, row) => sum + row.weight, 0)
+  if (total <= 0) return undefined
+  let cursor = boundedRandom(random) * total
+  for (const row of ranked) {
+    cursor -= row.weight
+    if (cursor < 0) return row.swap
+  }
+  return ranked.at(-1)?.swap
 }
 
 export function hasBattleMatches(board: readonly MatchTile[]): boolean {
@@ -236,7 +300,7 @@ function collapseAndFill(
   const survivors: ({ tile: MatchTile; source: number } | undefined)[] = board.map((current, index) => {
     const planned = plans.get(index)
     if (removed.has(index)) return undefined
-    return { tile: planned === undefined ? current : tile(current.ecology, planned), source: index }
+    return { tile: planned === undefined ? current : tile(current.ecology, planned, current.lockedActions), source: index }
   })
   const fallRows = Array.from({ length: MATCH_BOARD_CELLS }, () => 0)
   for (let column = 0; column < MATCH_BOARD_SIZE; column += 1) {
@@ -282,7 +346,7 @@ function resolveFrom(
     const counts = emptyCounts()
     for (const index of expanded.indexes) counts[board[index]!.ecology] += 1
     const before = cloneBoard(board)
-    for (const [index, special] of plans) before[index] = tile(before[index]!.ecology, special)
+    for (const [index, special] of plans) before[index] = tile(before[index]!.ecology, special, before[index]!.lockedActions)
     const fallRows = collapseAndFill(board, expanded.indexes, plans, random)
     frames.push({
       chain,
@@ -314,6 +378,7 @@ export function resolveBattleSwap(
   const board = cloneBoard(boardValue)
   const first = board[from]!
   const second = board[to]!
+  if ((first.lockedActions ?? 0) > 0 || (second.lockedActions ?? 0) > 0) return undefined
   rawSwap(board, from, to)
   if (first.special === 'origin' || second.special === 'origin') {
     const clear = new Set<number>([from, to])
@@ -358,7 +423,9 @@ export function convertRandomBattleTiles(
   random: RandomSource,
 ): MatchTile[] {
   const board = cloneBoard(boardValue)
-  const candidates = board.map((current, index) => current.special === 'none' && current.ecology !== ecology ? index : -1)
+  const candidates = board.map((current, index) => (
+    current.special === 'none' && (current.lockedActions ?? 0) === 0 && current.ecology !== ecology ? index : -1
+  ))
     .filter(index => index >= 0)
   const limit = Math.min(Math.max(0, Math.floor(count)), candidates.length)
   for (let converted = 0; converted < limit; converted += 1) {

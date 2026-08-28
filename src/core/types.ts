@@ -1,6 +1,8 @@
 export type TraceEcology = 'lumen' | 'forge' | 'relay' | 'aegis' | 'glitch'
 export type TraceRarity = 'common' | 'uncommon' | 'rare' | 'apex'
 export type CaptureCoreQuality = 'pebble' | 'pulse' | 'prism' | 'nova' | 'origin'
+export type IndividualQuality = CaptureCoreQuality
+export type GrowthMaterialQuality = CaptureCoreQuality
 
 export interface CreatureStats {
   hp: number
@@ -46,7 +48,11 @@ export interface WildEncounter {
   id: string
   creatureId: string
   ecology: TraceEcology
+  quality: IndividualQuality
+  level: number
+  captureAttempts: number
   spawnedAt: number
+  expiresAt: number
   enhanced: boolean
   armor: number
   mapX: number
@@ -58,6 +64,7 @@ export type TileSpecial = 'none' | 'row' | 'column' | 'burst' | 'origin'
 export interface MatchTile {
   ecology: TraceEcology
   special: TileSpecial
+  lockedActions?: number
 }
 
 export interface MatchCascadeFrame {
@@ -72,6 +79,8 @@ export interface TraceWildBattleAnimation {
   kind: 'match'
   battleId: string
   frames: MatchCascadeFrame[]
+  actor?: 'player' | 'boss'
+  swap?: { from: number; to: number }
 }
 
 export interface BattlePartyMember {
@@ -90,9 +99,17 @@ export interface BattlePartyMember {
   reviveUsed: boolean
   counterPower: number
   overcharge: number
+  stageDamage: number
+  frozenStages: number
 }
 
-export type EnemyIntent = 'strike' | 'guard' | 'disrupt' | 'corrupt' | 'mark'
+export type EnemyIntent = 'strike' | 'sweep' | 'guard' | 'disrupt' | 'corrupt' | 'mark' | 'lock' | 'freeze'
+export type EnemyTargetScope = 'single' | 'all' | 'self'
+
+export interface BattleContribution {
+  instanceId: string
+  amount: number
+}
 
 export interface BattleLogEntry {
   turn: number
@@ -105,10 +122,26 @@ export interface BattleLogEntry {
     | 'heal'
     | 'shield'
     | 'enemy'
+    | 'enemy-sweep'
     | 'enemy-shield'
     | 'enemy-delay'
+    | 'enemy-lock'
+    | 'enemy-freeze'
+    | 'boss-match'
+    | 'boss-combo'
+    | 'boss-energy'
+    | 'boss-action-refund'
+    | 'boss-action-bonus'
+    | 'boss-skill'
+    | 'stage-skip'
+    | 'frozen-skip'
+    | 'phase-shift'
     | 'switch'
+    | 'action-refund'
+    | 'action-bonus'
+    | 'team-strike'
     | 'capture-failed'
+    | 'wild-defeated'
     | 'defeat'
   amount?: number
   creatureId?: string
@@ -120,10 +153,22 @@ export interface BattleState {
   id: string
   encounterId: string
   wildCreatureId: string
+  mode: 'wild' | 'tower'
+  towerFloor?: number
+  bossSkillTier: 1 | 2 | 3 | 4 | 5
   board: MatchTile[]
   party: BattlePartyMember[]
+  turnOwner: 'player' | 'boss'
   activeIndex: number
   actionsRemaining: number
+  bossActionsRemaining: number
+  bossActionsTaken: number
+  bossEnergy: number
+  bossAttackCharge: number
+  bossBonusActionsGranted: number
+  bossSkillArmed: boolean
+  lastBossAttack: number
+  lastBossMatch: number
   stage: number
   round: number
   wildHp: number
@@ -131,7 +176,12 @@ export interface BattleState {
   wildArmor: number
   wildShield: number
   wildDefense: number
+  wildAttack: number
+  wildLevel: number
+  wildQuality: IndividualQuality
   enemyIntent: EnemyIntent
+  enemyTargetScope: EnemyTargetScope
+  enemyTargetIndex?: number
   enemyMarks: number
   enemyBurn: number
   enemyDelayed: number
@@ -139,6 +189,15 @@ export interface BattleState {
   boardLockActions: number
   repeatPower: number
   lastPlayerDamage: number
+  pendingTeamDamage: number
+  lastTeamStrike: number
+  lastTeamDamageApplied: number
+  lastTeamContributions: BattleContribution[]
+  bonusActionsGranted: number
+  captureWindow: boolean
+  captureAttempts: number
+  enemyHardControlCooldown: number
+  enemyPhase: number
   turn: number
   log: BattleLogEntry[]
 }
@@ -149,32 +208,69 @@ export interface TraceWildStats {
   successfulCaptures: number
   failedCaptures: number
   battlesStarted: number
+  wildDefeats: number
+  materialsEarned: number
   currentSuccessStreak: number
   longestSuccessStreak: number
+}
+
+export interface TraceWildTowerReward {
+  floor: number
+  materials: Record<GrowthMaterialQuality, number>
+  awardedAt: number
+}
+
+export interface TraceWildTowerState {
+  highestClearedFloor: number
+  attempts: number
+  clears: number
+  lastReward?: TraceWildTowerReward
 }
 
 export interface TraceLogEntry {
   id: string
   at: number
-  kind: 'core-drop' | 'encounter' | 'capture' | 'starter' | 'defeat'
+  kind: 'core-drop' | 'material-drop' | 'idle-reward' | 'encounter' | 'capture' | 'starter' | 'wild-defeat' | 'tower-clear' | 'defeat'
   ecology?: TraceEcology
   creatureId?: string
   quality?: CaptureCoreQuality
 }
 
+export interface TraceWildRewardPity {
+  wildHighQualityMisses: number
+  coreHighQualityMisses: number
+}
+
+export interface TraceWildIdleReward {
+  settledAt: number
+  elapsedMinutes: number
+  coreQuality?: CaptureCoreQuality
+  materials: Record<GrowthMaterialQuality, number>
+}
+
+export interface TraceWildIdleState {
+  lastSettlementAt: number
+  pendingReward?: TraceWildIdleReward
+  lastReward?: TraceWildIdleReward
+}
+
 export interface TraceWildState {
-  schemaVersion: 2
+  schemaVersion: 3
   revision: number
   createdAt: number
   updatedAt: number
   starterChosen: boolean
   cores: Record<CaptureCoreQuality, number>
+  materials: Record<GrowthMaterialQuality, number>
   creatures: CapturedCreature[]
   squad: string[]
   dex: DexRecord[]
   encounters: WildEncounter[]
   battle?: BattleState
   stats: TraceWildStats
+  rewardPity: TraceWildRewardPity
+  idle: TraceWildIdleState
+  tower: TraceWildTowerState
   processedSignals: string[]
   log: TraceLogEntry[]
 }
@@ -185,6 +281,7 @@ export interface TraceSignal {
   ecology: TraceEcology
   outcome: 'completed' | 'failed'
   intensity: number
+  activeMinutes: number
   enhanced: boolean
   variant?: 'missing' | 'timeout' | 'stack' | 'crash' | 'overflow'
 }
@@ -192,21 +289,26 @@ export interface TraceSignal {
 export type TraceWildAction =
   | { type: 'choose-starter'; creatureId: string }
   | { type: 'start-battle'; encounterId: string }
+  | { type: 'start-tower' }
   | { type: 'battle-swap'; from: number; to: number }
   | { type: 'battle-cast'; creatureInstanceId: string }
+  | { type: 'battle-skip-stage' }
+  | { type: 'battle-continue' }
   | { type: 'capture'; quality: CaptureCoreQuality }
+  | { type: 'claim-idle-reward' }
+  | { type: 'feed-material'; creatureInstanceId: string; quality: GrowthMaterialQuality; count: number }
   | { type: 'flee' }
   | { type: 'set-squad'; instanceIds: string[] }
 
 export interface TraceWildSnapshot {
-  schemaVersion: 2
+  schemaVersion: 3
   state: TraceWildState
   serverTime: number
 }
 
 export interface TraceWildActionResponse extends TraceWildSnapshot {
   ok: true
-  notice?: 'capture-success' | 'capture-failed' | 'battle-lost' | 'skill-cast'
+  notice?: 'capture-success' | 'capture-failed' | 'battle-lost' | 'wild-defeated' | 'tower-cleared' | 'skill-cast' | 'material-used' | 'idle-claimed'
   animation?: TraceWildBattleAnimation
 }
 

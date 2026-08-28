@@ -12,6 +12,11 @@ interface TurnTrace {
   callEcology: Map<string, TraceEcology>
 }
 
+interface SessionActivityClock {
+  lastEventAt: number
+  activeMs: number
+}
+
 function fresh(turn: number): TurnTrace {
   return { turn, lumen: 0, forge: 0, relay: 0, failedTools: 0, toolCount: 0, callEcology: new Map() }
 }
@@ -46,8 +51,10 @@ function failureVariant(reason: SessionEvent<'turn/end'>['data']['reason']): Tra
 
 export class TraceWildEventClassifier {
   private readonly traces = new WeakMap<Session, TurnTrace>()
+  private readonly activity = new WeakMap<Session, SessionActivityClock>()
 
   observe(session: Session, event: SessionEvent): TraceSignal | undefined {
+    const activeMinutes = this.observeActivity(session, event.time)
     switch (event.type) {
       case 'turn/start':
         this.traces.set(session, fresh(event.data.turn))
@@ -80,6 +87,7 @@ export class TraceWildEventClassifier {
             ecology: 'glitch',
             outcome: 'failed',
             intensity: Math.min(5, 1 + Math.floor(trace.toolCount / 2) + trace.failedTools),
+            activeMinutes,
             enhanced: true,
             ...(variant === undefined ? {} : { variant }),
           }
@@ -91,6 +99,7 @@ export class TraceWildEventClassifier {
           ecology,
           outcome: 'completed',
           intensity: Math.min(5, 1 + Math.floor(trace.toolCount / 3) + (trace.failedTools > 0 ? 2 : 0)),
+          activeMinutes,
           enhanced: false,
         }
       }
@@ -99,8 +108,41 @@ export class TraceWildEventClassifier {
     }
   }
 
+  /** Fold child activity into its live top-level turn without ever minting a child reward. */
+  observeRelatedActivity(session: Session, event: SessionEvent): void {
+    this.observeActivity(session, event.time)
+    const trace = this.traces.get(session)
+    if (trace === undefined) return
+    if (event.type === 'tool/call') {
+      const ecology = classifyTool(event.data.name)
+      trace.callEcology.set(String(event.data.callId), ecology)
+      trace.toolCount += 1
+      if (ecology === 'lumen') trace.lumen += 1
+      if (ecology === 'forge') trace.forge += 1
+      if (ecology === 'relay') trace.relay += 1
+      return
+    }
+    if (event.type === 'tool/result') {
+      const firstBlock = event.data.message.content[0]
+      if (event.data.error !== undefined || firstBlock?.isError === true) trace.failedTools += 1
+    }
+  }
+
   disposeSession(session: Session): void {
     this.traces.delete(session)
+    this.activity.delete(session)
+  }
+
+  private observeActivity(session: Session, at: number): number {
+    const current = this.activity.get(session)
+    if (current === undefined || !Number.isFinite(at) || at < current.lastEventAt) {
+      this.activity.set(session, { lastEventAt: Number.isFinite(at) ? at : 0, activeMs: 0 })
+      return 0
+    }
+    const gap = at - current.lastEventAt
+    if (gap > 0 && gap <= 2 * 60_000) current.activeMs = Math.min(180 * 60_000, current.activeMs + gap)
+    current.lastEventAt = at
+    return current.activeMs / 60_000
   }
 
   private trace(session: Session, turn: number): TurnTrace {

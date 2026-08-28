@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import type { UserConfig } from 'tsdown'
 import { transform } from 'lightningcss'
 
-const PACKAGE_ID = '@nath-vikky/dsh-tracewild'
+const PACKAGE_ID = '@nath-vikky/dsh-codekin'
 const CSS_PREFIX = '\0tracewild-css:'
 const CSS_SUFFIX = '.mjs'
 const PROJECT_ROOT = dirname(fileURLToPath(import.meta.url))

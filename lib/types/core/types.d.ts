@@ -68,9 +68,9 @@ export interface MatchCascadeFrame {
     after: MatchTile[];
     removed: number[];
     fallRows: number[];
-    /** Damage queued by this cascade step, including match passives. */
+    /** Damage accumulated by the acting side during this cascade step. */
     damage?: number;
-    /** Team-strike damage queued after this cascade step. */
+    /** Running damage total accumulated by the acting side. */
     totalDamage?: number;
     effectiveness?: MatchDamageEffectiveness;
     /** Shared-party damage caused by dangerous panels in this step. */
@@ -140,6 +140,10 @@ export interface BattleState {
     bossActionsTaken: number;
     bossEnergy: number;
     bossAttackCharge: number;
+    /** Exact damage accumulated during the current Boss board phase. */
+    pendingBossDamage: number;
+    /** Per-phase attack variance in thousandths, fixed before the first Boss action. */
+    bossDamageScale: number;
     bossBonusActionsGranted: number;
     bossSkillArmed: boolean;
     lastBossAttack: number;

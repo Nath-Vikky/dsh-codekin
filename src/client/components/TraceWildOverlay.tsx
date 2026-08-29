@@ -1531,10 +1531,10 @@ function BattleView(props: {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     for (const frame of animation.frames) {
       if (animationEpoch.current !== epoch) return
-      if (animation.actor !== 'boss' && frame.damage !== undefined && frame.totalDamage !== undefined) {
+      if (frame.damage !== undefined && frame.totalDamage !== undefined) {
         setDamageReadout({
           key: Date.now() + frame.chain,
-          actor: 'player',
+          actor: animation.actor === 'boss' ? 'boss' : 'player',
           total: frame.totalDamage,
           current: frame.damage,
           effectiveness: frame.effectiveness ?? 'neutral',
@@ -1545,16 +1545,18 @@ function BattleView(props: {
       setVisualBoard(frame.before.map(tile => ({ ...tile })))
       setClearingTiles(new Set(frame.removed))
       setActiveChain(frame.chain)
-      await pause(reducedMotion ? 20 : 190)
+      await pause(reducedMotion ? 20 : animation.actor === 'boss' ? 230 : 190)
       if (animationEpoch.current !== epoch) return
       setClearingTiles(undefined)
       setVisualBoard(frame.after.map(tile => ({ ...tile })))
       setFallRows(frame.fallRows)
       const longestFall = Math.max(...frame.fallRows)
-      await pause(reducedMotion ? 20 : Math.min(540, 270 + longestFall * 34))
+      await pause(reducedMotion ? 20 : animation.actor === 'boss'
+        ? Math.min(600, 310 + longestFall * 38)
+        : Math.min(540, 270 + longestFall * 34))
       if (animationEpoch.current !== epoch) return
       setFallRows(undefined)
-      await pause(reducedMotion ? 0 : 45)
+      await pause(reducedMotion ? 0 : animation.actor === 'boss' ? 70 : 45)
     }
     if (animationEpoch.current !== epoch) return
     setActiveChain(undefined)
@@ -1566,19 +1568,16 @@ function BattleView(props: {
       setDamageReadout(total > 0
         ? { key: Date.now(), actor: 'player', total, settled: finalBattle.pendingTeamDamage === 0 }
         : undefined)
-    } else if (finalBattle.turnOwner !== 'boss' && finalBattle.lastBossAttack > 0) {
-      const key = Date.now()
+    } else {
+      const total = finalBattle.turnOwner === 'boss'
+        ? finalBattle.pendingBossDamage
+        : finalBattle.lastBossAttack
       setDamageReadout({
-        key,
+        key: Date.now(),
         actor: 'boss',
-        total: finalBattle.lastBossAttack,
-        current: finalBattle.lastBossAttack,
-        effectiveness: 'neutral',
-        settled: false,
+        total,
+        settled: finalBattle.turnOwner !== 'boss',
       })
-      await pause(reducedMotion ? 40 : 440)
-      if (animationEpoch.current !== epoch) return
-      setDamageReadout({ key, actor: 'boss', total: finalBattle.lastBossAttack, settled: true })
     }
   }
 
@@ -1595,7 +1594,7 @@ function BattleView(props: {
         const motion = response.animation.swap
         if (motion !== undefined) {
           setSwapMotion(motion)
-          await pause(window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 20 : 150)
+          await pause(window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 20 : 220)
           setSwapMotion(undefined)
         }
         await playCascade(response.animation, finalBattle)
@@ -1615,7 +1614,7 @@ function BattleView(props: {
     bossActionTimer.current = window.setTimeout(() => {
       bossActionTimer.current = undefined
       runBossAction()
-    }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 30 : 420)
+    }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 30 : 560)
     return () => {
       if (bossActionTimer.current !== undefined) window.clearTimeout(bossActionTimer.current)
       bossActionTimer.current = undefined

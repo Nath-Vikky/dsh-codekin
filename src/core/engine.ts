@@ -888,18 +888,30 @@ function partyAffinity(battle: BattleState, wildEcology: TraceEcology): number {
   }, 0) / battle.party.length
 }
 
-function applyEnemyTeamHit(
+function enemyDamageEffectiveness(
   battle: BattleState,
   wildEcology: TraceEcology,
-  power: number,
-  maximumHealthRatio: number,
-  random: RandomSource,
-): number {
+): MatchDamageEffectiveness {
+  const multiplier = partyAffinity(battle, wildEcology)
+  return multiplier > 1.05 ? 'advantage' : multiplier < 0.95 ? 'resisted' : 'neutral'
+}
+
+function enemyTeamDamageForCharge(battle: BattleState, wildEcology: TraceEcology): number {
+  if (battle.bossAttackCharge <= 0 || battle.partyHp <= 0) return 0
+  const power = Math.min(1.55, Math.max(0.55, 0.35 + 0.22 * battle.bossAttackCharge))
   const partyPressure = 1 + 0.55 * Math.max(0, battle.party.length - 1)
-  const roll = battle.wildAttack * power * (0.88 + boundedRandom(random) * 0.24)
+  const roll = battle.wildAttack * power * (battle.bossDamageScale / 1000)
     * partyPressure * partyAffinity(battle, wildEcology) * 100 / (100 + partyDefense(battle))
-  const bounded = Math.min(roll, battle.partyMaxHp * maximumHealthRatio)
-  const damage = damageParty(battle, bounded)
+  return Math.max(1, Math.round(Math.min(
+    roll,
+    battle.partyMaxHp * 0.3,
+    battle.partyHp + battle.partyShield,
+  )))
+}
+
+function applyEnemyTeamHit(battle: BattleState, amount: number): number {
+  if (amount <= 0) return 0
+  const damage = damageParty(battle, amount)
   if (damage > 0) {
     for (const member of battle.party) {
       if (member.creatureId === 'forge-rivetclaw') member.counterPower = 0.8 * qualityMultiplier(member)
@@ -949,9 +961,8 @@ function performBossSettlement(battle: BattleState, random: RandomSource): boole
     applyWildDamage(battle, battle.wildMaxHp * 0.025 * battle.enemyBurn, undefined)
     battle.enemyBurn = Math.max(0, battle.enemyBurn - 0.5)
   }
-  const finalPower = Math.min(1.55, Math.max(0.55, 0.35 + 0.22 * battle.bossAttackCharge))
   const target = battle.party[battle.enemyTargetIndex ?? battle.activeIndex]
-  const totalDamage = applyEnemyTeamHit(battle, wild.ecology, finalPower, 0.3, random)
+  const totalDamage = applyEnemyTeamHit(battle, battle.pendingBossDamage)
   appendBattleLog(battle, { turn: battle.turn, kind: 'enemy', amount: totalDamage })
   battle.lastBossAttack = totalDamage
 
@@ -1094,6 +1105,8 @@ function installBattle(
     bossActionsTaken: 0,
     bossEnergy: input.startingBossEnergy,
     bossAttackCharge: 0,
+    pendingBossDamage: 0,
+    bossDamageScale: 1000,
     bossBonusActionsGranted: 0,
     bossSkillArmed: false,
     lastBossAttack: 0,
@@ -1222,6 +1235,8 @@ function beginBossPhase(battle: BattleState, random: RandomSource): BattleOutcom
   battle.bossActionsRemaining = BASE_BOSS_ACTIONS
   battle.bossActionsTaken = 0
   battle.bossAttackCharge = 0
+  battle.pendingBossDamage = 0
+  battle.bossDamageScale = 880 + Math.floor(boundedRandom(random) * 241)
   battle.bossBonusActionsGranted = 0
   battle.lastBossMatch = 0
   return 'none'
@@ -1233,6 +1248,8 @@ function finishBossPhase(battle: BattleState, random: RandomSource): BattleOutco
   battle.bossActionsRemaining = 0
   battle.bossActionsTaken = 0
   battle.bossAttackCharge = 0
+  battle.pendingBossDamage = 0
+  battle.bossDamageScale = 1000
   battle.bossBonusActionsGranted = 0
   if (advanceBattleStage(battle)) return 'battle-lost'
   prepareBossIntent(battle, random)
@@ -1305,16 +1322,23 @@ function performBossBoardAction(
   battle.board = resolution.board
   let matched = 0
   let ownColor = 0
-  let charge = 0
-  for (const step of resolution.steps) {
+  for (let index = 0; index < resolution.steps.length; index += 1) {
+    const step = resolution.steps[index]!
     const count = TRACE_ECOLOGIES.reduce((sum, ecology) => sum + step.counts[ecology], 0)
     const combo = Math.min(2, 1 + 0.2 * (step.chain - 1))
     matched += count
     ownColor += step.counts[wild.ecology]
-    charge += count / 3 * combo
+    battle.bossAttackCharge = Math.min(32, battle.bossAttackCharge + count / 3 * combo)
+    const totalDamage = enemyTeamDamageForCharge(battle, wild.ecology)
+    const frame = resolution.frames[index]
+    if (frame !== undefined) {
+      frame.damage = Math.max(0, totalDamage - battle.pendingBossDamage)
+      frame.totalDamage = totalDamage
+      frame.effectiveness = enemyDamageEffectiveness(battle, wild.ecology)
+    }
+    battle.pendingBossDamage = totalDamage
   }
   battle.lastBossMatch = matched
-  battle.bossAttackCharge = Math.min(32, battle.bossAttackCharge + charge)
   const energyGain = Math.min(8, ownColor)
   if (energyGain > 0) {
     battle.bossEnergy = Math.min(BOSS_SKILL_ENERGY_LIMIT, battle.bossEnergy + energyGain)
@@ -2084,6 +2108,8 @@ function restoreBattle(root: Record<string, unknown>, state: TraceWildState): Ba
       : 0,
     bossEnergy: safeInt(raw.bossEnergy, 0, BOSS_SKILL_ENERGY_LIMIT),
     bossAttackCharge: safeNumber(raw.bossAttackCharge, 0, 0, 32),
+    pendingBossDamage: 0,
+    bossDamageScale: Math.max(880, safeInt(raw.bossDamageScale, 1000, 1120)),
     bossBonusActionsGranted: safeInt(raw.bossBonusActionsGranted, 0, MAX_BOSS_BONUS_ACTIONS),
     bossSkillArmed: raw.bossSkillArmed === true,
     lastBossAttack: safeInt(raw.lastBossAttack, 0, 9_999_999),
@@ -2124,6 +2150,9 @@ function restoreBattle(root: Record<string, unknown>, state: TraceWildState): Ba
     turn: Math.max(1, safeInt(raw.turn, 1, 999999)),
     log: [{ turn: 0, kind: 'start', creatureId: wild.id, ecology: wild.ecology }],
   }
+  restored.pendingBossDamage = turnOwner === 'boss'
+    ? enemyTeamDamageForCharge(restored, wild.ecology)
+    : 0
   syncLegacyPartyHealth(restored)
   return restored
 }

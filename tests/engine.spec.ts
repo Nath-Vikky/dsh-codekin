@@ -227,9 +227,19 @@ describe('TraceWild match battle', () => {
     expect(state.battle?.turnOwner).toBe('boss')
     expect(state.battle?.bossActionsRemaining).toBe(3)
     let bossMoves = 0
+    let bossDamageTotal = 0
     while (state.battle?.turnOwner === 'boss' && bossMoves < 10) {
       const result = applyTraceWildAction(state, { type: 'battle-continue' }, low, 260 + bossMoves)
       expect(result.animation?.frames.length).toBeGreaterThan(0)
+      for (const frame of result.animation?.frames ?? []) {
+        expect(frame).toMatchObject({
+          damage: expect.any(Number),
+          totalDamage: expect.any(Number),
+          effectiveness: expect.stringMatching(/^(advantage|neutral|resisted)$/),
+        })
+        expect(frame.totalDamage).toBeGreaterThanOrEqual(bossDamageTotal)
+        bossDamageTotal = frame.totalDamage ?? bossDamageTotal
+      }
       state = result.state
       bossMoves += 1
     }
@@ -240,6 +250,7 @@ describe('TraceWild match battle', () => {
     expect(state.battle?.round).toBe(2)
     expect(state.battle?.lastTeamStrike).toBeGreaterThan(0)
     expect(state.battle?.lastBossAttack).toBeGreaterThan(0)
+    expect(state.battle?.lastBossAttack).toBe(bossDamageTotal)
     expect(state.battle?.log.some(row => row.kind === 'boss-match')).toBe(true)
   })
 

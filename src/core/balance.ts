@@ -19,7 +19,10 @@ export const MAX_BOSS_SWAPS_PER_PHASE = 7
 export const BOSS_SKILL_ENERGY_COST = 12
 export const BOSS_SKILL_ENERGY_LIMIT = 24
 export const CAPTURE_HEALTH_RATIO = 0.50
-export const MAX_CAPTURE_ATTEMPTS = 3
+// Capture is now an explicit phase rather than a fixed three-roll prompt.
+// Keep only a generous persistence/mercy-history bound; gameplay ends the
+// phase when the player abandons it or has no capture cores left.
+export const MAX_CAPTURE_ATTEMPTS = 999_999
 export const MAX_MAP_ENCOUNTERS = 7
 
 const MINUTE_MS = 60 * 1000

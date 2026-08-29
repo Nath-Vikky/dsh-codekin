@@ -22,10 +22,10 @@ import { areAdjacentTiles } from '../../core/match3.ts'
 import { skillByCreatureId } from '../../core/skills.ts'
 import { MAX_TOWER_FLOOR, towerFloorProfile } from '../../core/tower.ts'
 import type {
-  BattleLogEntry,
   CaptureCoreQuality,
   CreatureDefinition,
   EnemyIntent,
+  MatchDamageEffectiveness,
   MatchTile,
   TraceEcology,
   TraceLogEntry,
@@ -86,6 +86,13 @@ type AcquiredItem =
   | { kind: 'core'; quality: CaptureCoreQuality; quantity: number }
   | { kind: 'material'; quality: CaptureCoreQuality; quantity: number }
   | { kind: 'creature'; creatureId: string; quality: CaptureCoreQuality; quantity: 1 }
+
+type BattleTransitionKind = 'tower-cleared' | 'wild-defeated' | 'capture-success' | 'capture-failed' | 'battle-lost'
+
+interface BattleTransition {
+  key: number
+  kind: BattleTransitionKind
+}
 
 export type TraceWildOverlayProps = PropsRuntime<'shell.overlay'> & PropsLocale<'tracewild'>
 
@@ -376,44 +383,6 @@ function logText(
   return `${t(key)}${suffix}${quality}`
 }
 
-function battleLogText(row: BattleLogEntry, t: TraceWildOverlayProps['t'], zh: boolean): string {
-  const amount = row.amount ?? 0
-  switch (row.kind) {
-    case 'start': return t('battleStart')
-    case 'match': return t('battleMatch', { amount })
-    case 'combo': return t('battleCombo', { amount })
-    case 'armor-break': return t('battleArmor')
-    case 'skill': return t('battleSkill', { amount })
-    case 'heal': return t('battleHeal', { amount })
-    case 'shield': return t('battleShield', { amount })
-    case 'enemy': return t('battleEnemy', { amount })
-    case 'enemy-sweep': return t('battleEnemySweep', { amount })
-    case 'enemy-shield': return t('battleEnemyShield', { amount })
-    case 'enemy-delay': return t('battleEnemyDelay')
-    case 'enemy-lock': return t('battleEnemyLock', { amount })
-    case 'enemy-freeze': return t('battleEnemyFreeze', { amount })
-    case 'boss-match': return t('battleBossMatch', { amount })
-    case 'boss-combo': return t('battleBossCombo', { amount })
-    case 'boss-energy': return t('battleBossEnergy', { amount })
-    case 'boss-action-refund': return t('battleBossRefund')
-    case 'boss-action-bonus': return t('battleBossBonus', { amount })
-    case 'boss-skill': return t('battleBossSkill')
-    case 'stage-skip': return t('battleStageSkipped')
-    case 'frozen-skip': return t('battleFrozenSkip')
-    case 'phase-shift': return t('battlePhaseShift', { amount })
-    case 'action-refund': return t('battleActionRefund')
-    case 'action-bonus': return t('battleActionBonus', { amount })
-    case 'team-strike': return t('battleTeamStrike', { amount })
-    case 'switch': {
-      const creature = row.creatureId === undefined ? undefined : creatureById(row.creatureId)
-      return t('battleSwitch', { name: creature === undefined ? '—' : creatureName(creature, zh) })
-    }
-    case 'capture-failed': return t('battleCaptureFail')
-    case 'wild-defeated': return t('wildDefeated')
-    case 'defeat': return t('battleLost')
-  }
-}
-
 export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   const connection = useMemo(() => createTraceWildConnection(), [])
   const [snapshot, setSnapshot] = useState<TraceWildSnapshot>()
@@ -431,6 +400,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   const [growthTarget, setGrowthTarget] = useState<string>()
   const [rewardQueue, setRewardQueue] = useState<AcquiredItem[][]>([])
   const [releaseCandidate, setReleaseCandidate] = useState<string>()
+  const [battleTransition, setBattleTransition] = useState<BattleTransition>()
   const latestSnapshot = useRef<TraceWildSnapshot>()
   const actionInFlight = useRef(false)
   const pendingSnapshot = useRef<TraceWildSnapshot>()
@@ -658,7 +628,21 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
     setNotice(undefined)
     try {
       const response = await connection.act(action)
+      const transitionKind = response.notice === 'tower-cleared'
+        || response.notice === 'wild-defeated'
+        || response.notice === 'capture-success'
+        || response.notice === 'capture-failed'
+        || response.notice === 'battle-lost'
+        ? response.notice
+        : undefined
+      if (transitionKind !== undefined && latestSnapshot.current?.state.battle !== undefined) {
+        setBattleTransition({ key: Date.now(), kind: transitionKind })
+        await new Promise<void>(resolve => {
+          window.setTimeout(resolve, transitionKind === 'capture-failed' ? 720 : 1_080)
+        })
+      }
       adoptSnapshot(response)
+      setBattleTransition(undefined)
       setOnline(true)
       if (response.notice === 'capture-success') setNotice(t('captured'))
       if (response.notice === 'capture-failed') setNotice(t('captureFailed'))
@@ -671,6 +655,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
       if (response.notice === 'creature-released') setNotice(t('released'))
       return response
     } catch (error) {
+      setBattleTransition(undefined)
       if (error instanceof TraceWildConnectionError && error.code === 'invalid-action') {
         setNotice(action.type === 'claim-idle-reward' ? t('rewardUnavailable') : t('invalidSwap'))
       } else {
@@ -859,6 +844,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
                   zh={zh}
                   busy={busy}
                   act={act}
+                  transition={battleTransition}
                 />
               )}
               {notice !== undefined && <div className={css.toast} role="status">{notice}</div>}
@@ -1345,7 +1331,7 @@ const SPECIAL_KEYS = {
 } as const
 
 const INTENT_KEYS: Record<EnemyIntent, TraceWildLocaleKey> = {
-  strike: 'intentStrike', sweep: 'intentSweep', guard: 'intentGuard', disrupt: 'intentDisrupt',
+  strike: 'intentStrike', guard: 'intentGuard', disrupt: 'intentDisrupt',
   corrupt: 'intentCorrupt', mark: 'intentMark', lock: 'intentLock', freeze: 'intentFreeze',
 }
 
@@ -1353,7 +1339,8 @@ function tileLabel(tile: MatchTile, index: number, t: TraceWildOverlayProps['t']
   const ecology = t(ECOLOGY_KEYS[tile.ecology])
   const special = tile.special === 'none' ? '' : ` · ${t(SPECIAL_KEYS[tile.special])}`
   const locked = (tile.lockedActions ?? 0) > 0 ? ` · ${t('lockedTile', { actions: tile.lockedActions ?? 0 })}` : ''
-  return `${ecology}${special}${locked} · ${Math.floor(index / 7) + 1},${index % 7 + 1}`
+  const hazard = (tile.hazardActions ?? 0) > 0 ? ` · ${t('hazardTile', { actions: tile.hazardActions ?? 0 })}` : ''
+  return `${ecology}${special}${locked}${hazard} · ${Math.floor(index / 7) + 1},${index % 7 + 1}`
 }
 
 interface TileGesture {
@@ -1368,6 +1355,14 @@ interface TileGesture {
 interface SwapMotion {
   from: number
   to: number
+}
+
+interface DamageReadout {
+  key: number
+  total: number
+  current?: number
+  effectiveness?: MatchDamageEffectiveness
+  settled: boolean
 }
 
 function swipeTarget(index: number, deltaX: number, deltaY: number): number | undefined {
@@ -1410,6 +1405,7 @@ function BattleView(props: {
   zh: boolean
   busy: boolean
   act: (action: TraceWildAction) => Promise<TraceWildActionResponse | undefined>
+  transition?: BattleTransition | undefined
 }) {
   const battle = props.state.battle!
   const [selectedTile, setSelectedTile] = useState<number>()
@@ -1420,7 +1416,8 @@ function BattleView(props: {
   const [clearingTiles, setClearingTiles] = useState<ReadonlySet<number>>()
   const [fallRows, setFallRows] = useState<readonly number[]>()
   const [activeChain, setActiveChain] = useState<number>()
-  const [damageBurst, setDamageBurst] = useState<{ key: number; amount: number }>()
+  const [damageReadout, setDamageReadout] = useState<DamageReadout>()
+  const [captureIntro, setCaptureIntro] = useState(false)
   const [partyHitKey, setPartyHitKey] = useState(0)
   const gestureRef = useRef<TileGesture>()
   const bossActionInFlight = useRef(false)
@@ -1430,20 +1427,37 @@ function BattleView(props: {
   const animationEpoch = useRef(0)
   const suppressClick = useRef(false)
   const suppressClickTimer = useRef<number>()
-  const previousBattle = useRef({ id: battle.id, wildHp: battle.wildHp, partyHp: battle.party.reduce((sum, row) => sum + row.hp, 0) })
+  const captureIntroTimer = useRef<number>()
+  const previousCaptureWindow = useRef(false)
+  const previousBattle = useRef({ id: battle.id, wildHp: battle.wildHp, partyHp: battle.partyHp })
   const encounter = props.state.encounters.find(row => row.id === battle.encounterId)
   const wild = creatureById(battle.wildCreatureId)
   const active = battle.party[battle.activeIndex]
   const activeDefinition = active === undefined ? undefined : creatureById(active.creatureId)
   const locked = props.busy || animating
   const boardLocked = locked || battle.turnOwner === 'boss' || battle.captureWindow || battle.actionsRemaining <= 0
-  const partyHp = battle.party.reduce((sum, row) => sum + row.hp, 0)
+  const partyHp = battle.partyHp
 
   useEffect(() => {
     setSelectedTile(undefined)
     gestureRef.current = undefined
     setGesture(undefined)
   }, [battle.id, battle.turn, battle.turnOwner, battle.actionsRemaining, battle.bossActionsRemaining, battle.activeIndex])
+
+  useEffect(() => {
+    const entered = battle.captureWindow && !previousCaptureWindow.current
+    previousCaptureWindow.current = battle.captureWindow
+    if (!entered) {
+      if (!battle.captureWindow) setCaptureIntro(false)
+      return
+    }
+    setCaptureIntro(true)
+    if (captureIntroTimer.current !== undefined) window.clearTimeout(captureIntroTimer.current)
+    captureIntroTimer.current = window.setTimeout(() => {
+      captureIntroTimer.current = undefined
+      setCaptureIntro(false)
+    }, 760)
+  }, [battle.captureWindow, battle.id])
 
   useEffect(() => {
     animationEpoch.current += 1
@@ -1462,19 +1476,29 @@ function BattleView(props: {
     const previous = previousBattle.current
     if (previous.id !== battle.id) {
       previousBattle.current = { id: battle.id, wildHp: battle.wildHp, partyHp }
+      setDamageReadout(undefined)
       return
     }
     const wildDamage = previous.wildHp - battle.wildHp
-    if (wildDamage > 0) setDamageBurst({ key: Date.now(), amount: wildDamage })
+    if (wildDamage > 0) {
+      setDamageReadout({ key: Date.now(), total: battle.lastTeamDamageApplied || wildDamage, settled: true })
+    } else if (!animating && battle.pendingTeamDamage > 0) {
+      setDamageReadout(current => ({
+        key: current?.key ?? Date.now(),
+        total: battle.pendingTeamDamage,
+        settled: false,
+      }))
+    }
     if (previous.partyHp > partyHp) setPartyHitKey(value => value + 1)
     previousBattle.current = { id: battle.id, wildHp: battle.wildHp, partyHp }
-  }, [battle.id, battle.wildHp, partyHp])
+  }, [animating, battle.id, battle.lastTeamDamageApplied, battle.pendingTeamDamage, battle.wildHp, partyHp])
 
   useEffect(() => () => {
     animationEpoch.current += 1
     if (bossActionTimer.current !== undefined) window.clearTimeout(bossActionTimer.current)
     if (swapTimer.current !== undefined) window.clearTimeout(swapTimer.current)
     if (suppressClickTimer.current !== undefined) window.clearTimeout(suppressClickTimer.current)
+    if (captureIntroTimer.current !== undefined) window.clearTimeout(captureIntroTimer.current)
     for (const timer of motionTimers.current) window.clearTimeout(timer)
     motionTimers.current.clear()
   }, [])
@@ -1498,13 +1522,22 @@ function BattleView(props: {
 
   const playCascade = async (
     animation: NonNullable<TraceWildActionResponse['animation']>,
-    finalBoard: readonly MatchTile[],
+    finalBattle: NonNullable<TraceWildSnapshot['state']['battle']>,
   ): Promise<void> => {
     if (animation.battleId !== battle.id) return
     const epoch = ++animationEpoch.current
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     for (const frame of animation.frames) {
       if (animationEpoch.current !== epoch) return
+      if (animation.actor !== 'boss' && frame.damage !== undefined && frame.totalDamage !== undefined) {
+        setDamageReadout({
+          key: Date.now() + frame.chain,
+          total: frame.totalDamage,
+          current: frame.damage,
+          effectiveness: frame.effectiveness ?? 'neutral',
+          settled: false,
+        })
+      }
       setFallRows(undefined)
       setVisualBoard(frame.before.map(tile => ({ ...tile })))
       setClearingTiles(new Set(frame.removed))
@@ -1522,7 +1555,13 @@ function BattleView(props: {
     }
     if (animationEpoch.current !== epoch) return
     setActiveChain(undefined)
-    setVisualBoard(finalBoard.map(tile => ({ ...tile })))
+    setVisualBoard(finalBattle.board.map(tile => ({ ...tile })))
+    if (animation.actor !== 'boss') {
+      const total = finalBattle.pendingTeamDamage > 0
+        ? finalBattle.pendingTeamDamage
+        : finalBattle.lastTeamDamageApplied
+      setDamageReadout(total > 0 ? { key: Date.now(), total, settled: finalBattle.pendingTeamDamage === 0 } : undefined)
+    }
   }
 
   const runBossAction = (): void => {
@@ -1538,7 +1577,7 @@ function BattleView(props: {
           await pause(window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 20 : 150)
           setSwapMotion(undefined)
         }
-        await playCascade(response.animation, finalBattle.board)
+        await playCascade(response.animation, finalBattle)
       }
     }).finally(() => {
       bossActionInFlight.current = false
@@ -1566,17 +1605,29 @@ function BattleView(props: {
   const availableCores = CAPTURE_CORE_QUALITIES.filter(quality => props.state.cores[quality] > 0)
   const captureReady = battle.mode === 'wild' && battle.captureWindow
   const predictedHp = Math.max(0, battle.wildHp - Math.max(0, battle.pendingTeamDamage - battle.wildShield))
-  const enemyTarget = battle.enemyTargetScope === 'all'
-    ? props.t('targetAll')
+  const enemyTarget = battle.enemyTargetScope === 'team'
+    ? props.t('targetTeam')
     : battle.enemyTargetScope === 'self'
       ? props.t('targetSelf')
+      : battle.enemyTargetScope === 'board'
+        ? props.t('targetBoard')
       : (() => {
           const target = battle.party[battle.enemyTargetIndex ?? battle.activeIndex]
           const definition = target === undefined ? undefined : creatureById(target.creatureId)
-          return definition === undefined ? props.t('targetSingle') : creatureName(definition, props.zh)
+          return definition === undefined ? props.t('targetMember') : creatureName(definition, props.zh)
         })()
-  const latestLog = battle.log.slice(-2)
   const lastLog = battle.log.at(-1)
+  const transitionTitle = props.transition === undefined
+    ? undefined
+    : props.t(props.transition.kind === 'tower-cleared'
+        ? 'transitionTowerCleared'
+        : props.transition.kind === 'wild-defeated'
+          ? 'transitionWildDefeated'
+          : props.transition.kind === 'capture-success'
+            ? 'transitionCaptureSuccess'
+            : props.transition.kind === 'capture-failed'
+              ? 'transitionCaptureFailed'
+              : 'transitionBattleLost')
 
   const swap = (from: number, to: number): void => {
     if (boardLocked || (visualBoard[from]?.lockedActions ?? 0) > 0 || (visualBoard[to]?.lockedActions ?? 0) > 0
@@ -1595,7 +1646,7 @@ function BattleView(props: {
         setSwapMotion(undefined)
         const finalBattle = response?.state.battle
         if (response?.animation !== undefined && finalBattle?.id === battle.id) {
-          await playCascade(response.animation, finalBattle.board)
+          await playCascade(response.animation, finalBattle)
         }
       }).finally(() => {
         setClearingTiles(undefined)
@@ -1612,7 +1663,7 @@ function BattleView(props: {
     void props.act({ type: 'battle-cast', creatureInstanceId }).then(async (response) => {
       const finalBattle = response?.state.battle
       if (response?.animation !== undefined && finalBattle?.id === battle.id) {
-        await playCascade(response.animation, finalBattle.board)
+        await playCascade(response.animation, finalBattle)
       }
     }).finally(() => {
       setClearingTiles(undefined)
@@ -1701,7 +1752,21 @@ function BattleView(props: {
             <strong>{props.t(INTENT_KEYS[battle.enemyIntent])}</strong>
             <small>{enemyTarget}</small>
           </div>
-          {damageBurst !== undefined && <strong key={damageBurst.key} className={css.damageBurst}>-{damageBurst.amount}</strong>}
+          {damageReadout !== undefined && (
+            <div
+              key={damageReadout.key}
+              className={`${css.totalDamageHud} ${damageReadout.settled ? css.totalDamageSettled : ''}`}
+              aria-live="polite"
+            >
+              <span>{props.t('totalDamage')}</span>
+              <strong>{damageReadout.total.toLocaleString()}</strong>
+              {damageReadout.current !== undefined && (
+                <em className={css[`damage_${damageReadout.effectiveness ?? 'neutral'}`]}>
+                  +{damageReadout.current.toLocaleString()}
+                </em>
+              )}
+            </div>
+          )}
           {lastLog?.kind === 'combo' && <strong className={css.comboBurst}>CHAIN ×{lastLog.amount ?? 1}</strong>}
         </div>
 
@@ -1713,26 +1778,33 @@ function BattleView(props: {
                 const skill = skillByCreatureId(member.creatureId)
                 if (creature === undefined || skill === undefined) return null
                 const isActive = index === battle.activeIndex
-                const canCast = battle.turnOwner === 'player' && isActive && member.hp > 0 && battle.actionsRemaining > 0 && !battle.captureWindow
-                  && member.energy >= skill.energyCost && !member.skillUsedStage
+                const skillReady = member.energy >= skill.energyCost && !member.skillUsedStage && member.skillSealedStages === 0
+                const canCast = battle.turnOwner === 'player' && isActive && battle.partyHp > 0 && battle.actionsRemaining > 0
+                  && !battle.captureWindow && skillReady
+                const portraitStyle = {
+                  '--energy-progress': `${percent(member.energy, skill.energyCost) * 3.6}deg`,
+                } as CSSProperties
                 return (
                   <article
                     key={member.instanceId}
-                    className={`${css.partyCombatant} ${isActive ? css.partyCombatantActive : ''} ${member.hp <= 0 ? css.partyCombatantDown : ''}`}
+                    className={`${css.partyCombatant} ${isActive ? css.partyCombatantActive : ''} ${skillReady ? css.partyCombatantReady : ''} ${member.skillSealedStages > 0 ? css.partyCombatantSealed : ''} ${battle.partyHp <= 0 ? css.partyCombatantDown : ''}`}
                     title={`${props.t('passiveSkill')} · ${props.zh ? skill.passiveNameZh : skill.passiveNameEn}\n${props.zh ? skill.passiveDescriptionZh : skill.passiveDescriptionEn}`}
                   >
                     <span className={css.partySlot}>{index + 1}</span>
-                    <CreatureSprite creature={creature} size="small" />
+                    <div className={css.partyPortrait} style={portraitStyle}>
+                      <CreatureSprite creature={creature} size="small" />
+                      <i className={css.partyEnergyRing} aria-hidden="true" />
+                    </div>
                     <div className={css.partyCombatantBody}>
                       <div className={css.fighterName}>
                         <strong>{creatureName(creature, props.zh)}</strong>
-                        <span>{props.t(CORE_KEYS[member.quality])}</span>
+                        <span>Lv.{member.level} · {props.t(CORE_KEYS[member.quality])}</span>
                       </div>
-                      <div className={css.hpBar}><i style={{ width: `${percent(member.hp, member.maxHp)}%` }} /></div>
                       <div className={css.energyBar}><i style={{ width: `${percent(member.energy, skill.energyCost)}%` }} /></div>
-                      <small>{member.hp}/{member.maxHp} · {props.t('energy')} {member.energy}/{skill.energyCost}</small>
-                      {member.stageDamage > 0 && <small>{props.t('stageDamage')} +{member.stageDamage}</small>}
+                      <small>{props.t('energy')} {member.energy}/{skill.energyCost}</small>
+                      {member.stageDamage > 0 && <small className={css.partyDamageBadge}>+{member.stageDamage}</small>}
                       {member.frozenStages > 0 && <strong className={css.frozenBadge}>{props.t('frozen')}</strong>}
+                      {member.skillSealedStages > 0 && <strong className={css.sealedBadge}>{props.t('skillSealed')}</strong>}
                       <button
                         type="button"
                         className={css.skillButton}
@@ -1740,12 +1812,22 @@ function BattleView(props: {
                         onClick={() => { castSkill(member.instanceId) }}
                         title={props.zh ? skill.activeDescriptionZh : skill.activeDescriptionEn}
                       >
-                        {props.zh ? skill.activeNameZh : skill.activeNameEn}
+                        {skillReady ? props.t('skillOk') : props.zh ? skill.activeNameZh : skill.activeNameEn}
                       </button>
                     </div>
                   </article>
                 )
               })}
+            </div>
+            <div className={css.sharedPartyVitals}>
+              <div className={css.sharedHpHeader}>
+                <span>{props.t('teamRuntime')}</span>
+                <strong>{battle.partyHp.toLocaleString()} / {battle.partyMaxHp.toLocaleString()}</strong>
+              </div>
+              <div className={`${css.hpBar} ${css.hpTeam}`}>
+                <i style={{ width: `${percent(battle.partyHp, battle.partyMaxHp)}%` }} />
+              </div>
+              {battle.partyShield > 0 && <small>{props.t('shield')} +{battle.partyShield}</small>}
             </div>
           </div>
 
@@ -1762,13 +1844,14 @@ function BattleView(props: {
               </span>
               {activeChain !== undefined && <span className={css.cascadePill}>CHAIN {activeChain}</span>}
             </div>
-            <div
-              className={css.matchBoard}
-              role="grid"
-              aria-label={props.t('boardHelp')}
-              aria-busy={boardLocked}
-            >
-              {visualBoard.map((tile, index) => {
+            <div className={css.boardStage}>
+              <div
+                className={css.matchBoard}
+                role="grid"
+                aria-label={props.t('boardHelp')}
+                aria-busy={boardLocked}
+              >
+                {visualBoard.map((tile, index) => {
                 const dragging = gesture?.index === index
                 const fallDistance = fallRows?.[index] ?? 0
                 const tileStyle = {
@@ -1786,7 +1869,7 @@ function BattleView(props: {
                     role="gridcell"
                     draggable={false}
                     style={tileStyle}
-                    className={`${css.matchTile} ${css[`tile_${tile.ecology}`]} ${selectedTile === index ? css.matchTileSelected : ''} ${dragging ? css.matchTileDragging : ''} ${clearingTiles?.has(index) === true ? css.matchTileClearing : ''} ${fallDistance > 0 ? css.matchTileFalling : ''} ${tile.special !== 'none' ? css.matchTileSpecial : ''} ${(tile.lockedActions ?? 0) > 0 ? css.matchTileLocked : ''} ${swapMotionClass(index, swapMotion)}`}
+                    className={`${css.matchTile} ${css[`tile_${tile.ecology}`]} ${selectedTile === index ? css.matchTileSelected : ''} ${dragging ? css.matchTileDragging : ''} ${clearingTiles?.has(index) === true ? css.matchTileClearing : ''} ${fallDistance > 0 ? css.matchTileFalling : ''} ${tile.special !== 'none' ? css.matchTileSpecial : ''} ${(tile.lockedActions ?? 0) > 0 ? css.matchTileLocked : ''} ${(tile.hazardActions ?? 0) > 0 ? css.matchTileHazard : ''} ${swapMotionClass(index, swapMotion)}`}
                     aria-label={tileLabel(tile, index, props.t)}
                     disabled={boardLocked || (tile.lockedActions ?? 0) > 0}
                     onClick={() => {
@@ -1833,42 +1916,56 @@ function BattleView(props: {
                     <span aria-hidden="true">{TILE_SYMBOLS[tile.ecology]}</span>
                     {tile.special !== 'none' && <b aria-hidden="true">{tile.special === 'origin' ? '◎' : tile.special === 'burst' ? '✣' : tile.special === 'row' ? '↔' : '↕'}</b>}
                     {(tile.lockedActions ?? 0) > 0 && <em aria-hidden="true">⌁</em>}
+                    {(tile.hazardActions ?? 0) > 0 && <small className={css.hazardMark} aria-hidden="true">!</small>}
                   </button>
                 )
-              })}
+                })}
+              </div>
+              {captureReady && (
+                <section className={`${css.captureBoardOverlay} ${captureIntro ? css.captureBoardIntro : ''}`} aria-live="polite">
+                  <header>
+                    <small>CAPTURE PHASE</small>
+                    <strong>{props.t('capturePhaseTitle')}</strong>
+                    <span>{props.t('capturePhaseHint')}</span>
+                  </header>
+                  {availableCores.length === 0 && <p>{props.t('noCores')}</p>}
+                  <div className={css.captureCoreGrid}>
+                    {availableCores.map(quality => (
+                      <button
+                        key={quality}
+                        type="button"
+                        className={css[`core_${quality}`]}
+                        disabled={locked}
+                        onClick={() => { void props.act({ type: 'capture', quality }) }}
+                        aria-label={`${props.t(CORE_KEYS[quality])} · ${Math.round(visibleCaptureChance(props.state, quality) * 100)}% · ${props.state.cores[quality]}`}
+                      >
+                        <i aria-hidden="true" />
+                        <span>{props.t(CORE_KEYS[quality])}</span>
+                        <b>{Math.round(visibleCaptureChance(props.state, quality) * 100)}%</b>
+                        <small>×{props.state.cores[quality]}</small>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className={css.captureAbandon}
+                    disabled={locked}
+                    onClick={() => { void props.act({ type: 'battle-continue' }) }}
+                  >
+                    {props.t('abandonCapture')}
+                  </button>
+                </section>
+              )}
             </div>
             <p className={css.boardHelp}>{props.t('boardHelp')}</p>
           </div>
 
           {battle.mode === 'wild' ? (
-            <div className={`${css.capturePanel} ${captureReady ? css.capturePanelReady : ''}`}>
-              <div>
-                <strong>{props.t('capture')}</strong>
-                <span>{captureReady
-                  ? props.t('captureReady')
-                  : battle.turnOwner === 'boss' ? props.t('bossActing') : props.t('captureLocked')}</span>
-              </div>
-              {availableCores.length === 0 && <p>{props.t('noCores')}</p>}
-              <div className={css.captureButtons}>
-                {availableCores.map(quality => (
-                  <button
-                    key={quality}
-                    type="button"
-                    className={css[`core_${quality}`]}
-                    disabled={locked || !captureReady}
-                    onClick={() => { void props.act({ type: 'capture', quality }) }}
-                    aria-label={`${props.t(CORE_KEYS[quality])} · ${props.state.cores[quality]}`}
-                  >
-                    <i /><span>{props.t(CORE_KEYS[quality])}</span>
-                    <b>{Math.round(visibleCaptureChance(props.state, quality) * 100)}%</b>
-                    <small>×{props.state.cores[quality]}</small>
-                  </button>
-                ))}
-              </div>
+            <>
               {battle.turnOwner === 'player' && !battle.captureWindow && battle.actionsRemaining > 0 && (
                 <button
                   type="button"
-                  className={`${css.continueButton} ${css.skipStageButton}`}
+                  className={`${css.continueButton} ${css.skipStageButton} ${css.battleUtilityAction}`}
                   disabled={locked}
                   title={props.t('skipStageHint')}
                   onClick={() => { void props.act({ type: 'battle-skip-stage' }) }}
@@ -1876,17 +1973,17 @@ function BattleView(props: {
                   {props.t('skipStage')}
                 </button>
               )}
-              {battle.turnOwner === 'player' && (battle.captureWindow || battle.actionsRemaining === 0) && (
+              {battle.turnOwner === 'player' && !battle.captureWindow && battle.actionsRemaining === 0 && (
                 <button
                   type="button"
-                  className={css.continueButton}
+                  className={`${css.continueButton} ${css.battleUtilityAction}`}
                   disabled={locked}
                   onClick={() => { void props.act({ type: 'battle-continue' }) }}
                 >
-                  {battle.captureWindow ? props.t('continueBattle') : props.t('skipFrozen')}
+                  {props.t('skipFrozen')}
                 </button>
               )}
-            </div>
+            </>
           ) : (
             <div className={css.towerBattleStatus}>
               <span className={css.towerBattleMark} aria-hidden="true">▲</span>
@@ -1908,19 +2005,19 @@ function BattleView(props: {
             </div>
           )}
 
-          <div className={css.battleFooterArea}>
-            {(battle.pendingTeamDamage > 0 || battle.lastTeamStrike > 0) && (
-              <div className={css.teamStrikeSummary}>
-                <span>{props.t('pendingDamage')} <b>{battle.pendingTeamDamage}</b></span>
-                <span>{props.t('lastTeamStrike')} <b>{battle.lastTeamDamageApplied}</b></span>
-              </div>
-            )}
-            <p>{props.t('battleHint')}</p>
-            <ol className={css.battleLog}>{latestLog.map((row, index) => (
-              <li key={`${row.turn}-${row.kind}-${index}`}>{battleLogText(row, props.t, props.zh)}</li>
-            ))}</ol>
-          </div>
         </div>
+        {props.transition !== undefined && transitionTitle !== undefined && (
+          <div
+            key={props.transition.key}
+            className={`${css.battleTransition} ${props.transition.kind.startsWith('capture') ? css.battleTransitionCapture : ''} ${props.transition.kind === 'capture-failed' || props.transition.kind === 'battle-lost' ? css.battleTransitionFailed : ''}`}
+            role="status"
+            aria-live="assertive"
+          >
+            <span aria-hidden="true" />
+            <small>{props.transition.kind.startsWith('capture') ? 'CAPTURE' : 'BATTLE RESULT'}</small>
+            <strong>{transitionTitle}</strong>
+          </div>
+        )}
       </section>
     </div>
   )

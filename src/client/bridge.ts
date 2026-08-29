@@ -1,12 +1,13 @@
 import type {
   MatchTile,
+  MatchDamageEffectiveness,
   TraceWildAction,
   TraceWildActionResponse,
   TraceWildBattleAnimation,
   TraceWildSnapshot,
 } from '../core/types.ts'
 import { TRACE_ECOLOGIES } from '../core/catalog.ts'
-import { MATCH_BOARD_CELLS, MAX_MATCH_CASCADES } from '../core/match3.ts'
+import { MATCH_BOARD_CELLS, MAX_MATCH_CASCADES, areAdjacentTiles } from '../core/match3.ts'
 
 const API = '/api/tracewild'
 
@@ -27,16 +28,19 @@ function plainRecord(value: unknown): Record<string, unknown> {
 function matchTile(value: unknown): MatchTile {
   const row = plainRecord(value)
   const keys = Object.keys(row)
-  if ((keys.length !== 2 && keys.length !== 3) || !('ecology' in row) || !('special' in row)
-    || keys.some(key => key !== 'ecology' && key !== 'special' && key !== 'lockedActions')
+  if (keys.length < 2 || keys.length > 4 || !('ecology' in row) || !('special' in row)
+    || keys.some(key => key !== 'ecology' && key !== 'special' && key !== 'lockedActions' && key !== 'hazardActions')
     || !TRACE_ECOLOGIES.includes(row.ecology as never)
     || !TILE_SPECIALS.includes(row.special as never)) throw new TypeError('invalid animation')
   if (row.lockedActions !== undefined && (!Number.isSafeInteger(row.lockedActions)
     || (row.lockedActions as number) < 1 || (row.lockedActions as number) > 2)) throw new TypeError('invalid animation')
+  if (row.hazardActions !== undefined && (!Number.isSafeInteger(row.hazardActions)
+    || (row.hazardActions as number) < 1 || (row.hazardActions as number) > 3)) throw new TypeError('invalid animation')
   return {
     ecology: row.ecology as MatchTile['ecology'],
     special: row.special as MatchTile['special'],
     ...(row.lockedActions === undefined ? {} : { lockedActions: row.lockedActions as number }),
+    ...(row.hazardActions === undefined ? {} : { hazardActions: row.hazardActions as number }),
   }
 }
 
@@ -69,15 +73,43 @@ function battleAnimation(value: unknown): TraceWildBattleAnimation {
       }
       return distance as number
     })
+    const hasDamage = frame.damage !== undefined || frame.totalDamage !== undefined || frame.effectiveness !== undefined
+    if (hasDamage && (!Number.isSafeInteger(frame.damage) || (frame.damage as number) < 0 || (frame.damage as number) > 9_999_999
+      || !Number.isSafeInteger(frame.totalDamage) || (frame.totalDamage as number) < 0 || (frame.totalDamage as number) > 9_999_999
+      || frame.effectiveness !== 'advantage' && frame.effectiveness !== 'neutral' && frame.effectiveness !== 'resisted')) {
+      throw new TypeError('invalid animation')
+    }
+    if (frame.hazardDamage !== undefined && (!Number.isSafeInteger(frame.hazardDamage)
+      || (frame.hazardDamage as number) < 1 || (frame.hazardDamage as number) > 9_999_999)) {
+      throw new TypeError('invalid animation')
+    }
     return {
       chain: frame.chain as number,
       before: matchBoard(frame.before),
       after: matchBoard(frame.after),
       removed,
       fallRows,
+      ...(hasDamage ? {
+        damage: frame.damage as number,
+        totalDamage: frame.totalDamage as number,
+        effectiveness: frame.effectiveness as MatchDamageEffectiveness,
+      } : {}),
+      ...(frame.hazardDamage === undefined ? {} : { hazardDamage: frame.hazardDamage as number }),
     }
   })
-  return { kind: 'match', battleId: row.battleId, frames }
+  if (row.actor !== undefined && row.actor !== 'player' && row.actor !== 'boss') throw new TypeError('invalid animation')
+  let swap: TraceWildBattleAnimation['swap']
+  if (row.swap !== undefined) {
+    const rawSwap = plainRecord(row.swap)
+    if (!Number.isSafeInteger(rawSwap.from) || !Number.isSafeInteger(rawSwap.to)
+      || !areAdjacentTiles(rawSwap.from as number, rawSwap.to as number)) throw new TypeError('invalid animation')
+    swap = { from: rawSwap.from as number, to: rawSwap.to as number }
+  }
+  return {
+    kind: 'match', battleId: row.battleId, frames,
+    ...(row.actor === undefined ? {} : { actor: row.actor }),
+    ...(swap === undefined ? {} : { swap }),
+  }
 }
 
 function snapshot(value: unknown): TraceWildSnapshot {

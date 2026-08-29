@@ -55,6 +55,27 @@ function request(method: string, headers: IncomingMessage['headers'] = {}): Inco
 }
 
 describe('TraceWild Cordis lifecycle', () => {
+  it('rejects every direct Web route before touching game state', async () => {
+    const snapshot = vi.fn()
+    const act = vi.fn()
+    const subscribe = vi.fn()
+    const reject = vi.fn(() => 401 as const)
+    const service = { snapshot, act, subscribe } as unknown as TraceWildService
+    const group = createTraceWildRoutes(service, '.', reject)
+
+    await Promise.all(group.routes.map(async (route) => {
+      const res = response()
+      await route.handler(request(route.path.endsWith('/action') ? 'POST' : 'GET'), res.response)
+      expect(res.statuses).toEqual([401])
+      expect(res.writes).toEqual(['unauthorized'])
+    }))
+
+    expect(reject).toHaveBeenCalledTimes(4)
+    expect(snapshot).not.toHaveBeenCalled()
+    expect(act).not.toHaveBeenCalled()
+    expect(subscribe).not.toHaveBeenCalled()
+  })
+
   it('ends active event streams and removes their subscriptions when unloaded', () => {
     let subscribed = 0
     let unsubscribed = 0
@@ -65,7 +86,7 @@ describe('TraceWild Cordis lifecycle', () => {
         return () => { unsubscribed += 1 }
       },
     } as unknown as TraceWildService
-    const group = createTraceWildRoutes(service, '.')
+    const group = createTraceWildRoutes(service, '.', () => undefined)
     const events = group.routes.find(route => route.path === `${TRACEWILD_API_PREFIX}/events`)!
     const res = response()
 
@@ -83,7 +104,7 @@ describe('TraceWild Cordis lifecycle', () => {
   it('fails closed without committing an action that was awaiting its body during unload', async () => {
     const act = vi.fn()
     const service = { act } as unknown as TraceWildService
-    const group = createTraceWildRoutes(service, '.')
+    const group = createTraceWildRoutes(service, '.', () => undefined)
     const action = group.routes.find(route => route.path === `${TRACEWILD_API_PREFIX}/action`)!
     const req = request('POST', {
       host: '127.0.0.1:63214',

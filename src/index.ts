@@ -1,6 +1,7 @@
 /** Codekin Host plugin. */
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
+import type { HostConnectionHandle } from '@deepseek-ai/dsh-client-connection'
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
 import type { Session, SessionEvent, SessionStore } from '@deepseek-ai/dsh-session'
 import { createTraceWildRoutes } from './host/routes.ts'
@@ -10,7 +11,7 @@ export * from './core/index.ts'
 export { TraceWildService } from './host/service.ts'
 
 export const name = 'dsh-codekin'
-export const inject = ['sessions', 'webServer']
+export const inject = ['sessions', 'webServer', 'connection']
 
 // Local declarations keep development links and a normally installed package
 // on the same public Cordis contract. The official service packages declare
@@ -19,6 +20,7 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     webServer: WebServer
     sessions: SessionStore
+    connection: HostConnectionHandle
   }
   interface Events {
     'session/event'(session: Session, event: SessionEvent): void
@@ -31,7 +33,11 @@ export function apply(ctx: Context): void {
   const assetDirectory = fileURLToPath(new URL('../assets/creatures/', import.meta.url))
 
   ctx.effect(() => {
-    const routeGroup = createTraceWildRoutes(service, assetDirectory)
+    const routeGroup = createTraceWildRoutes(
+      service,
+      assetDirectory,
+      request => ctx.connection.requestRejection(request),
+    )
     const disposers: (() => void)[] = []
     try {
       for (const route of routeGroup.routes) {

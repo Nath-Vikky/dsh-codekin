@@ -1,6 +1,6 @@
 # Codekin
 
-[简体中文](README.zh-CN.md) · [npm](https://www.npmjs.com/package/@nath-vikky/dsh-codekin) · [Releases](https://github.com/Nath-Vikky/dsh-codekin/releases)
+[简体中文](README.zh-CN.md) · [Stable npm package](https://www.npmjs.com/package/@nath-vikky/dsh-codekin) · [GitHub Releases](https://github.com/Nath-Vikky/dsh-codekin/releases)
 
 Codekin is a creature-collection and match-three battle plugin for DeepSeek Harness Web. It turns
 high-level DSH runtime outcomes into local game events without changing prompts, tools, model
@@ -10,19 +10,33 @@ requests, or agent behavior.
 
 ## Install and enable
 
-Install or update the stable release through the DSH profile manager:
+### DSH `0.1.2-alpha.1` preview
+
+Codekin `0.3.0-alpha.1` targets the source-only DSH `0.1.2-alpha.1` preview. It is distributed only
+as a GitHub Release asset and is intentionally blocked from npm publishing:
 
 ```sh
-dsh plugin --profile web add @nath-vikky/dsh-codekin@latest
+dsh plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.0-alpha.1/nath-vikky-dsh-codekin-0.3.0-alpha.1.tgz
 ```
 
 Restart DSH Web after installation, then open **DSH Settings → Codekin** and enable the plugin.
 The launcher is draggable and toggles the compact portrait game window. When idle supplies are
 ready, the launcher changes into a gently animated gift reminder.
 
-Users upgrading from a prerelease should keep the explicit `@latest` suffix once so that a cached
-`next` resolution cannot retain an older release candidate. Release notes and the matching
-prebuilt `.tgz` are also available on the [GitHub Releases page](https://github.com/Nath-Vikky/dsh-codekin/releases/latest).
+This preview adopts the Alpha client-module split and the official browser-authentication cookie.
+Every Codekin state, action, event-stream, and image route rejects unauthenticated requests before
+touching game state.
+
+### Current stable DSH release
+
+For DSH Web `0.1.0-rc.5`, keep using the stable Codekin `0.2.0` package:
+
+```sh
+dsh plugin --profile web add @nath-vikky/dsh-codekin@latest
+```
+
+Do not install the Alpha `.tgz` on rc.5. The two release lines are kept separate so the compatibility
+preview cannot replace the current stable npm package.
 
 ## Core loop
 
@@ -77,8 +91,13 @@ or modify conversations.
 
 ## Compatibility and status
 
-The current stable release is `0.2.0` for DeepSeek Harness Web `0.1.0-rc.5`.
-Stable packages use the npm `latest` tag; future preview builds use `next`.
+- `0.2.0`: stable npm `latest`, for DeepSeek Harness Web `0.1.0-rc.5`.
+- `0.3.0-alpha.1`: GitHub-only prerelease, for the source tag `dsh-v0.1.2-alpha.1`.
+
+The Alpha build has been validated in an isolated official source profile for package installation,
+client composition, authenticated state/action/assets, client-bundle HMR, and live Cordis
+disable/re-enable cleanup. It is still a compatibility preview because upstream Alpha APIs may
+change again before the next stable DSH release.
 
 ## License
 

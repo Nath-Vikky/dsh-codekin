@@ -1966,6 +1966,13 @@ function BattleView(props: {
               {activeChain !== undefined && <span className={css.cascadePill}>CHAIN {activeChain}</span>}
             </div>
             <div className={css.boardStage}>
+              {battle.turnOwner === 'boss' && (
+                <div className={css.enemyActionAlert} role="status" aria-live="polite">
+                  <i aria-hidden="true" />
+                  <strong>{props.t('enemyActing')}</strong>
+                  <span>ENEMY TURN</span>
+                </div>
+              )}
               <div
                 className={css.matchBoard}
                 role="grid"

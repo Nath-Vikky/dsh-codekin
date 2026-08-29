@@ -235,6 +235,7 @@ export declare const zh: {
     readonly bossEnergy: "Boss 指令值";
     readonly bossCharge: "算力蓄积";
     readonly bossActing: "Boss 正在选择交换并积攒算力";
+    readonly enemyActing: "敌方行动中";
     readonly battleBossMatch: "Boss 消除了 {amount} 颗色珠";
     readonly battleBossCombo: "Boss 触发 {amount} 层连锁";
     readonly battleBossEnergy: "Boss 获得 {amount} 点指令值";

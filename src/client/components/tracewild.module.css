@@ -1615,6 +1615,29 @@
 
 .boardStage { position: relative; width: min(100%, clamp(260px, calc(100vh - 480px), 346px)); margin: 0 auto; }
 .boardStage .matchBoard { width: 100%; }
+.enemyActionAlert {
+  position: absolute; z-index: 19; top: 8px; left: 9px; right: 9px; min-height: 31px;
+  display: flex; align-items: center; justify-content: center; gap: 8px; overflow: hidden;
+  border: 1px solid #ffb0b8; border-radius: 10px; padding: 5px 12px;
+  color: #fff; background: linear-gradient(90deg, #8f1730ed, #e7354bea 46%, #b51d37ed);
+  box-shadow: 0 7px 20px #9e183c4a, inset 0 1px #ffffff59, inset 0 -1px #650a1e4f;
+  pointer-events: none; animation: enemyActionAlertIn .22s cubic-bezier(.2,1,.36,1) both;
+}
+.enemyActionAlert::after {
+  content: ''; position: absolute; inset: 0; width: 34%;
+  background: linear-gradient(105deg, transparent, #ffffff3e, transparent);
+  transform: translateX(-170%); animation: enemyActionAlertScan 1.15s ease-in-out infinite;
+}
+.enemyActionAlert > i {
+  width: 7px; height: 7px; flex: 0 0 auto; border: 2px solid #fff; border-radius: 50%;
+  background: #ffced3; box-shadow: 0 0 0 4px #fff2, 0 0 11px #fff;
+  animation: enemyActionAlertPulse .72s ease-in-out infinite alternate;
+}
+.enemyActionAlert > strong { position: relative; z-index: 1; font-size: 11px; line-height: 1; letter-spacing: .08em; }
+.enemyActionAlert > span { position: relative; z-index: 1; opacity: .72; font: 850 7px/1 ui-monospace, monospace; letter-spacing: .12em; }
+@keyframes enemyActionAlertIn { from { opacity: 0; transform: translateY(-7px) scale(.97); } }
+@keyframes enemyActionAlertScan { 48%, 100% { transform: translateX(340%); } }
+@keyframes enemyActionAlertPulse { to { opacity: .55; transform: scale(.72); box-shadow: 0 0 0 2px #fff1, 0 0 4px #fff; } }
 .captureBoardOverlay {
   position: absolute; z-index: 20; inset: 5px; display: grid; align-content: center; gap: 11px;
   border: 1px solid #fffef0e8; border-radius: 17px; padding: 18px 16px;
@@ -1681,5 +1704,6 @@
 @media (prefers-reduced-motion: reduce) {
   .wildBanner .sprite_medium, .wildBanner .enemyAura, .captureBoardOverlay, .captureCoreGrid button,
   .captureBoardIntro > header strong, .battleTransition, .battleTransition::before, .battleTransition::after,
-  .battleTransition > span, .attackWave, .attackImpact, .wildWasHit .sprite_medium { animation: none; }
+  .battleTransition > span, .attackWave, .attackImpact, .wildWasHit .sprite_medium,
+  .enemyActionAlert, .enemyActionAlert::after, .enemyActionAlert > i { animation: none; }
 }

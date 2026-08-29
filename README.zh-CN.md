@@ -11,7 +11,7 @@
 
 ### DSH `0.1.2-alpha.1` 预览版
 
-码灵 `0.3.0-alpha.1` 专门适配仅提供源码的 DSH `0.1.2-alpha.1` 预览版。本版本只通过
+码灵 `0.3.1-alpha.1` 专门适配仅提供源码的 DSH `0.1.2-alpha.1` 预览版。本版本只通过
 GitHub 分发，并通过包清单主动禁止 npm 发布。当前 `main` 分支会提交经过检查的运行时 Bundle，
 因此 dsh-web 创意工坊兼容的仓库安装不需要额外准备 Alpha SDK 源码：
 
@@ -22,7 +22,7 @@ dsh plugin --profile web add https://github.com/Nath-Vikky/dsh-codekin
 如需锁定到可复现的具体版本，请改用 Release 附件：
 
 ```sh
-dsh plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.0-alpha.1/nath-vikky-dsh-codekin-0.3.0-alpha.1.tgz
+dsh plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.1-alpha.1/nath-vikky-dsh-codekin-0.3.1-alpha.1.tgz
 ```
 
 安装后重启 DSH Web，再前往 **DSH 设置 → 码灵** 启用插件。入口图标可以拖动，重复点击可
@@ -95,7 +95,7 @@ dsh plugin --profile web add @nath-vikky/dsh-codekin@latest
 ## 兼容性与状态
 
 - `0.2.0`：npm `latest` 稳定版，适配 DeepSeek Harness Web `0.1.0-rc.5`。
-- `0.3.0-alpha.1`：仅 GitHub 提供的预发行版，适配源码标签 `dsh-v0.1.2-alpha.1`。
+- `0.3.1-alpha.1`：仅 GitHub 提供的预发行版，适配源码标签 `dsh-v0.1.2-alpha.1`。
 
 Alpha 版本已经在隔离的官方源码 Profile 中验证安装、Client 组合、带认证的状态/操作/资源访问、
 Client Bundle HMR，以及 Cordis 实时禁用和恢复时的资源清理。由于上游 Alpha API 在下一个稳定版

@@ -109,6 +109,8 @@ const RARITY_KEYS = {
   common: 'rarityCommon', uncommon: 'rarityUncommon', rare: 'rarityRare', apex: 'rarityApex',
 } as const
 
+const BOSS_ACTION_PAUSE_MS = 860
+
 function CreatureSprite(props: {
   creature: CreatureDefinition
   size?: 'tiny' | 'small' | 'medium' | 'large'
@@ -1614,7 +1616,7 @@ function BattleView(props: {
     bossActionTimer.current = window.setTimeout(() => {
       bossActionTimer.current = undefined
       runBossAction()
-    }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 30 : 560)
+    }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 30 : BOSS_ACTION_PAUSE_MS)
     return () => {
       if (bossActionTimer.current !== undefined) window.clearTimeout(bossActionTimer.current)
       bossActionTimer.current = undefined

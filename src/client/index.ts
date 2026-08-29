@@ -1,7 +1,8 @@
 /** Codekin browser plugin. */
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
-import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { TraceWildOverlay } from './components/TraceWildOverlay.tsx'
@@ -9,9 +10,17 @@ import { TraceWildSettings } from './components/TraceWildSettings.tsx'
 import { styleId, styleText } from './components/tracewild.module.css'
 import { en, NS, zh } from './locales.ts'
 
-// rc.5 re-exports the owner type but does not retain its SlotMap augmentation
-// in every standalone consumer declaration build, so keep the exact contract
-// local as well. It is identical to the canonical settings-domain entry.
+// Standalone plugin declaration builds can resolve Cordis through a different
+// workspace symlink than the Alpha client packages. Keep the exact public
+// service and slot contracts local so the emitted plugin declarations remain
+// deterministic outside the DSH monorepo.
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    locale: LocaleRuntime
+    slots: SlotRegistry
+  }
+}
+
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     'settings.section': { kind: 'list'; scope: 'root'; owner: SettingsSectionOwnerProps }

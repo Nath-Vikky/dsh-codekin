@@ -51,6 +51,8 @@ export interface TraceWildRouteGroup {
   close(): void
 }
 
+export type TraceWildRequestRejection = (request: IncomingMessage) => 401 | 403 | undefined
+
 const ASSET_FILES = new Set([
   'sprites/codekin-launcher-v1.webp',
   ...CREATURE_CATALOG.map(creature => `sprites/${creature.id}.webp`),
@@ -75,6 +77,18 @@ function sendJson(res: ServerResponse, status: number, value: unknown): void {
 
 function failure(res: ServerResponse, status: number, error: TraceWildFailureResponse['error']): void {
   sendJson(res, status, { ok: false, error } satisfies TraceWildFailureResponse)
+}
+
+function rejectUntrusted(
+  req: IncomingMessage,
+  res: ServerResponse,
+  requestRejection: TraceWildRequestRejection,
+): boolean {
+  const status = requestRejection(req)
+  if (status === undefined) return false
+  res.writeHead(status, securityHeaders())
+  res.end(status === 401 ? 'unauthorized' : 'forbidden')
+  return true
 }
 
 function sameOrigin(req: IncomingMessage): boolean {
@@ -146,11 +160,16 @@ function readBody(req: IncomingMessage, signal: AbortSignal): Promise<unknown> {
   })
 }
 
-function stateRoute(service: TraceWildService, lifecycle: TraceWildRouteLifecycle): WebRoute {
+function stateRoute(
+  service: TraceWildService,
+  lifecycle: TraceWildRouteLifecycle,
+  requestRejection: TraceWildRequestRejection,
+): WebRoute {
   return {
     kind: 'exact',
     path: `${TRACEWILD_API_PREFIX}/state`,
     handler(req, res) {
+      if (rejectUntrusted(req, res, requestRejection)) return
       if (req.method !== 'GET') {
         res.writeHead(405, securityHeaders())
         res.end()
@@ -165,11 +184,16 @@ function stateRoute(service: TraceWildService, lifecycle: TraceWildRouteLifecycl
   }
 }
 
-function actionRoute(service: TraceWildService, lifecycle: TraceWildRouteLifecycle): WebRoute {
+function actionRoute(
+  service: TraceWildService,
+  lifecycle: TraceWildRouteLifecycle,
+  requestRejection: TraceWildRequestRejection,
+): WebRoute {
   return {
     kind: 'exact',
     path: `${TRACEWILD_API_PREFIX}/action`,
     async handler(req, res) {
+      if (rejectUntrusted(req, res, requestRejection)) return
       if (req.method !== 'POST') {
         res.writeHead(405, securityHeaders())
         res.end()
@@ -202,11 +226,16 @@ function actionRoute(service: TraceWildService, lifecycle: TraceWildRouteLifecyc
   }
 }
 
-function eventsRoute(service: TraceWildService, lifecycle: TraceWildRouteLifecycle): WebRoute {
+function eventsRoute(
+  service: TraceWildService,
+  lifecycle: TraceWildRouteLifecycle,
+  requestRejection: TraceWildRequestRejection,
+): WebRoute {
   return {
     kind: 'exact',
     path: `${TRACEWILD_API_PREFIX}/events`,
     handler(req, res) {
+      if (rejectUntrusted(req, res, requestRejection)) return
       if (req.method !== 'GET') {
         res.writeHead(405, securityHeaders())
         res.end()
@@ -255,11 +284,16 @@ function eventsRoute(service: TraceWildService, lifecycle: TraceWildRouteLifecyc
   }
 }
 
-function assetRoute(assetDirectory: string, lifecycle: TraceWildRouteLifecycle): WebRoute {
+function assetRoute(
+  assetDirectory: string,
+  lifecycle: TraceWildRouteLifecycle,
+  requestRejection: TraceWildRequestRejection,
+): WebRoute {
   return {
     kind: 'prefix',
     path: `${TRACEWILD_API_PREFIX}/assets`,
     async handler(req, res) {
+      if (rejectUntrusted(req, res, requestRejection)) return
       if (req.method !== 'GET') {
         res.writeHead(405, securityHeaders())
         res.end()
@@ -297,14 +331,18 @@ function assetRoute(assetDirectory: string, lifecycle: TraceWildRouteLifecycle):
   }
 }
 
-export function createTraceWildRoutes(service: TraceWildService, assetDirectory: string): TraceWildRouteGroup {
+export function createTraceWildRoutes(
+  service: TraceWildService,
+  assetDirectory: string,
+  requestRejection: TraceWildRequestRejection,
+): TraceWildRouteGroup {
   const lifecycle = new TraceWildRouteLifecycle()
   return {
     routes: [
-      stateRoute(service, lifecycle),
-      actionRoute(service, lifecycle),
-      eventsRoute(service, lifecycle),
-      assetRoute(assetDirectory, lifecycle),
+      stateRoute(service, lifecycle, requestRejection),
+      actionRoute(service, lifecycle, requestRejection),
+      eventsRoute(service, lifecycle, requestRejection),
+      assetRoute(assetDirectory, lifecycle, requestRejection),
     ],
     close: () => { lifecycle.close() },
   }

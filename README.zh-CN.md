@@ -1,6 +1,6 @@
 # 码灵（Codekin）
 
-[English](README.md) · [npm](https://www.npmjs.com/package/@nath-vikky/dsh-codekin) · [版本发布](https://github.com/Nath-Vikky/dsh-codekin/releases)
+[English](README.md) · [稳定版 npm 包](https://www.npmjs.com/package/@nath-vikky/dsh-codekin) · [GitHub 版本发布](https://github.com/Nath-Vikky/dsh-codekin/releases)
 
 码灵是一款面向 DeepSeek Harness Web 的精灵收集与三消对战插件。它会将 DSH
 运行过程中的高层结果转化为本地游戏事件，不修改提示词、工具、模型请求或 Agent 行为。
@@ -9,18 +9,39 @@
 
 ## 安装与启用
 
-通过 DSH Profile 管理器安装或更新稳定版：
+### DSH `0.1.2-alpha.1` 预览版
+
+码灵 `0.3.0-alpha.1` 专门适配仅提供源码的 DSH `0.1.2-alpha.1` 预览版。本版本只通过
+GitHub 分发，并通过包清单主动禁止 npm 发布。当前 `main` 分支会提交经过检查的运行时 Bundle，
+因此 dsh-web 创意工坊兼容的仓库安装不需要额外准备 Alpha SDK 源码：
 
 ```sh
-dsh plugin --profile web add @nath-vikky/dsh-codekin@latest
+dsh plugin --profile web add https://github.com/Nath-Vikky/dsh-codekin
+```
+
+如需锁定到可复现的具体版本，请改用 Release 附件：
+
+```sh
+dsh plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.0-alpha.1/nath-vikky-dsh-codekin-0.3.0-alpha.1.tgz
 ```
 
 安装后重启 DSH Web，再前往 **DSH 设置 → 码灵** 启用插件。入口图标可以拖动，重复点击可
 开关竖屏游戏窗口；挂机补给可领取时，入口会变成带有轻微动效的礼盒提醒。
 
-从预发布版本升级的用户建议至少显式使用一次 `@latest`，避免本机缓存的 `next` 解析继续
-保留旧候选版本。版本说明和对应的预构建 `.tgz` 也可以从
-[GitHub Releases](https://github.com/Nath-Vikky/dsh-codekin/releases/latest) 获取。
+该预览版已经迁移到 Alpha 的 Client 模块拆分结构，并接入官方浏览器认证 Cookie。码灵的状态、
+操作、事件流和图片接口都会先拒绝未认证请求，再接触游戏状态。
+
+此前可通过 npm 构建的源码线保留在 `stable/0.2.x` 分支。
+
+### 当前稳定版 DSH
+
+如果你仍在使用 DSH Web `0.1.0-rc.5`，请继续安装稳定版码灵 `0.2.0`：
+
+```sh
+dsh plugin --profile web add @nath-vikky/dsh-codekin@latest
+```
+
+请不要把 Alpha `.tgz` 安装到 rc.5。两个发布线保持隔离，兼容预览版不会替换当前 npm 稳定版。
 
 ## 核心循环
 
@@ -68,8 +89,12 @@ dsh plugin --profile web add @nath-vikky/dsh-codekin@latest
 
 ## 兼容性与状态
 
-当前稳定版为适配 DeepSeek Harness Web `0.1.0-rc.5` 的 `0.2.0`。
-稳定版本使用 npm 的 `latest` 标签；后续预览版本使用 `next`。
+- `0.2.0`：npm `latest` 稳定版，适配 DeepSeek Harness Web `0.1.0-rc.5`。
+- `0.3.0-alpha.1`：仅 GitHub 提供的预发行版，适配源码标签 `dsh-v0.1.2-alpha.1`。
+
+Alpha 版本已经在隔离的官方源码 Profile 中验证安装、Client 组合、带认证的状态/操作/资源访问、
+Client Bundle HMR，以及 Cordis 实时禁用和恢复时的资源清理。由于上游 Alpha API 在下一个稳定版
+之前仍可能变化，本版本仍标记为兼容性预览版。
 
 ## 许可证
 

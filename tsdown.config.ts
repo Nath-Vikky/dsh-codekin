@@ -24,7 +24,6 @@ const CLIENT_EXTERNALS = new Set([
   '@deepseek-ai/dsh-client-ui-slots',
   '@deepseek-ai/dsh-client-ui-settings/client',
   '@deepseek-ai/dsh-client-ui-primitives',
-  '@deepseek-ai/dsh-client-runtime/client',
 ])
 
 function sourceAssetPath(source: string, importer: string): string {
@@ -94,9 +93,13 @@ const client: UserConfig = {
       if (!virtualId.startsWith(CSS_PREFIX)) return null
       const file = CSS_FILES.get(virtualId)
       if (file === undefined) throw new Error(`missing CSS source for ${virtualId}`)
+      const logicalId = virtualId.slice(CSS_PREFIX.length, -CSS_SUFFIX.length)
       this.addWatchFile(file)
       const result = transform({
-        filename: file,
+        // lightningcss includes the filename in CSS-module hashes. Keep it
+        // repository-relative so committed GitHub-install artifacts are
+        // reproducible across checkout paths and operating systems.
+        filename: logicalId,
         code: await readFile(file),
         cssModules: { pattern: '[hash]_[local]' },
         minify: true,

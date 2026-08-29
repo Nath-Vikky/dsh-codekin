@@ -92,6 +92,16 @@ export interface TraceWildBattleAnimation {
   frames: MatchCascadeFrame[]
   actor?: 'player' | 'boss'
   swap?: { from: number; to: number }
+  /** Final, authoritative hit applied after the board cascade has finished. */
+  strike?: TraceWildBattleStrike
+}
+
+export interface TraceWildBattleStrike {
+  actor: 'player' | 'boss'
+  damage: number
+  targetHpBefore: number
+  targetHpAfter: number
+  targetMaxHp: number
 }
 
 export interface BattlePartyMember {

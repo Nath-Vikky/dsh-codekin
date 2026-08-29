@@ -74,6 +74,7 @@ import type {
   WildEncounter,
   TraceWildAction,
   TraceWildBattleAnimation,
+  TraceWildBattleStrike,
   TraceWildIdleReward,
   TraceWildState,
 } from './types.ts'
@@ -1255,8 +1256,24 @@ function beginBossPhase(battle: BattleState, random: RandomSource): BattleOutcom
   return 'none'
 }
 
-function finishBossPhase(battle: BattleState, random: RandomSource): BattleOutcome {
-  if (performBossSettlement(battle, random)) return 'battle-lost'
+interface BattleStageCompletion {
+  outcome: BattleOutcome
+  strike?: TraceWildBattleStrike
+}
+
+function finishBossPhase(battle: BattleState, random: RandomSource): BattleStageCompletion {
+  const targetHpBefore = battle.partyHp
+  const defeated = performBossSettlement(battle, random)
+  const strike = battle.lastBossAttack > 0
+    ? {
+        actor: 'boss' as const,
+        damage: battle.lastBossAttack,
+        targetHpBefore,
+        targetHpAfter: battle.partyHp,
+        targetMaxHp: battle.partyMaxHp,
+      }
+    : undefined
+  if (defeated) return { outcome: 'battle-lost', ...(strike === undefined ? {} : { strike }) }
   battle.turnOwner = 'player'
   battle.bossActionsRemaining = 0
   battle.bossActionsTaken = 0
@@ -1264,24 +1281,38 @@ function finishBossPhase(battle: BattleState, random: RandomSource): BattleOutco
   battle.pendingBossDamage = 0
   battle.bossDamageScale = 1000
   battle.bossBonusActionsGranted = 0
-  if (advanceBattleStage(battle)) return 'battle-lost'
+  if (advanceBattleStage(battle)) return { outcome: 'battle-lost', ...(strike === undefined ? {} : { strike }) }
   prepareBossIntent(battle, random)
-  return 'none'
+  return { outcome: 'none', ...(strike === undefined ? {} : { strike }) }
 }
 
 function completeBattleStage(
   battle: BattleState,
   random: RandomSource,
-): BattleOutcome {
+): BattleStageCompletion {
   const next = nextLivingIndex(battle)
   const wrapped = next?.wrapped === true
-  if (wrapped && settleTeamStrike(battle)) return 'wild-defeated'
-  if (wrapped && isCaptureWindowAvailable(battle)) {
-    battle.captureWindow = true
-    return 'none'
+  if (wrapped) {
+    const targetHpBefore = battle.wildHp
+    const defeated = settleTeamStrike(battle)
+    const strike = battle.lastTeamStrike > 0
+      ? {
+          actor: 'player' as const,
+          damage: battle.lastTeamDamageApplied,
+          targetHpBefore,
+          targetHpAfter: battle.wildHp,
+          targetMaxHp: battle.wildMaxHp,
+        }
+      : undefined
+    if (defeated) return { outcome: 'wild-defeated', ...(strike === undefined ? {} : { strike }) }
+    if (isCaptureWindowAvailable(battle)) {
+      battle.captureWindow = true
+      return { outcome: 'none', ...(strike === undefined ? {} : { strike }) }
+    }
+    const outcome = beginBossPhase(battle, random)
+    return { outcome, ...(strike === undefined ? {} : { strike }) }
   }
-  if (wrapped) return beginBossPhase(battle, random)
-  return advanceBattleStage(battle) ? 'battle-lost' : 'none'
+  return { outcome: advanceBattleStage(battle) ? 'battle-lost' : 'none' }
 }
 
 function performBattleSwap(
@@ -1315,10 +1346,11 @@ function performBattleSwap(
   ageTileLocks(battle)
   if (battle.affinityFloorActions > 0) battle.affinityFloorActions -= 1
   if (battle.boardLockActions > 0) battle.boardLockActions -= 1
-  const outcome = battle.partyHp <= 0
-    ? 'battle-lost'
-    : battle.actionsRemaining === 0 ? completeBattleStage(battle, random) : 'none'
-  return { outcome, animation }
+  const completion = battle.partyHp <= 0
+    ? { outcome: 'battle-lost' as const }
+    : battle.actionsRemaining === 0 ? completeBattleStage(battle, random) : { outcome: 'none' as const }
+  if (completion.strike !== undefined) animation.strike = completion.strike
+  return { outcome: completion.outcome, animation }
 }
 
 function performBossBoardAction(
@@ -1380,11 +1412,14 @@ function performBossBoardAction(
     battle.bossActionsRemaining = Math.max(0, beforeActions - 1)
   }
   if (battle.bossActionsTaken >= MAX_BOSS_SWAPS_PER_PHASE) battle.bossActionsRemaining = 0
-  const outcome = battle.bossActionsRemaining === 0 ? finishBossPhase(battle, random) : 'none'
+  const completion = battle.bossActionsRemaining === 0
+    ? finishBossPhase(battle, random)
+    : { outcome: 'none' as const }
   return {
-    outcome,
+    outcome: completion.outcome,
     animation: {
       kind: 'match', battleId: battle.id, actor: 'boss', swap: { from: swap.from, to: swap.to }, frames: resolution.frames,
+      ...(completion.strike === undefined ? {} : { strike: completion.strike }),
     },
   }
 }
@@ -1404,10 +1439,16 @@ function continueBattle(
   }
   active.frozenStages -= 1
   appendBattleLog(battle, { turn: battle.turn, kind: 'frozen-skip', creatureId: active.creatureId })
-  return { outcome: completeBattleStage(battle, random) }
+  const completion = completeBattleStage(battle, random)
+  return {
+    outcome: completion.outcome,
+    ...(completion.strike === undefined
+      ? {}
+      : { animation: { kind: 'match', battleId: battle.id, actor: 'player', frames: [], strike: completion.strike } }),
+  }
 }
 
-function skipPlayerStage(battle: BattleState, random: RandomSource): BattleOutcome {
+function skipPlayerStage(battle: BattleState, random: RandomSource): BattleStageCompletion {
   const active = battle.party[battle.activeIndex]
   if (battle.turnOwner !== 'player' || battle.captureWindow
     || battle.actionsRemaining <= 0 || active === undefined || battle.partyHp <= 0) {
@@ -1831,12 +1872,16 @@ export function applyTraceWildAction(
     }
     case 'battle-skip-stage': {
       if (next.battle === undefined) throw new TraceWildRuleError('conflict')
-      const outcome = skipPlayerStage(next.battle, random)
-      if (outcome === 'battle-lost') {
+      const battleId = next.battle.id
+      const result = skipPlayerStage(next.battle, random)
+      if (result.strike !== undefined) {
+        animation = { kind: 'match', battleId, actor: 'player', frames: [], strike: result.strike }
+      }
+      if (result.outcome === 'battle-lost') {
         logBattleDefeat(next, now, random)
         delete next.battle
         notice = 'battle-lost'
-      } else if (outcome === 'wild-defeated') {
+      } else if (result.outcome === 'wild-defeated') {
         notice = settleBattleVictory(next, now, random)
       }
       break

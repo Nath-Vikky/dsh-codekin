@@ -202,6 +202,7 @@ describe('TraceWild match battle', () => {
     if (cleared === undefined) throw new Error('tower did not settle')
     expect(cleared.notice).toBe('tower-cleared')
     expect(cleared.state.battle).toBeUndefined()
+    expect(cleared.animation?.strike).toMatchObject({ actor: 'player', targetHpAfter: 0 })
     expect(cleared.state.tower).toMatchObject({ highestClearedFloor: 1, attempts: 1, clears: 1 })
     expect(Object.values(cleared.state.tower.lastReward!.materials).reduce((sum, count) => sum + count, 0)).toBe(1)
     expect(Object.values(cleared.state.materials).reduce((sum, count) => sum + count, 0)).toBe(1)
@@ -219,6 +220,7 @@ describe('TraceWild match battle', () => {
     state.battle!.wildHp = 9999
     state.battle!.wildMaxHp = 9999
     let moves = 0
+    let playerStrike: NonNullable<NonNullable<ReturnType<typeof applyTraceWildAction>['animation']>['strike']> | undefined
     while (state.battle?.stage === 1 && state.battle.turnOwner === 'player' && moves < 20) {
       const swap = findFirstLegalBattleSwap(state.battle!.board)
       expect(swap).toBeDefined()
@@ -232,14 +234,22 @@ describe('TraceWild match battle', () => {
         totalDamage: expect.any(Number),
         effectiveness: expect.stringMatching(/^(advantage|neutral|resisted)$/),
       })
+      if (result.animation?.strike !== undefined) playerStrike = result.animation.strike
       state = result.state
       moves += 1
     }
     expect(moves).toBeGreaterThanOrEqual(3)
     expect(state.battle?.turnOwner).toBe('boss')
     expect(state.battle?.bossActionsRemaining).toBe(3)
+    expect(playerStrike).toMatchObject({
+      actor: 'player',
+      targetHpBefore: 9999,
+      targetHpAfter: expect.any(Number),
+      targetMaxHp: 9999,
+    })
     let bossMoves = 0
     let bossDamageTotal = 0
+    let bossStrike: typeof playerStrike
     const bossRandom = seededRandom(0xc0de_0088)
     while (state.battle?.turnOwner === 'boss' && bossMoves < 10) {
       const result = applyTraceWildAction(state, { type: 'battle-continue' }, bossRandom, 260 + bossMoves)
@@ -254,6 +264,7 @@ describe('TraceWild match battle', () => {
         expect(frame.totalDamage).toBeGreaterThan(bossDamageTotal)
         bossDamageTotal = frame.totalDamage ?? bossDamageTotal
       }
+      if (result.animation?.strike !== undefined) bossStrike = result.animation.strike
       state = result.state
       bossMoves += 1
     }
@@ -265,6 +276,13 @@ describe('TraceWild match battle', () => {
     expect(state.battle?.lastTeamStrike).toBeGreaterThan(0)
     expect(state.battle?.lastBossAttack).toBeGreaterThan(0)
     expect(state.battle?.lastBossAttack).toBe(bossDamageTotal)
+    expect(bossStrike).toMatchObject({
+      actor: 'boss',
+      damage: bossDamageTotal,
+      targetHpBefore: 1000,
+      targetHpAfter: state.battle?.partyHp,
+      targetMaxHp: 1000,
+    })
     expect(state.battle?.log.some(row => row.kind === 'boss-match')).toBe(true)
   })
 

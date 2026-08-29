@@ -31,6 +31,7 @@ import type {
   TraceLogEntry,
   TraceWildAction,
   TraceWildActionResponse,
+  TraceWildBattleStrike,
   TraceWildSnapshot,
 } from '../../core/types.ts'
 import { TraceWildConnectionError, createTraceWildConnection } from '../bridge.ts'
@@ -93,6 +94,8 @@ interface BattleTransition {
   key: number
   kind: BattleTransitionKind
 }
+
+type BattleActionPresenter = (response: TraceWildActionResponse) => Promise<void>
 
 export type TraceWildOverlayProps = PropsRuntime<'shell.overlay'> & PropsLocale<'tracewild'>
 
@@ -623,7 +626,10 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
   }
 
-  const act = useCallback(async (action: TraceWildAction): Promise<TraceWildActionResponse | undefined> => {
+  const act = useCallback(async (
+    action: TraceWildAction,
+    present?: BattleActionPresenter,
+  ): Promise<TraceWildActionResponse | undefined> => {
     if (busy || actionInFlight.current) return undefined
     actionInFlight.current = true
     setBusy(true)
@@ -637,6 +643,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
         || response.notice === 'battle-lost'
         ? response.notice
         : undefined
+      if (present !== undefined) await present(response)
       if (transitionKind !== undefined && latestSnapshot.current?.state.battle !== undefined) {
         setBattleTransition({ key: Date.now(), kind: transitionKind })
         await new Promise<void>(resolve => {
@@ -1376,6 +1383,11 @@ interface DamageReadout {
   settled: boolean
 }
 
+interface AttackPresentation extends TraceWildBattleStrike {
+  key: number
+  phase: 'flight' | 'impact'
+}
+
 function swipeTarget(index: number, deltaX: number, deltaY: number): number | undefined {
   const row = Math.floor(index / MATCH_BOARD_SIZE)
   const column = index % MATCH_BOARD_SIZE
@@ -1415,7 +1427,7 @@ function BattleView(props: {
   t: TraceWildOverlayProps['t']
   zh: boolean
   busy: boolean
-  act: (action: TraceWildAction) => Promise<TraceWildActionResponse | undefined>
+  act: (action: TraceWildAction, present?: BattleActionPresenter) => Promise<TraceWildActionResponse | undefined>
   transition?: BattleTransition | undefined
 }) {
   const battle = props.state.battle!
@@ -1430,6 +1442,9 @@ function BattleView(props: {
   const [damageReadout, setDamageReadout] = useState<DamageReadout>()
   const [captureIntro, setCaptureIntro] = useState(false)
   const [partyHitKey, setPartyHitKey] = useState(0)
+  const [attackPresentation, setAttackPresentation] = useState<AttackPresentation>()
+  const [displayedWildHp, setDisplayedWildHp] = useState(battle.wildHp)
+  const [displayedPartyHp, setDisplayedPartyHp] = useState(battle.partyHp)
   const gestureRef = useRef<TileGesture>()
   const bossActionInFlight = useRef(false)
   const bossActionTimer = useRef<number>()
@@ -1447,8 +1462,6 @@ function BattleView(props: {
   const activeDefinition = active === undefined ? undefined : creatureById(active.creatureId)
   const locked = props.busy || animating
   const boardLocked = locked || battle.turnOwner === 'boss' || battle.captureWindow || battle.actionsRemaining <= 0
-  const partyHp = battle.partyHp
-
   useEffect(() => {
     setSelectedTile(undefined)
     gestureRef.current = undefined
@@ -1477,7 +1490,13 @@ function BattleView(props: {
     setFallRows(undefined)
     setActiveChain(undefined)
     setVisualBoard(battle.board.map(tile => ({ ...tile })))
+    setAttackPresentation(undefined)
+    setDisplayedWildHp(battle.wildHp)
+    setDisplayedPartyHp(battle.partyHp)
   }, [battle.id])
+
+  useEffect(() => { setDisplayedWildHp(battle.wildHp) }, [battle.id, battle.wildHp])
+  useEffect(() => { setDisplayedPartyHp(battle.partyHp) }, [battle.id, battle.partyHp])
 
   useEffect(() => {
     if (!animating) setVisualBoard(battle.board.map(tile => ({ ...tile })))
@@ -1486,7 +1505,7 @@ function BattleView(props: {
   useEffect(() => {
     const previous = previousBattle.current
     if (previous.id !== battle.id) {
-      previousBattle.current = { id: battle.id, wildHp: battle.wildHp, partyHp }
+      previousBattle.current = { id: battle.id, wildHp: battle.wildHp, partyHp: battle.partyHp }
       setDamageReadout(undefined)
       return
     }
@@ -1501,9 +1520,9 @@ function BattleView(props: {
         settled: false,
       }))
     }
-    if (previous.partyHp > partyHp) setPartyHitKey(value => value + 1)
-    previousBattle.current = { id: battle.id, wildHp: battle.wildHp, partyHp }
-  }, [animating, battle.id, battle.lastTeamDamageApplied, battle.pendingTeamDamage, battle.wildHp, partyHp])
+    if (previous.partyHp > battle.partyHp) setPartyHitKey(value => value + 1)
+    previousBattle.current = { id: battle.id, wildHp: battle.wildHp, partyHp: battle.partyHp }
+  }, [animating, battle.id, battle.lastTeamDamageApplied, battle.pendingTeamDamage, battle.wildHp, battle.partyHp])
 
   useEffect(() => () => {
     animationEpoch.current += 1
@@ -1534,7 +1553,7 @@ function BattleView(props: {
 
   const playCascade = async (
     animation: NonNullable<TraceWildActionResponse['animation']>,
-    finalBattle: NonNullable<TraceWildSnapshot['state']['battle']>,
+    finalBattle: TraceWildSnapshot['state']['battle'],
   ): Promise<void> => {
     if (animation.battleId !== battle.id) return
     const epoch = ++animationEpoch.current
@@ -1570,7 +1589,18 @@ function BattleView(props: {
     }
     if (animationEpoch.current !== epoch) return
     setActiveChain(undefined)
-    setVisualBoard(finalBattle.board.map(tile => ({ ...tile })))
+    const finalBoard = finalBattle?.board ?? animation.frames.at(-1)?.after ?? battle.board
+    setVisualBoard(finalBoard.map(tile => ({ ...tile })))
+    if (animation.strike !== undefined) {
+      setDamageReadout({
+        key: Date.now(),
+        actor: animation.strike.actor,
+        total: animation.strike.damage,
+        settled: false,
+      })
+      return
+    }
+    if (finalBattle === undefined) return
     if (animation.actor !== 'boss') {
       const total = finalBattle.pendingTeamDamage > 0
         ? finalBattle.pendingTeamDamage
@@ -1591,6 +1621,43 @@ function BattleView(props: {
     }
   }
 
+  const playStrike = async (strike: TraceWildBattleStrike): Promise<void> => {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const key = Date.now()
+    setAttackPresentation({ ...strike, key, phase: 'flight' })
+    setDamageReadout({ key, actor: strike.actor, total: strike.damage, settled: false })
+    await pause(reducedMotion ? 40 : 540)
+    setAttackPresentation({ ...strike, key, phase: 'impact' })
+    if (strike.actor === 'player') {
+      setDisplayedWildHp(strike.targetHpAfter)
+    } else {
+      setDisplayedPartyHp(strike.targetHpAfter)
+      setPartyHitKey(value => value + 1)
+    }
+    previousBattle.current = strike.actor === 'player'
+      ? { ...previousBattle.current, wildHp: strike.targetHpAfter }
+      : { ...previousBattle.current, partyHp: strike.targetHpAfter }
+    setDamageReadout({ key: key + 1, actor: strike.actor, total: strike.damage, settled: true })
+    await pause(reducedMotion ? 40 : 340)
+    setAttackPresentation(undefined)
+  }
+
+  const presentBattleResponse: BattleActionPresenter = async response => {
+    const animation = response.animation
+    if (animation === undefined || animation.battleId !== battle.id) return
+    const finalBattle = response.state.battle?.id === battle.id ? response.state.battle : undefined
+    const motion = animation.swap
+    if (motion !== undefined && animation.actor === 'boss') {
+      setSwapMotion(motion)
+      await pause(window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 20 : 220)
+      setSwapMotion(undefined)
+    } else {
+      setSwapMotion(undefined)
+    }
+    await playCascade(animation, finalBattle)
+    if (animation.strike !== undefined) await playStrike(animation.strike)
+  }
+
   const runBossAction = (): void => {
     if (battle.turnOwner !== 'boss' || props.busy || animating || bossActionInFlight.current) return
     bossActionInFlight.current = true
@@ -1598,18 +1665,7 @@ function BattleView(props: {
       ? current
       : { key: Date.now(), actor: 'boss', total: 0, settled: false })
     setAnimating(true)
-    void props.act({ type: 'battle-continue' }).then(async (response) => {
-      const finalBattle = response?.state.battle
-      if (response?.animation !== undefined && finalBattle?.id === battle.id) {
-        const motion = response.animation.swap
-        if (motion !== undefined) {
-          setSwapMotion(motion)
-          await pause(window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 20 : 220)
-          setSwapMotion(undefined)
-        }
-        await playCascade(response.animation, finalBattle)
-      }
-    }).finally(() => {
+    void props.act({ type: 'battle-continue' }, presentBattleResponse).finally(() => {
       bossActionInFlight.current = false
       setSwapMotion(undefined)
       setClearingTiles(undefined)
@@ -1634,7 +1690,20 @@ function BattleView(props: {
   if ((battle.mode === 'wild' && encounter === undefined) || wild === undefined || active === undefined || activeDefinition === undefined) return null
   const availableCores = CAPTURE_CORE_QUALITIES.filter(quality => props.state.cores[quality] > 0)
   const captureReady = battle.mode === 'wild' && battle.captureWindow
-  const predictedHp = Math.max(0, battle.wildHp - Math.max(0, battle.pendingTeamDamage - battle.wildShield))
+  const playerStrikeLanded = attackPresentation?.actor === 'player' && attackPresentation.phase === 'impact'
+    || displayedWildHp < battle.wildHp
+  const bossStrikeLanded = attackPresentation?.actor === 'boss' && attackPresentation.phase === 'impact'
+    || displayedPartyHp < battle.partyHp
+  const bossDamageForecast = damageReadout?.actor === 'boss' && !damageReadout.settled
+    ? Math.max(battle.pendingBossDamage, damageReadout.total)
+    : battle.pendingBossDamage
+  const predictedHp = playerStrikeLanded
+    ? displayedWildHp
+    : Math.max(0, displayedWildHp - Math.max(0, battle.pendingTeamDamage - battle.wildShield))
+  const predictedPartyHp = bossStrikeLanded
+    ? displayedPartyHp
+    : Math.max(0, displayedPartyHp - Math.max(0, bossDamageForecast - battle.partyShield))
+  const partyDamagePreview = Math.max(0, displayedPartyHp - predictedPartyHp)
   const enemyTarget = battle.enemyTargetScope === 'team'
     ? props.t('targetTeam')
     : battle.enemyTargetScope === 'self'
@@ -1672,13 +1741,7 @@ function BattleView(props: {
     setAnimating(true)
     swapTimer.current = window.setTimeout(() => {
       swapTimer.current = undefined
-      void props.act({ type: 'battle-swap', from, to }).then(async (response) => {
-        setSwapMotion(undefined)
-        const finalBattle = response?.state.battle
-        if (response?.animation !== undefined && finalBattle?.id === battle.id) {
-          await playCascade(response.animation, finalBattle)
-        }
-      }).finally(() => {
+      void props.act({ type: 'battle-swap', from, to }, presentBattleResponse).finally(() => {
         setClearingTiles(undefined)
         setFallRows(undefined)
         setActiveChain(undefined)
@@ -1690,12 +1753,7 @@ function BattleView(props: {
   const castSkill = (creatureInstanceId: string): void => {
     if (boardLocked) return
     setAnimating(true)
-    void props.act({ type: 'battle-cast', creatureInstanceId }).then(async (response) => {
-      const finalBattle = response?.state.battle
-      if (response?.animation !== undefined && finalBattle?.id === battle.id) {
-        await playCascade(response.animation, finalBattle)
-      }
-    }).finally(() => {
+    void props.act({ type: 'battle-cast', creatureInstanceId }, presentBattleResponse).finally(() => {
       setClearingTiles(undefined)
       setFallRows(undefined)
       setActiveChain(undefined)
@@ -1741,6 +1799,17 @@ function BattleView(props: {
   return (
     <div className={css.battleBackdrop}>
       <section className={`${css.battlePanel} ${partyHitKey > 0 ? css.battleWasHit : ''}`} role="dialog" aria-modal="true" aria-label={battle.mode === 'tower' ? props.t('towerBattle') : props.t('battle')}>
+        {attackPresentation !== undefined && (
+          <div
+            key={attackPresentation.key}
+            className={`${css.attackSequence} ${attackPresentation.actor === 'player' ? css.attackSequencePlayer : css.attackSequenceBoss} ${attackPresentation.phase === 'impact' ? css.attackSequenceImpact : ''}`}
+            role="img"
+            aria-label={`${props.t(attackPresentation.actor === 'boss' ? 'enemyDamage' : 'totalDamage')} ${attackPresentation.damage}`}
+          >
+            <i className={css.attackWave} aria-hidden="true" />
+            <span className={css.attackImpact} aria-hidden="true" />
+          </div>
+        )}
         <header className={css.battleHeader}>
           <div>
             <h2>{battle.mode === 'tower' ? props.t('towerBattle') : props.t('battle')}</h2>
@@ -1754,7 +1823,7 @@ function BattleView(props: {
           <button type="button" className={css.flee} disabled={locked || battle.turnOwner === 'boss'} onClick={() => { void props.act({ type: 'flee' }) }}>{props.t('flee')}</button>
         </header>
 
-        <div className={`${css.wildBanner} ${encounter?.enhanced === true || battle.mode === 'tower' ? css.fighterEnhanced : ''}`} key={`${battle.id}-${battle.wildHp}`}>
+        <div className={`${css.wildBanner} ${encounter?.enhanced === true || battle.mode === 'tower' ? css.fighterEnhanced : ''} ${playerStrikeLanded ? css.wildWasHit : ''}`} key={`${battle.id}-${displayedWildHp}`}>
           <div className={css.enemyAura} aria-hidden="true" />
           <CreatureSprite creature={wild} size="medium" />
           <div className={css.wildVitals}>
@@ -1764,10 +1833,10 @@ function BattleView(props: {
             </div>
             <div className={`${css.hpBar} ${css.hpWild}`}>
               <em style={{ width: `${percent(predictedHp, battle.wildMaxHp)}%` }} />
-              <i style={{ width: `${percent(battle.wildHp, battle.wildMaxHp)}%` }} />
+              <i style={{ width: `${percent(displayedWildHp, battle.wildMaxHp)}%` }} />
             </div>
             <small>
-              {props.t('health')} {battle.wildHp}/{battle.wildMaxHp} · {props.t('armor')} {battle.wildArmor}
+              {props.t('health')} {displayedWildHp}/{battle.wildMaxHp} · {props.t('armor')} {battle.wildArmor}
               {battle.wildShield > 0 ? ` · ${props.t('shield')} ${battle.wildShield}` : ''}
               {battle.pendingTeamDamage > 0 ? ` · ${props.t('pendingDamage')} ${battle.pendingTeamDamage}` : ''}
             </small>
@@ -1852,12 +1921,19 @@ function BattleView(props: {
             <div className={css.sharedPartyVitals}>
               <div className={css.sharedHpHeader}>
                 <span>{props.t('teamRuntime')}</span>
-                <strong>{battle.partyHp.toLocaleString()} / {battle.partyMaxHp.toLocaleString()}</strong>
+                <strong>{displayedPartyHp.toLocaleString()} / {battle.partyMaxHp.toLocaleString()}</strong>
               </div>
               <div className={`${css.hpBar} ${css.hpTeam}`}>
-                <i style={{ width: `${percent(battle.partyHp, battle.partyMaxHp)}%` }} />
+                <i style={{ width: `${percent(displayedPartyHp, battle.partyMaxHp)}%` }} />
+                <em
+                  style={{
+                    left: `${percent(predictedPartyHp, battle.partyMaxHp)}%`,
+                    width: `${percent(displayedPartyHp - predictedPartyHp, battle.partyMaxHp)}%`,
+                  }}
+                />
               </div>
               {battle.partyShield > 0 && <small>{props.t('shield')} +{battle.partyShield}</small>}
+              {partyDamagePreview > 0 && <small className={css.teamDamageForecast}>{props.t('pendingDamage')} -{partyDamagePreview}</small>}
             </div>
           </div>
 
@@ -1878,7 +1954,7 @@ function BattleView(props: {
                   onClick={() => {
                     void props.act(battle.captureWindow || battle.actionsRemaining === 0
                       ? { type: 'battle-continue' }
-                      : { type: 'battle-skip-stage' })
+                      : { type: 'battle-skip-stage' }, presentBattleResponse)
                   }}
                 >
                   {props.t('skipTurn')}

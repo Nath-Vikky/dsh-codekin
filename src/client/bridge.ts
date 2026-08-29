@@ -52,7 +52,8 @@ function matchBoard(value: unknown): MatchTile[] {
 function battleAnimation(value: unknown): TraceWildBattleAnimation {
   const row = plainRecord(value)
   if (row.kind !== 'match' || typeof row.battleId !== 'string' || row.battleId.length < 3 || row.battleId.length > 96
-    || !Array.isArray(row.frames) || row.frames.length < 1 || row.frames.length > MAX_MATCH_CASCADES) {
+    || !Array.isArray(row.frames) || row.frames.length > MAX_MATCH_CASCADES
+    || row.frames.length === 0 && row.strike === undefined) {
     throw new TypeError('invalid animation')
   }
   const frames = row.frames.map((value, frameIndex) => {
@@ -98,6 +99,31 @@ function battleAnimation(value: unknown): TraceWildBattleAnimation {
     }
   })
   if (row.actor !== undefined && row.actor !== 'player' && row.actor !== 'boss') throw new TypeError('invalid animation')
+  let strike: TraceWildBattleAnimation['strike']
+  if (row.strike !== undefined) {
+    const rawStrike = plainRecord(row.strike)
+    const strikeKeys = Object.keys(rawStrike)
+    if (strikeKeys.length !== 5
+      || strikeKeys.some(key => key !== 'actor' && key !== 'damage' && key !== 'targetHpBefore'
+        && key !== 'targetHpAfter' && key !== 'targetMaxHp')
+      || rawStrike.actor !== 'player' && rawStrike.actor !== 'boss'
+      || row.actor !== undefined && rawStrike.actor !== row.actor
+      || !Number.isSafeInteger(rawStrike.damage) || (rawStrike.damage as number) < 1 || (rawStrike.damage as number) > 9_999_999
+      || !Number.isSafeInteger(rawStrike.targetMaxHp) || (rawStrike.targetMaxHp as number) < 1 || (rawStrike.targetMaxHp as number) > 9_999_999
+      || !Number.isSafeInteger(rawStrike.targetHpBefore) || (rawStrike.targetHpBefore as number) < 0
+      || (rawStrike.targetHpBefore as number) > (rawStrike.targetMaxHp as number)
+      || !Number.isSafeInteger(rawStrike.targetHpAfter) || (rawStrike.targetHpAfter as number) < 0
+      || (rawStrike.targetHpAfter as number) > (rawStrike.targetHpBefore as number)) {
+      throw new TypeError('invalid animation')
+    }
+    strike = {
+      actor: rawStrike.actor,
+      damage: rawStrike.damage as number,
+      targetHpBefore: rawStrike.targetHpBefore as number,
+      targetHpAfter: rawStrike.targetHpAfter as number,
+      targetMaxHp: rawStrike.targetMaxHp as number,
+    }
+  }
   let swap: TraceWildBattleAnimation['swap']
   if (row.swap !== undefined) {
     const rawSwap = plainRecord(row.swap)
@@ -109,6 +135,7 @@ function battleAnimation(value: unknown): TraceWildBattleAnimation {
     kind: 'match', battleId: row.battleId, frames,
     ...(row.actor === undefined ? {} : { actor: row.actor }),
     ...(swap === undefined ? {} : { swap }),
+    ...(strike === undefined ? {} : { strike }),
   }
 }
 

@@ -13,7 +13,15 @@ requests, or agent behavior.
 ### DSH `0.1.2-alpha.1` preview
 
 Codekin `0.3.0-alpha.1` targets the source-only DSH `0.1.2-alpha.1` preview. It is distributed only
-as a GitHub Release asset and is intentionally blocked from npm publishing:
+through GitHub and is intentionally blocked from npm publishing. The current `main` branch commits
+its reviewed runtime bundles, so the dsh-web Workshop-compatible repository install needs no Alpha
+SDK checkout:
+
+```sh
+dsh plugin --profile web add https://github.com/Nath-Vikky/dsh-codekin
+```
+
+For a reproducible version-pinned install, use the release asset instead:
 
 ```sh
 dsh plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.0-alpha.1/nath-vikky-dsh-codekin-0.3.0-alpha.1.tgz
@@ -26,6 +34,8 @@ ready, the launcher changes into a gently animated gift reminder.
 This preview adopts the Alpha client-module split and the official browser-authentication cookie.
 Every Codekin state, action, event-stream, and image route rejects unauthenticated requests before
 touching game state.
+
+The previous npm-compatible source line is preserved on the `stable/0.2.x` branch.
 
 ### Current stable DSH release
 

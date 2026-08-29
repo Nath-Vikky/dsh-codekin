@@ -12,7 +12,14 @@
 ### DSH `0.1.2-alpha.1` 预览版
 
 码灵 `0.3.0-alpha.1` 专门适配仅提供源码的 DSH `0.1.2-alpha.1` 预览版。本版本只通过
-GitHub Release 附件分发，并通过包清单主动禁止 npm 发布：
+GitHub 分发，并通过包清单主动禁止 npm 发布。当前 `main` 分支会提交经过检查的运行时 Bundle，
+因此 dsh-web 创意工坊兼容的仓库安装不需要额外准备 Alpha SDK 源码：
+
+```sh
+dsh plugin --profile web add https://github.com/Nath-Vikky/dsh-codekin
+```
+
+如需锁定到可复现的具体版本，请改用 Release 附件：
 
 ```sh
 dsh plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.0-alpha.1/nath-vikky-dsh-codekin-0.3.0-alpha.1.tgz
@@ -23,6 +30,8 @@ dsh plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-
 
 该预览版已经迁移到 Alpha 的 Client 模块拆分结构，并接入官方浏览器认证 Cookie。码灵的状态、
 操作、事件流和图片接口都会先拒绝未认证请求，再接触游戏状态。
+
+此前可通过 npm 构建的源码线保留在 `stable/0.2.x` 分支。
 
 ### 当前稳定版 DSH
 

@@ -1,0 +1,1 @@
+{"version":3,"file":"persistence.d.ts","sourceRoot":"","sources":["../../../src/host/persistence.ts"],"names":[],"mappings":"AAIA,OAAO,KAAK,EAAE,cAAc,EAAE,MAAM,kBAAkB,CAAA;AAItD,wBAAgB,aAAa,IAAI,MAAM,CAStC;AAED,wBAAgB,kBAAkB,IAAI,MAAM,CAE3C;AAED,qBAAa,oBAAoB;IACnB,QAAQ,CAAC,QAAQ;gBAAR,QAAQ,SAAuB;IAEpD,IAAI,CAAC,GAAG,SAAa,GAAG,cAAc;IAStC,IAAI,CAAC,KAAK,EAAE,cAAc,GAAG,IAAI;CAQlC"}

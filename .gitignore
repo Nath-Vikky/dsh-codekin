@@ -1,10 +1,16 @@
 # Dependencies and build output
 node_modules/
 dist/
-lib/
 coverage/
 .pnpm-store/
 *.log
+
+# Runtime bundles and public declarations are committed so a GitHub source
+# install does not need the unpublished DSH Alpha SDK. Keep only TypeScript's
+# build intermediates out of version control.
+lib/types/**/*.js
+lib/types/**/*.js.map
+lib/tsconfig.tsbuildinfo
 
 # Tool caches and reports
 .cache/

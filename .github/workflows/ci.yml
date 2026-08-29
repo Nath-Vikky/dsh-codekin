@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+      - 'compat/**'
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codekin-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  alpha:
+    name: DSH Alpha (${{ matrix.os }}, Node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+        node:
+          - 22
+          - 24
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout Codekin
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 11.7.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Checkout pinned DSH Alpha source
+        run: |
+          git clone --depth 1 --branch dsh-v0.1.2-alpha.1 \
+            https://github.com/deepseek-ai/deepseek-harness.git \
+            "$GITHUB_WORKSPACE/../deepseek-harness"
+          test "$(git -C "$GITHUB_WORKSPACE/../deepseek-harness" rev-parse HEAD)" = \
+            "cd5ef8148158c3a752a658978873241fdf8e2bbc"
+
+      - name: Build official Alpha libraries
+        run: |
+          pnpm --dir "$GITHUB_WORKSPACE/../deepseek-harness" install --frozen-lockfile --ignore-scripts
+          pnpm --dir "$GITHUB_WORKSPACE/../deepseek-harness" run build:lib
+
+      - name: Install Codekin dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Check Codekin
+        run: pnpm check
+
+      - name: Verify committed GitHub-install artifacts
+        run: git diff --exit-code -- lib

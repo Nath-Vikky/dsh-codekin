@@ -128,6 +128,7 @@ function snapshot(value: unknown): TraceWildSnapshot {
 export interface TraceWildConnection {
   load(signal?: AbortSignal): Promise<TraceWildSnapshot>
   act(action: TraceWildAction, signal?: AbortSignal): Promise<TraceWildActionResponse>
+  clearLocalData(signal?: AbortSignal): Promise<TraceWildActionResponse>
   subscribe(onSnapshot: (value: TraceWildSnapshot) => void, onStatus: (online: boolean) => void): () => void
 }
 
@@ -179,6 +180,23 @@ export function createTraceWildConnection(): TraceWildConnection {
         ...(row.notice === undefined ? {} : { notice: row.notice }),
         ...(row.animation === undefined ? {} : { animation: battleAnimation(row.animation) }),
       }
+    },
+
+    async clearLocalData(signal) {
+      const response = await fetch(`${API}/save`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ confirmation: 'delete-codekin-save' }),
+        ...(signal === undefined ? {} : { signal }),
+      })
+      if (!response.ok) throw new TraceWildConnectionError(response.status >= 500 ? 'unavailable' : 'invalid-action')
+      const raw = await response.json() as unknown
+      const parsed = snapshot(raw)
+      const row = raw as Partial<TraceWildActionResponse>
+      if (row.ok !== true) throw new TraceWildConnectionError('unavailable')
+      return { ok: true, ...parsed }
     },
 
     subscribe(onSnapshot, onStatus) {

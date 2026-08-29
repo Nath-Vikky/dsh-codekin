@@ -6,6 +6,7 @@ export declare class TraceWildConnectionError extends Error {
 export interface TraceWildConnection {
     load(signal?: AbortSignal): Promise<TraceWildSnapshot>;
     act(action: TraceWildAction, signal?: AbortSignal): Promise<TraceWildActionResponse>;
+    clearLocalData(signal?: AbortSignal): Promise<TraceWildActionResponse>;
     subscribe(onSnapshot: (value: TraceWildSnapshot) => void, onStatus: (online: boolean) => void): () => void;
 }
 export declare function createTraceWildConnection(): TraceWildConnection;

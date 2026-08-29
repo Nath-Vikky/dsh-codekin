@@ -31,6 +31,11 @@ Restart DSH Web after installation, then open **DSH Settings → Codekin** and e
 The launcher is draggable and toggles the compact portrait game window. When idle supplies are
 ready, the launcher changes into a gently animated gift reminder.
 
+Codekin saves progress at `$DSH_HOME/codekinsave/state.json`. Existing installs automatically move
+the former `tracewild/state.json` save on first launch. Uninstalling from the dsh-web plugin manager
+is a confirmed one-click operation and preserves progress by default. For a complete removal, first
+use **DSH Settings → Codekin → Delete local save**, then uninstall the plugin.
+
 This preview adopts the Alpha client-module split and the official browser-authentication cookie.
 Every Codekin state, action, event-stream, and image route rejects unauthenticated requests before
 touching game state.
@@ -94,8 +99,8 @@ spawn slot.
 
 ## Data behavior
 
-Game progress is stored locally by the plugin. Codekin records bounded game events and aggregate
-runtime outcomes; it does not store prompt text, assistant responses, tool arguments, commands,
+Game progress is stored locally at `$DSH_HOME/codekinsave/state.json`. Codekin records bounded game
+events and aggregate runtime outcomes; it does not store prompt text, assistant responses, tool arguments, commands,
 workspace paths, or raw error bodies. It does not submit prompts, invoke tools, alter model requests,
 or modify conversations.
 

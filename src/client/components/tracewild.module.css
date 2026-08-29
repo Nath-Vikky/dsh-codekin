@@ -1315,6 +1315,19 @@
 .settingsSwitch:disabled { cursor: wait; opacity: .58; }
 .settingsStatus, .settingsError { margin: 12px 5px 0; font-size: 12px; line-height: 1.5; }
 .settingsStatus { color: #668078; } .settingsError { color: #a35f69; }
+.settingsStorageCard { margin-top: 12px; }
+.settingsStorageCard code {
+  width: fit-content; border: 1px solid #6f948923; border-radius: 8px; background: #edf5f2;
+  padding: 5px 8px; color: #4d6d65; font: 650 11px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.settingsDeleteButton, .settingsDeleteActions button {
+  flex: 0 0 auto; min-height: 38px; border: 1px solid #bd7d8740; border-radius: 12px;
+  background: #fff6f6; color: #a45f69; cursor: pointer; padding: 0 14px; font: 750 11px/1 ui-sans-serif, system-ui, sans-serif;
+}
+.settingsDeleteActions { display: flex !important; grid-auto-flow: column; gap: 8px !important; }
+.settingsDeleteActions button:first-child { border-color: #829a9335; background: #f4f7f5; color: #60736e; }
+.settingsDeleteActions .settingsDeleteConfirm { border-color: #a85d674f; background: #a65f69; color: #fff; }
+.settingsDeleteButton:disabled, .settingsDeleteActions button:disabled { cursor: wait; opacity: .55; }
 
 /* Squad release control and confirmation */
 .creatureCard { padding: 0; cursor: default; overflow: hidden; }
@@ -1358,6 +1371,8 @@
   .settingsHero { padding: 17px; }
   .settingsHero img { width: 62px; height: 62px; border-radius: 18px; }
   .settingsCard { align-items: flex-start; flex-direction: column; }
+  .settingsDeleteActions { width: 100%; grid-template-columns: 1fr 1fr; }
+  .settingsDeleteActions button, .settingsDeleteButton { width: 100%; }
 }
 
 /* Battle HUD v3 — shared team runtime, portrait combatants, and readable damage. */

@@ -226,6 +226,51 @@ function actionRoute(
   }
 }
 
+function saveRoute(
+  service: TraceWildService,
+  lifecycle: TraceWildRouteLifecycle,
+  requestRejection: TraceWildRequestRejection,
+): WebRoute {
+  return {
+    kind: 'exact',
+    path: `${TRACEWILD_API_PREFIX}/save`,
+    async handler(req, res) {
+      if (rejectUntrusted(req, res, requestRejection)) return
+      if (req.method !== 'DELETE') {
+        res.writeHead(405, securityHeaders())
+        res.end()
+        return
+      }
+      if (!sameOrigin(req) || !/^application\/json(?:\s*;|$)/i.test(String(req.headers['content-type'] ?? ''))) {
+        failure(res, 403, 'invalid-action')
+        return
+      }
+      try {
+        const value = await readBody(req, lifecycle.signal)
+        if (lifecycle.signal.aborted) throw new TraceWildRoutesClosedError()
+        if (typeof value !== 'object' || value === null || Array.isArray(value)
+          || Object.getPrototypeOf(value) !== Object.prototype) throw new TypeError('invalid cleanup request')
+        const row = value as Record<string, unknown>
+        const keys = Object.keys(row)
+        if (keys.length !== 1 || keys[0] !== 'confirmation' || row.confirmation !== 'delete-codekin-save') {
+          throw new TypeError('invalid cleanup request')
+        }
+        sendJson(res, 200, service.clearLocalData())
+      } catch (error) {
+        if (error instanceof TraceWildRoutesClosedError || lifecycle.signal.aborted) {
+          failure(res, 503, 'unavailable')
+          return
+        }
+        if (error instanceof TypeError) {
+          failure(res, 400, 'invalid-action')
+          return
+        }
+        failure(res, 500, 'unavailable')
+      }
+    },
+  }
+}
+
 function eventsRoute(
   service: TraceWildService,
   lifecycle: TraceWildRouteLifecycle,
@@ -341,6 +386,7 @@ export function createTraceWildRoutes(
     routes: [
       stateRoute(service, lifecycle, requestRejection),
       actionRoute(service, lifecycle, requestRejection),
+      saveRoute(service, lifecycle, requestRejection),
       eventsRoute(service, lifecycle, requestRejection),
       assetRoute(assetDirectory, lifecycle, requestRejection),
     ],

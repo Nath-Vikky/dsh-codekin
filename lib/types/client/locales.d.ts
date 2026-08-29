@@ -16,6 +16,12 @@ export declare const zh: {
     readonly settingsUnavailable: "码灵设置暂时不可用，请稍后重试。";
     readonly settingsOnHint: "码灵正在监听不含正文的会话结果事件。";
     readonly settingsOffHint: "码灵已暂停；你的编队与道具不会被删除。";
+    readonly settingsStorage: "本地存档与卸载";
+    readonly settingsStorageHint: "通过 dsh-web 插件管理器卸载时会保留此存档。若要彻底卸载，请先在这里永久删除存档，再卸载插件。";
+    readonly settingsDeleteData: "删除本地存档";
+    readonly settingsDeleteConfirm: "确认永久删除";
+    readonly settingsDeleteCancel: "取消";
+    readonly settingsDeleted: "本地存档已删除，码灵已停用；现在可以从插件管理器卸载。";
     readonly map: "码灵地图";
     readonly squad: "编队";
     readonly dex: "图鉴";

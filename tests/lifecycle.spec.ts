@@ -70,7 +70,7 @@ describe('TraceWild Cordis lifecycle', () => {
       expect(res.writes).toEqual(['unauthorized'])
     }))
 
-    expect(reject).toHaveBeenCalledTimes(4)
+    expect(reject).toHaveBeenCalledTimes(5)
     expect(snapshot).not.toHaveBeenCalled()
     expect(act).not.toHaveBeenCalled()
     expect(subscribe).not.toHaveBeenCalled()
@@ -99,6 +99,27 @@ describe('TraceWild Cordis lifecycle', () => {
     expect(res.ended()).toBe(true)
     group.close()
     expect(unsubscribed).toBe(1)
+  })
+
+  it('requires the explicit cleanup phrase before deleting the local save', async () => {
+    const clearLocalData = vi.fn(() => ({ ok: true, schemaVersion: 3, state: { schemaVersion: 3 }, serverTime: 1 }))
+    const service = { clearLocalData } as unknown as TraceWildService
+    const group = createTraceWildRoutes(service, '.', () => undefined)
+    const route = group.routes.find(candidate => candidate.path === `${TRACEWILD_API_PREFIX}/save`)!
+    const req = request('DELETE', {
+      host: '127.0.0.1:63214',
+      origin: 'http://127.0.0.1:63214',
+      'content-type': 'application/json',
+    })
+    const res = response()
+
+    const pending = route.handler(req, res.response)
+    req.emit('data', Buffer.from('{"confirmation":"delete-codekin-save"}'))
+    req.emit('end')
+    await pending
+
+    expect(clearLocalData).toHaveBeenCalledOnce()
+    expect(res.statuses).toEqual([200])
   })
 
   it('fails closed without committing an action that was awaiting its body during unload', async () => {

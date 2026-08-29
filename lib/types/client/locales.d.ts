@@ -220,6 +220,7 @@ export declare const zh: {
     readonly pendingDamage: "待结算总算力";
     readonly stageDamage: "本阶段算力";
     readonly totalDamage: "TOTAL DAMAGE";
+    readonly enemyDamage: "ENEMY DAMAGE";
     readonly teamRuntime: "队伍共享运行值";
     readonly frozen: "冻结";
     readonly skillSealed: "协议封锁";

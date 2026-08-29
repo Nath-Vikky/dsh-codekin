@@ -1359,6 +1359,7 @@ interface SwapMotion {
 
 interface DamageReadout {
   key: number
+  actor: 'player' | 'boss'
   total: number
   current?: number
   effectiveness?: MatchDamageEffectiveness
@@ -1481,10 +1482,11 @@ function BattleView(props: {
     }
     const wildDamage = previous.wildHp - battle.wildHp
     if (wildDamage > 0) {
-      setDamageReadout({ key: Date.now(), total: battle.lastTeamDamageApplied || wildDamage, settled: true })
+      setDamageReadout({ key: Date.now(), actor: 'player', total: battle.lastTeamDamageApplied || wildDamage, settled: true })
     } else if (!animating && battle.pendingTeamDamage > 0) {
       setDamageReadout(current => ({
         key: current?.key ?? Date.now(),
+        actor: 'player',
         total: battle.pendingTeamDamage,
         settled: false,
       }))
@@ -1532,6 +1534,7 @@ function BattleView(props: {
       if (animation.actor !== 'boss' && frame.damage !== undefined && frame.totalDamage !== undefined) {
         setDamageReadout({
           key: Date.now() + frame.chain,
+          actor: 'player',
           total: frame.totalDamage,
           current: frame.damage,
           effectiveness: frame.effectiveness ?? 'neutral',
@@ -1560,13 +1563,31 @@ function BattleView(props: {
       const total = finalBattle.pendingTeamDamage > 0
         ? finalBattle.pendingTeamDamage
         : finalBattle.lastTeamDamageApplied
-      setDamageReadout(total > 0 ? { key: Date.now(), total, settled: finalBattle.pendingTeamDamage === 0 } : undefined)
+      setDamageReadout(total > 0
+        ? { key: Date.now(), actor: 'player', total, settled: finalBattle.pendingTeamDamage === 0 }
+        : undefined)
+    } else if (finalBattle.turnOwner !== 'boss' && finalBattle.lastBossAttack > 0) {
+      const key = Date.now()
+      setDamageReadout({
+        key,
+        actor: 'boss',
+        total: finalBattle.lastBossAttack,
+        current: finalBattle.lastBossAttack,
+        effectiveness: 'neutral',
+        settled: false,
+      })
+      await pause(reducedMotion ? 40 : 440)
+      if (animationEpoch.current !== epoch) return
+      setDamageReadout({ key, actor: 'boss', total: finalBattle.lastBossAttack, settled: true })
     }
   }
 
   const runBossAction = (): void => {
     if (battle.turnOwner !== 'boss' || props.busy || animating || bossActionInFlight.current) return
     bossActionInFlight.current = true
+    setDamageReadout(current => current?.actor === 'boss'
+      ? current
+      : { key: Date.now(), actor: 'boss', total: 0, settled: false })
     setAnimating(true)
     void props.act({ type: 'battle-continue' }).then(async (response) => {
       const finalBattle = response?.state.battle
@@ -1758,7 +1779,7 @@ function BattleView(props: {
               className={`${css.totalDamageHud} ${damageReadout.settled ? css.totalDamageSettled : ''}`}
               aria-live="polite"
             >
-              <span>{props.t('totalDamage')}</span>
+              <span>{props.t(damageReadout.actor === 'boss' ? 'enemyDamage' : 'totalDamage')}</span>
               <strong>{damageReadout.total.toLocaleString()}</strong>
               {damageReadout.current !== undefined && (
                 <em className={css[`damage_${damageReadout.effectiveness ?? 'neutral'}`]}>

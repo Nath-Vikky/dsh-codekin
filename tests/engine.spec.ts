@@ -215,6 +215,11 @@ describe('TraceWild match battle', () => {
       expect(result.animation?.frames[0]?.removed.length).toBeGreaterThanOrEqual(3)
       expect(result.animation?.frames[0]?.fallRows).toHaveLength(49)
       expect(Math.max(...(result.animation?.frames[0]?.fallRows ?? []))).toBeGreaterThan(0)
+      expect(result.animation?.frames[0]).toMatchObject({
+        damage: expect.any(Number),
+        totalDamage: expect.any(Number),
+        effectiveness: expect.stringMatching(/^(advantage|neutral|resisted)$/),
+      })
       state = result.state
       moves += 1
     }
@@ -222,9 +227,19 @@ describe('TraceWild match battle', () => {
     expect(state.battle?.turnOwner).toBe('boss')
     expect(state.battle?.bossActionsRemaining).toBe(3)
     let bossMoves = 0
+    let bossDamageTotal = 0
     while (state.battle?.turnOwner === 'boss' && bossMoves < 10) {
       const result = applyTraceWildAction(state, { type: 'battle-continue' }, low, 260 + bossMoves)
       expect(result.animation?.frames.length).toBeGreaterThan(0)
+      for (const frame of result.animation?.frames ?? []) {
+        expect(frame).toMatchObject({
+          damage: expect.any(Number),
+          totalDamage: expect.any(Number),
+          effectiveness: expect.stringMatching(/^(advantage|neutral|resisted)$/),
+        })
+        expect(frame.totalDamage).toBeGreaterThanOrEqual(bossDamageTotal)
+        bossDamageTotal = frame.totalDamage ?? bossDamageTotal
+      }
       state = result.state
       bossMoves += 1
     }
@@ -235,6 +250,7 @@ describe('TraceWild match battle', () => {
     expect(state.battle?.round).toBe(2)
     expect(state.battle?.lastTeamStrike).toBeGreaterThan(0)
     expect(state.battle?.lastBossAttack).toBeGreaterThan(0)
+    expect(state.battle?.lastBossAttack).toBe(bossDamageTotal)
     expect(state.battle?.log.some(row => row.kind === 'boss-match')).toBe(true)
   })
 
@@ -273,27 +289,51 @@ describe('TraceWild match battle', () => {
     expect(result.state.creatures.at(-1)?.quality).toBe('pebble')
   })
 
-  it('applies a boss party sweep to every living squad member', () => {
+  it('keeps capture open after a failed core until the player abandons or runs out', () => {
+    const high = (): number => 0.999_999
+    const state = battleState()
+    state.battle!.wildArmor = 0
+    state.battle!.wildHp = 1
+    state.battle!.captureWindow = true
+    state.cores.pebble = 2
+
+    const first = applyTraceWildAction(state, { type: 'capture', quality: 'pebble' }, high, 241)
+    expect(first.notice).toBe('capture-failed')
+    expect(first.state.battle).toMatchObject({ captureWindow: true, captureAttempts: 1 })
+    expect(first.state.cores.pebble).toBe(1)
+
+    const last = applyTraceWildAction(first.state, { type: 'capture', quality: 'pebble' }, high, 242)
+    expect(last.notice).toBe('capture-failed')
+    expect(last.state.cores.pebble).toBe(0)
+    expect(last.state.battle).toMatchObject({ captureWindow: false, turnOwner: 'boss' })
+  })
+
+  it('uses one combined runtime pool for the full squad and one Boss settlement', () => {
     let state = battleState()
     const first = state.battle!.party[0]!
     state.battle!.party.push(
       { ...first, instanceId: 'pet_test_sweep_00000001' },
       { ...first, instanceId: 'pet_test_sweep_00000002' },
     )
-    state.battle!.enemyIntent = 'sweep'
-    state.battle!.enemyTargetScope = 'all'
+    state.battle!.partyMaxHp = state.battle!.party.reduce((sum, member) => sum + member.maxHp, 0)
+    state.battle!.partyHp = state.battle!.partyMaxHp
+    state.battle!.enemyIntent = 'strike'
+    state.battle!.enemyTargetScope = 'team'
     delete state.battle!.enemyTargetIndex
     state.battle!.captureWindow = true
     state.battle!.wildAttack = 20
-    const before = state.battle!.party.map(member => member.hp)
+    const before = state.battle!.partyHp
     state = applyTraceWildAction(state, { type: 'battle-continue' }, low, 245).state
     let bossMoves = 0
     while (state.battle?.turnOwner === 'boss' && bossMoves < 10) {
       state = applyTraceWildAction(state, { type: 'battle-continue' }, low, 246 + bossMoves).state
       bossMoves += 1
     }
-    expect(state.battle?.party.every((member, index) => member.hp < before[index]!)).toBe(true)
-    expect(state.battle?.log.some(row => row.kind === 'enemy-sweep')).toBe(true)
+    expect(state.battle?.partyHp).toBeLessThan(before)
+    expect(state.battle?.partyMaxHp).toBe(state.battle!.party.reduce((sum, member) => sum + member.maxHp, 0))
+    expect(state.battle?.party.every(member => member.hp > 0)).toBe(true)
+    expect(state.battle?.log.some(row => row.kind === 'enemy')).toBe(true)
+    expect(state.battle?.log.some(row => row.kind === 'enemy-sweep')).toBe(false)
   })
 
   it('migrates schema-v1 creatures to Prism quality and drops the legacy battle', () => {

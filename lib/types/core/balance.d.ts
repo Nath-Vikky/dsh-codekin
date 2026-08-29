@@ -10,7 +10,7 @@ export declare const MAX_BOSS_SWAPS_PER_PHASE = 7;
 export declare const BOSS_SKILL_ENERGY_COST = 12;
 export declare const BOSS_SKILL_ENERGY_LIMIT = 24;
 export declare const CAPTURE_HEALTH_RATIO = 0.5;
-export declare const MAX_CAPTURE_ATTEMPTS = 3;
+export declare const MAX_CAPTURE_ATTEMPTS = 999999;
 export declare const MAX_MAP_ENCOUNTERS = 7;
 export declare const QUALITY_ORDER: readonly ["pebble", "pulse", "prism", "nova", "origin"];
 export declare const PLAYER_QUALITY_BASE_MULTIPLIERS: Readonly<Record<IndividualQuality, number>>;

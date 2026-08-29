@@ -22,6 +22,7 @@ export declare class TraceWildService {
     private rootSession;
     disposeSession(session: Session): void;
     act(action: TraceWildAction): TraceWildActionResponse;
+    clearLocalData(): TraceWildActionResponse;
     private publish;
 }
 //# sourceMappingURL=service.d.ts.map

@@ -63,6 +63,7 @@ import type {
   CreatureStats,
   EnemyIntent,
   MatchCascadeFrame,
+  MatchDamageEffectiveness,
   MatchTile,
   RandomSource,
   TileSpecial,
@@ -412,12 +413,12 @@ function ecologyThatCounters(defender: TraceEcology): TraceEcology {
 
 function activeMember(battle: BattleState): BattlePartyMember {
   const member = battle.party[battle.activeIndex]
-  if (member === undefined || member.hp <= 0) throw new TraceWildRuleError('conflict')
+  if (member === undefined || battle.partyHp <= 0) throw new TraceWildRuleError('conflict')
   return member
 }
 
 function livingMembers(battle: BattleState): BattlePartyMember[] {
-  return battle.party.filter(member => member.hp > 0)
+  return battle.partyHp > 0 ? battle.party : []
 }
 
 function qualityMultiplier(member: BattlePartyMember): number {
@@ -430,17 +431,37 @@ function playerOffenseLevelFactor(member: BattlePartyMember, battle: BattleState
   return Math.min(1.15, 1 + levelDelta * 0.003)
 }
 
-function healMember(member: BattlePartyMember, amount: number): number {
-  const before = member.hp
-  member.hp = Math.min(member.maxHp, member.hp + Math.max(0, Math.round(amount)))
-  return member.hp - before
+function syncLegacyPartyHealth(battle: BattleState): void {
+  const ratio = battle.partyMaxHp <= 0 ? 0 : battle.partyHp / battle.partyMaxHp
+  for (const member of battle.party) {
+    member.hp = battle.partyHp <= 0 ? 0 : Math.max(1, Math.min(member.maxHp, Math.round(member.maxHp * ratio)))
+    member.shield = 0
+  }
 }
 
-function shieldMember(member: BattlePartyMember, amount: number): number {
-  const limit = Math.round(member.maxHp * 0.75)
-  const before = member.shield
-  member.shield = Math.min(limit, member.shield + Math.max(0, Math.round(amount)))
-  return member.shield - before
+function healParty(battle: BattleState, amount: number): number {
+  const before = battle.partyHp
+  battle.partyHp = Math.min(battle.partyMaxHp, battle.partyHp + Math.max(0, Math.round(amount)))
+  syncLegacyPartyHealth(battle)
+  return battle.partyHp - before
+}
+
+function shieldParty(battle: BattleState, amount: number): number {
+  const limit = Math.round(battle.partyMaxHp * 0.6)
+  const before = battle.partyShield
+  battle.partyShield = Math.min(limit, battle.partyShield + Math.max(0, Math.round(amount)))
+  return battle.partyShield - before
+}
+
+function damageParty(battle: BattleState, amountValue: number): number {
+  let amount = Math.max(1, Math.round(amountValue))
+  const absorbed = Math.min(battle.partyShield, amount)
+  battle.partyShield -= absorbed
+  amount -= absorbed
+  const before = battle.partyHp
+  battle.partyHp = Math.max(0, battle.partyHp - amount)
+  syncLegacyPartyHealth(battle)
+  return absorbed + before - battle.partyHp
 }
 
 function grantEnergy(member: BattlePartyMember, amount: number): void {
@@ -503,7 +524,17 @@ function settleTeamStrike(battle: BattleState): boolean {
   return battle.wildHp <= 0
 }
 
-function damageForStep(battle: BattleState, member: BattlePartyMember, counts: Readonly<Record<TraceEcology, number>>, chain: number): number {
+interface MatchStepDamage {
+  total: number
+  effectiveness: MatchDamageEffectiveness
+}
+
+function damageForStep(
+  battle: BattleState,
+  member: BattlePartyMember,
+  counts: Readonly<Record<TraceEcology, number>>,
+  chain: number,
+): MatchStepDamage {
   const wild = creatureById(battleEncounterCreatureId(battle))
   if (wild === undefined) throw new TraceWildRuleError('conflict')
   const stats = memberStats(member)
@@ -514,24 +545,28 @@ function damageForStep(battle: BattleState, member: BattlePartyMember, counts: R
     combo = Math.max(combo, 1.15)
   }
   let total = 0
+  const effectivenessDamage: Record<MatchDamageEffectiveness, number> = { advantage: 0, neutral: 0, resisted: 0 }
   for (const ecology of TRACE_ECOLOGIES) {
     const count = counts[ecology]
     if (count <= 0) continue
     const element = battle.affinityFloorActions > 0 ? Math.max(1.2, affinity(ecology, wild.ecology)) : affinity(ecology, wild.ecology)
-    total += stats.attack * (count / 3) * combo * element
+    const contribution = stats.attack * (count / 3) * combo * element
       * playerOffenseLevelFactor(member, battle) * 100 / (100 + battle.wildDefense)
+    total += contribution
+    const effectiveness: MatchDamageEffectiveness = element > 1 ? 'advantage' : element < 1 ? 'resisted' : 'neutral'
+    effectivenessDamage[effectiveness] += contribution
   }
-  if (member.creatureId === 'glitch-crashfox' && member.hp * 2 < member.maxHp) total *= 1.25
+  if (member.creatureId === 'glitch-crashfox' && battle.partyHp * 2 < battle.partyMaxHp) total *= 1.25
   if (member.creatureId === 'relay-duplex-hare' && battle.round % 2 === 1) total *= 1.1
-  return Math.max(1, Math.round(total))
+  const effectiveness = (Object.entries(effectivenessDamage) as [MatchDamageEffectiveness, number][])
+    .sort((left, right) => right[1] - left[1]
+      || ['advantage', 'neutral', 'resisted'].indexOf(left[0]) - ['advantage', 'neutral', 'resisted'].indexOf(right[0]))[0]?.[0]
+    ?? 'neutral'
+  return { total: Math.max(1, Math.round(total)), effectiveness }
 }
 
 function battleEncounterCreatureId(battle: BattleState): string {
   return battle.wildCreatureId
-}
-
-function lowestHealthMember(battle: BattleState): BattlePartyMember | undefined {
-  return livingMembers(battle).sort((left, right) => left.hp / left.maxHp - right.hp / right.maxHp)[0]
 }
 
 function convertOnePassiveTile(
@@ -544,7 +579,7 @@ function convertOnePassiveTile(
   for (let offset = 0; offset < board.length; offset += 1) {
     const index = (start + offset) % board.length
     const current = board[index]!
-    if (current.special !== 'none' || current.ecology === ecology) continue
+    if (current.special !== 'none' || (current.hazardActions ?? 0) > 0 || current.ecology === ecology) continue
     board[index] = { ecology, special: 'none' }
     if (!hasBattleMatches(board)) return board
     board[index] = current
@@ -557,7 +592,7 @@ function createGuaranteedMatch(boardValue: readonly MatchTile[], ecology: TraceE
   for (let row = 0; row < 7; row += 1) {
     for (let column = 0; column <= 4; column += 1) {
       const indexes = [row * 7 + column, row * 7 + column + 1, row * 7 + column + 2]
-      if (indexes.every(index => board[index]!.special === 'none')) {
+      if (indexes.every(index => board[index]!.special === 'none' && (board[index]!.hazardActions ?? 0) === 0)) {
         for (const index of indexes) board[index] = { ecology, special: 'none' }
         return board
       }
@@ -589,8 +624,7 @@ function applyMatchPassives(
         break
       case 'lumen-foliomoth':
         if (counts.lumen >= 4) {
-          const target = lowestHealthMember(battle)
-          if (target !== undefined) healMember(target, target.maxHp * 0.03 * scale)
+          healParty(battle, member.maxHp * 0.03 * scale)
         }
         break
       case 'lumen-lensel':
@@ -637,17 +671,17 @@ function applyMatchPassives(
         break
       case 'aegis-veribud':
         if (counts.aegis > 0 && member.passiveStage !== battle.stage) {
-          healMember(active, active.maxHp * 0.02 * scale)
+          healParty(battle, active.maxHp * 0.02 * scale)
           member.passiveStage = battle.stage
         }
         break
       case 'aegis-anchorbee':
-        if (specialCount > 0) shieldMember(active, active.maxHp * 0.04 * scale)
+        if (specialCount > 0) shieldParty(battle, active.maxHp * 0.04 * scale)
         break
       case 'aegis-steady-ram': {
         const wild = creatureById(battleEncounterCreatureId(battle))!
         const resisted = ECOLOGY_ADVANTAGE[wild.ecology]
-        if (counts[resisted] > 0) shieldMember(active, stepDamage * 0.2 * scale)
+        if (counts[resisted] > 0) shieldParty(battle, stepDamage * 0.2 * scale)
         break
       }
       case 'glitch-null-nibbler':
@@ -692,14 +726,37 @@ function applyResolution(
   const active = activeMember(battle)
   let totalDamage = 0
   const armorBefore = battle.wildArmor
-  for (const step of resolution.steps) {
+  for (let index = 0; index < resolution.steps.length; index += 1) {
+    const step = resolution.steps[index]!
+    const frame = resolution.frames[index]
+    const pendingBefore = battle.pendingTeamDamage
     for (const ecology of TRACE_ECOLOGIES) totals[ecology] += step.counts[ecology]
-    const rawDamage = damageForStep(battle, active, step.counts, step.chain)
-    const damage = applyWildDamage(battle, rawDamage)
+    const stepDamage = damageForStep(battle, active, step.counts, step.chain)
+    const damage = applyWildDamage(battle, stepDamage.total)
     totalDamage += damage
     totalDamage += applyMatchPassives(
       battle, step.counts, step.chain, step.maxGroup, step.specialCount, damage, random,
     )
+    if (frame !== undefined) {
+      const hazardCount = frame.removed.reduce((count, tileIndex) => (
+        count + ((frame.before[tileIndex]?.hazardActions ?? 0) > 0 ? 1 : 0)
+      ), 0)
+      const partyBeforeHazard = battle.partyHp
+      if (hazardCount > 0 && battle.partyHp > 0) {
+        const hazardDamage = damageParty(
+          battle,
+          Math.min(battle.partyMaxHp * 0.16, battle.partyMaxHp * (0.018 + battle.bossSkillTier * 0.002) * hazardCount),
+        )
+        if (hazardDamage > 0) {
+          appendBattleLog(battle, { turn: battle.turn, kind: 'hazard-damage', amount: hazardDamage })
+        }
+      }
+      frame.damage = Math.max(0, battle.pendingTeamDamage - pendingBefore)
+      frame.totalDamage = battle.pendingTeamDamage
+      frame.effectiveness = stepDamage.effectiveness
+      const hazardDamage = Math.max(0, partyBeforeHazard - battle.partyHp)
+      if (hazardDamage > 0) frame.hazardDamage = hazardDamage
+    }
   }
   if (resolution.steps.length > 0 && armorBefore > 0 && battle.wildArmor === armorBefore) {
     battle.wildArmor -= 1
@@ -707,7 +764,13 @@ function applyResolution(
   }
   distributeEnergy(battle, totals)
   if (consumeRepeat && battle.repeatPower > 0 && totalDamage > 0) {
-    totalDamage += applyWildDamage(battle, totalDamage * battle.repeatPower)
+    const repeated = applyWildDamage(battle, totalDamage * battle.repeatPower)
+    totalDamage += repeated
+    const lastFrame = resolution.frames.at(-1)
+    if (lastFrame !== undefined) {
+      lastFrame.damage = Math.min(9_999_999, (lastFrame.damage ?? 0) + repeated)
+      lastFrame.totalDamage = battle.pendingTeamDamage
+    }
     battle.repeatPower = 0
   }
   battle.lastPlayerDamage = totalDamage
@@ -721,41 +784,33 @@ function applyStageEntryPassives(battle: BattleState): void {
   member.skillUsedStage = false
   const scale = qualityMultiplier(member)
   if (member.creatureId === 'relay-pingfly') grantEnergy(member, 2)
-  if (member.creatureId === 'aegis-loop-tortoise') shieldMember(member, member.maxHp * 0.08 * scale)
+  if (member.creatureId === 'aegis-loop-tortoise') shieldParty(battle, member.maxHp * 0.08 * scale)
   appendBattleLog(battle, { turn: battle.turn, kind: 'switch', creatureId: member.creatureId })
 }
 
 function nextLivingIndex(battle: BattleState): { index: number; wrapped: boolean } | undefined {
+  if (battle.partyHp <= 0) return undefined
   for (let offset = 1; offset <= battle.party.length; offset += 1) {
     const index = (battle.activeIndex + offset) % battle.party.length
-    if (battle.party[index]!.hp > 0) return { index, wrapped: index <= battle.activeIndex }
+    if (battle.party[index] !== undefined) return { index, wrapped: index <= battle.activeIndex }
   }
   return undefined
 }
 
-function damagePartyMember(member: BattlePartyMember, amountValue: number): number {
-  let amount = Math.max(1, Math.round(amountValue))
-  const absorbed = Math.min(member.shield, amount)
-  member.shield -= absorbed
-  amount -= absorbed
-  const before = member.hp
-  member.hp = Math.max(0, member.hp - amount)
-  return absorbed + before - member.hp
-}
-
-function maybePreventDefeat(battle: BattleState, target: BattlePartyMember): boolean {
-  if (target.hp > 0) return true
+function maybePreventDefeat(battle: BattleState): boolean {
+  if (battle.partyHp > 0) return true
   const guardian = battle.party.find(member => member.creatureId === 'aegis-dawnguard' && !member.reviveUsed)
   if (guardian === undefined) return false
   guardian.reviveUsed = true
-  target.hp = 1
-  shieldMember(target, target.maxHp * 0.1 * qualityMultiplier(guardian))
+  battle.partyHp = 1
+  syncLegacyPartyHealth(battle)
+  shieldParty(battle, battle.partyMaxHp * 0.1 * qualityMultiplier(guardian))
   return true
 }
 
 function maybeDelayForLagtoad(battle: BattleState): void {
-  const lagtoad = battle.party.find(member => member.hp > 0 && member.creatureId === 'glitch-lagtoad' && !member.passiveBattleUsed)
-  if (lagtoad !== undefined && battle.party.some(member => member.hp > 0 && member.hp * 2 < member.maxHp)) {
+  const lagtoad = battle.party.find(member => member.creatureId === 'glitch-lagtoad' && !member.passiveBattleUsed)
+  if (lagtoad !== undefined && battle.partyHp * 2 < battle.partyMaxHp) {
     lagtoad.passiveBattleUsed = true
     battle.enemyDelayed = Math.max(1, battle.enemyDelayed)
   }
@@ -770,7 +825,7 @@ function mutateBoardForEnemy(battle: BattleState, ecology: TraceEcology, random:
 function baseEnemyIntent(ecology: TraceEcology): EnemyIntent {
   switch (ecology) {
     case 'lumen': return 'mark'
-    case 'forge': return 'strike'
+    case 'forge': return 'corrupt'
     case 'relay': return 'disrupt'
     case 'aegis': return 'guard'
     case 'glitch': return 'corrupt'
@@ -785,14 +840,14 @@ function bossSkillTierForThreat(threat: number): 1 | 2 | 3 | 4 | 5 {
   return 1
 }
 
-function enemyTargetFor(battle: BattleState, intent: EnemyIntent): { scope: BattleState['enemyTargetScope']; index?: number } {
+function enemyTargetFor(
+  battle: Pick<BattleState, 'activeIndex'>,
+  intent: EnemyIntent,
+): { scope: BattleState['enemyTargetScope']; index?: number } {
   if (intent === 'guard') return { scope: 'self' }
-  if (intent === 'sweep') return { scope: 'all' }
-  if (intent === 'freeze') {
-    const next = nextLivingIndex(battle)
-    return { scope: 'single', ...(next === undefined ? {} : { index: next.index }) }
-  }
-  return { scope: 'single', index: battle.activeIndex }
+  if (intent === 'strike') return { scope: 'team' }
+  if (intent === 'freeze' || intent === 'mark') return { scope: 'member', index: battle.activeIndex }
+  return { scope: 'board' }
 }
 
 function prepareBossIntent(battle: BattleState, random: RandomSource): void {
@@ -803,14 +858,15 @@ function prepareBossIntent(battle: BattleState, random: RandomSource): void {
   battle.bossSkillArmed = battle.bossEnergy >= BOSS_SKILL_ENERGY_COST
   let intent: EnemyIntent
   if (!battle.bossSkillArmed) {
-    intent = tier >= 2 && roll < 0.16 + tier * 0.03 ? 'sweep' : 'strike'
+    intent = 'strike'
   } else {
-    intent = tier >= 2 ? baseEnemyIntent(wild.ecology) : 'strike'
+    // Even entry-level bosses spend a full energy bar on a visible board or
+    // status mechanic. Their tier controls intensity, not whether the cast is
+    // meaningful at all.
+    intent = baseEnemyIntent(wild.ecology)
     if (tier >= 4 && battle.enemyHardControlCooldown === 0 && roll < 0.1 + tier * 0.02) {
       intent = wild.ecology === 'lumen' || wild.ecology === 'relay' ? 'lock' : 'freeze'
-    } else if (tier >= 2 && roll < 0.26 + tier * 0.025) {
-      intent = 'sweep'
-    } else if (tier >= 3 && roll < 0.5 + tier * 0.02 && (wild.ecology === 'lumen' || wild.ecology === 'glitch')) {
+    } else if (tier >= 3 && roll < 0.42 + tier * 0.02 && (wild.ecology === 'lumen' || wild.ecology === 'glitch')) {
       intent = 'lock'
     }
   }
@@ -821,25 +877,63 @@ function prepareBossIntent(battle: BattleState, random: RandomSource): void {
   else battle.enemyTargetIndex = target.index
 }
 
-function applyEnemyHit(
+function partyDefense(battle: BattleState): number {
+  return battle.party.reduce((sum, member) => sum + memberStats(member).defense, 0) / battle.party.length
+}
+
+function partyAffinity(battle: BattleState, wildEcology: TraceEcology): number {
+  return battle.party.reduce((sum, member) => {
+    const definition = creatureById(member.creatureId)
+    return sum + (definition === undefined ? 1 : affinity(wildEcology, definition.ecology))
+  }, 0) / battle.party.length
+}
+
+function enemyDamageEffectiveness(
   battle: BattleState,
-  target: BattlePartyMember,
   wildEcology: TraceEcology,
-  power: number,
-  maximumHealthRatio: number,
-  random: RandomSource,
-): number {
-  const targetDefinition = creatureById(target.creatureId)
-  if (targetDefinition === undefined) throw new TraceWildRuleError('conflict')
-  const roll = battle.wildAttack * power * (0.88 + boundedRandom(random) * 0.24)
-    * affinity(wildEcology, targetDefinition.ecology) * 100 / (100 + memberStats(target).defense)
-  const bounded = Math.min(roll, target.maxHp * maximumHealthRatio)
-  const damage = damagePartyMember(target, bounded)
-  if (target.creatureId === 'forge-rivetclaw' && damage > 0) {
-    target.counterPower = 0.8 * qualityMultiplier(target)
+): MatchDamageEffectiveness {
+  const multiplier = partyAffinity(battle, wildEcology)
+  return multiplier > 1.05 ? 'advantage' : multiplier < 0.95 ? 'resisted' : 'neutral'
+}
+
+function enemyTeamDamageForCharge(battle: BattleState, wildEcology: TraceEcology): number {
+  if (battle.bossAttackCharge <= 0 || battle.partyHp <= 0) return 0
+  const power = Math.min(1.55, Math.max(0.55, 0.35 + 0.22 * battle.bossAttackCharge))
+  const partyPressure = 1 + 0.55 * Math.max(0, battle.party.length - 1)
+  const roll = battle.wildAttack * power * (battle.bossDamageScale / 1000)
+    * partyPressure * partyAffinity(battle, wildEcology) * 100 / (100 + partyDefense(battle))
+  return Math.max(1, Math.round(Math.min(
+    roll,
+    battle.partyMaxHp * 0.3,
+    battle.partyHp + battle.partyShield,
+  )))
+}
+
+function applyEnemyTeamHit(battle: BattleState, amount: number): number {
+  if (amount <= 0) return 0
+  const damage = damageParty(battle, amount)
+  if (damage > 0) {
+    for (const member of battle.party) {
+      if (member.creatureId === 'forge-rivetclaw') member.counterPower = 0.8 * qualityMultiplier(member)
+    }
   }
-  maybePreventDefeat(battle, target)
+  maybePreventDefeat(battle)
   return damage
+}
+
+function installHazardTiles(battle: BattleState, random: RandomSource): number {
+  const countLimit = Math.min(6, 2 + battle.bossSkillTier)
+  const candidates = battle.board.map((tile, index) => (
+    tile.special === 'none' && (tile.lockedActions ?? 0) === 0 && (tile.hazardActions ?? 0) === 0 ? index : -1
+  )).filter(index => index >= 0)
+  let count = 0
+  while (candidates.length > 0 && count < countLimit) {
+    const cursor = Math.floor(boundedRandom(random) * candidates.length)
+    const index = candidates.splice(cursor, 1)[0]!
+    battle.board[index] = { ...battle.board[index]!, hazardActions: 3 }
+    count += 1
+  }
+  return count
 }
 
 function lockEnemyTiles(battle: BattleState, random: RandomSource): number {
@@ -867,23 +961,14 @@ function performBossSettlement(battle: BattleState, random: RandomSource): boole
     applyWildDamage(battle, battle.wildMaxHp * 0.025 * battle.enemyBurn, undefined)
     battle.enemyBurn = Math.max(0, battle.enemyBurn - 0.5)
   }
-  const finalPower = Math.min(1.55, Math.max(0.55, 0.35 + 0.22 * battle.bossAttackCharge))
-  const intendedTarget = battle.party[battle.enemyTargetIndex ?? battle.activeIndex]
-  const target = intendedTarget !== undefined && intendedTarget.hp > 0
-    ? intendedTarget
-    : livingMembers(battle)[0]
-  let totalDamage = 0
-  if (battle.enemyIntent === 'sweep') {
-    for (const member of livingMembers(battle)) {
-      totalDamage += applyEnemyHit(battle, member, wild.ecology, finalPower * 0.62, 0.25, random)
-    }
-    appendBattleLog(battle, { turn: battle.turn, kind: 'enemy-sweep', amount: totalDamage })
-  } else if (target !== undefined && target.hp > 0) {
-    const strikePower = battle.enemyIntent === 'strike' && battle.bossSkillArmed ? finalPower * 1.15 : finalPower
-    totalDamage = applyEnemyHit(battle, target, wild.ecology, strikePower, 0.35, random)
-    appendBattleLog(battle, { turn: battle.turn, kind: 'enemy', amount: totalDamage, creatureId: target.creatureId })
-  }
+  const target = battle.party[battle.enemyTargetIndex ?? battle.activeIndex]
+  const totalDamage = applyEnemyTeamHit(battle, battle.pendingBossDamage)
+  appendBattleLog(battle, { turn: battle.turn, kind: 'enemy', amount: totalDamage })
   battle.lastBossAttack = totalDamage
+
+  // A defeated team must not receive a late board mutation or status effect.
+  // This also keeps the final combat frame focused on the shared-HP knockout.
+  if (battle.partyHp <= 0) return true
 
   if (battle.bossSkillArmed) {
     battle.bossEnergy = Math.max(0, battle.bossEnergy - BOSS_SKILL_ENERGY_COST)
@@ -897,7 +982,7 @@ function performBossSettlement(battle: BattleState, random: RandomSource): boole
         appendBattleLog(battle, { turn: battle.turn, kind: 'enemy-shield', amount: battle.wildShield })
         break
       case 'freeze':
-        if (target !== undefined && target.hp > 0) {
+        if (target !== undefined) {
           target.frozenStages = Math.max(target.frozenStages, 1)
           battle.enemyHardControlCooldown = 3
           appendBattleLog(battle, { turn: battle.turn, kind: 'enemy-freeze', amount: 1, creatureId: target.creatureId })
@@ -913,13 +998,16 @@ function performBossSettlement(battle: BattleState, random: RandomSource): boole
         mutateBoardForEnemy(battle, 'relay', random)
         break
       case 'corrupt':
-        mutateBoardForEnemy(battle, 'glitch', random)
+        appendBattleLog(battle, { turn: battle.turn, kind: 'enemy-hazard', amount: installHazardTiles(battle, random) })
         break
       case 'mark':
-        if (target !== undefined) target.energy = Math.max(0, target.energy - 2)
+        if (target !== undefined) {
+          target.energy = Math.max(0, target.energy - 2)
+          target.skillSealedStages = Math.max(target.skillSealedStages, 1)
+          appendBattleLog(battle, { turn: battle.turn, kind: 'enemy-seal', amount: 1, creatureId: target.creatureId })
+        }
         break
       case 'strike':
-      case 'sweep':
         break
     }
   } else {
@@ -928,11 +1016,13 @@ function performBossSettlement(battle: BattleState, random: RandomSource): boole
   if (battle.enemyHardControlCooldown > 0 && battle.enemyIntent !== 'freeze' && battle.enemyIntent !== 'lock') {
     battle.enemyHardControlCooldown -= 1
   }
-  return livingMembers(battle).length === 0
+  return battle.partyHp <= 0
 }
 
 function advanceBattleStage(battle: BattleState): boolean {
-  if (livingMembers(battle).length === 0) return true
+  if (battle.partyHp <= 0) return true
+  const leaving = battle.party[battle.activeIndex]
+  if (leaving !== undefined && leaving.skillSealedStages > 0) leaving.skillSealedStages -= 1
   const next = nextLivingIndex(battle)
   if (next === undefined) return true
   battle.activeIndex = next.index
@@ -969,6 +1059,7 @@ function createBattleParty(state: TraceWildState): BattlePartyMember[] {
       overcharge: 0,
       stageDamage: 0,
       frozenStages: 0,
+      skillSealedStages: 0,
     }
   })
 }
@@ -994,6 +1085,7 @@ function installBattle(
   const wild = creatureById(input.wildCreatureId)
   if (wild === undefined) throw new TraceWildRuleError('conflict')
   const wildMaxHp = input.stats.hp
+  const partyMaxHp = party.reduce((sum, member) => sum + member.maxHp, 0)
   const battle: BattleState = {
     id: randomId('battle', now, random),
     encounterId: input.encounterId,
@@ -1003,6 +1095,9 @@ function installBattle(
     bossSkillTier: input.bossSkillTier,
     board: createMatchBoard(random),
     party,
+    partyHp: partyMaxHp,
+    partyMaxHp,
+    partyShield: 0,
     turnOwner: 'player',
     activeIndex: 0,
     actionsRemaining: BASE_ACTIONS_PER_CREATURE,
@@ -1010,6 +1105,8 @@ function installBattle(
     bossActionsTaken: 0,
     bossEnergy: input.startingBossEnergy,
     bossAttackCharge: 0,
+    pendingBossDamage: 0,
+    bossDamageScale: 1000,
     bossBonusActionsGranted: 0,
     bossSkillArmed: false,
     lastBossAttack: 0,
@@ -1025,8 +1122,7 @@ function installBattle(
     wildLevel: input.level,
     wildQuality: input.quality,
     enemyIntent: 'strike',
-    enemyTargetScope: 'single',
-    enemyTargetIndex: 0,
+    enemyTargetScope: 'team',
     enemyMarks: 0,
     enemyBurn: 0,
     enemyDelayed: 0,
@@ -1109,14 +1205,19 @@ function isCaptureWindowAvailable(battle: BattleState): boolean {
   return battle.mode === 'wild'
     && battle.wildArmor === 0
     && battle.wildHp > 0
-    && battle.captureAttempts < MAX_CAPTURE_ATTEMPTS
     && battle.wildHp / battle.wildMaxHp <= CAPTURE_HEALTH_RATIO
 }
 
 function ageTileLocks(battle: BattleState): void {
   battle.board = battle.board.map(tile => {
-    const remaining = Math.max(0, (tile.lockedActions ?? 0) - 1)
-    return remaining > 0 ? { ...tile, lockedActions: remaining } : { ecology: tile.ecology, special: tile.special }
+    const lockedActions = Math.max(0, (tile.lockedActions ?? 0) - 1)
+    const hazardActions = Math.max(0, (tile.hazardActions ?? 0) - 1)
+    return {
+      ecology: tile.ecology,
+      special: tile.special,
+      ...(lockedActions > 0 ? { lockedActions } : {}),
+      ...(hazardActions > 0 ? { hazardActions } : {}),
+    }
   })
 }
 
@@ -1134,6 +1235,8 @@ function beginBossPhase(battle: BattleState, random: RandomSource): BattleOutcom
   battle.bossActionsRemaining = BASE_BOSS_ACTIONS
   battle.bossActionsTaken = 0
   battle.bossAttackCharge = 0
+  battle.pendingBossDamage = 0
+  battle.bossDamageScale = 880 + Math.floor(boundedRandom(random) * 241)
   battle.bossBonusActionsGranted = 0
   battle.lastBossMatch = 0
   return 'none'
@@ -1145,6 +1248,8 @@ function finishBossPhase(battle: BattleState, random: RandomSource): BattleOutco
   battle.bossActionsRemaining = 0
   battle.bossActionsTaken = 0
   battle.bossAttackCharge = 0
+  battle.pendingBossDamage = 0
+  battle.bossDamageScale = 1000
   battle.bossBonusActionsGranted = 0
   if (advanceBattleStage(battle)) return 'battle-lost'
   prepareBossIntent(battle, random)
@@ -1197,7 +1302,9 @@ function performBattleSwap(
   ageTileLocks(battle)
   if (battle.affinityFloorActions > 0) battle.affinityFloorActions -= 1
   if (battle.boardLockActions > 0) battle.boardLockActions -= 1
-  const outcome = battle.actionsRemaining === 0 ? completeBattleStage(battle, random) : 'none'
+  const outcome = battle.partyHp <= 0
+    ? 'battle-lost'
+    : battle.actionsRemaining === 0 ? completeBattleStage(battle, random) : 'none'
   return { outcome, animation }
 }
 
@@ -1215,16 +1322,23 @@ function performBossBoardAction(
   battle.board = resolution.board
   let matched = 0
   let ownColor = 0
-  let charge = 0
-  for (const step of resolution.steps) {
+  for (let index = 0; index < resolution.steps.length; index += 1) {
+    const step = resolution.steps[index]!
     const count = TRACE_ECOLOGIES.reduce((sum, ecology) => sum + step.counts[ecology], 0)
     const combo = Math.min(2, 1 + 0.2 * (step.chain - 1))
     matched += count
     ownColor += step.counts[wild.ecology]
-    charge += count / 3 * combo
+    battle.bossAttackCharge = Math.min(32, battle.bossAttackCharge + count / 3 * combo)
+    const totalDamage = enemyTeamDamageForCharge(battle, wild.ecology)
+    const frame = resolution.frames[index]
+    if (frame !== undefined) {
+      frame.damage = Math.max(0, totalDamage - battle.pendingBossDamage)
+      frame.totalDamage = totalDamage
+      frame.effectiveness = enemyDamageEffectiveness(battle, wild.ecology)
+    }
+    battle.pendingBossDamage = totalDamage
   }
   battle.lastBossMatch = matched
-  battle.bossAttackCharge = Math.min(32, battle.bossAttackCharge + charge)
   const energyGain = Math.min(8, ownColor)
   if (energyGain > 0) {
     battle.bossEnergy = Math.min(BOSS_SKILL_ENERGY_LIMIT, battle.bossEnergy + energyGain)
@@ -1282,7 +1396,7 @@ function continueBattle(
 function skipPlayerStage(battle: BattleState, random: RandomSource): BattleOutcome {
   const active = battle.party[battle.activeIndex]
   if (battle.mode !== 'wild' || battle.turnOwner !== 'player' || battle.captureWindow
-    || battle.actionsRemaining <= 0 || active === undefined || active.hp <= 0) {
+    || battle.actionsRemaining <= 0 || active === undefined || battle.partyHp <= 0) {
     throw new TraceWildRuleError('conflict')
   }
   battle.actionsRemaining = 0
@@ -1307,7 +1421,9 @@ function castActiveSkill(state: TraceWildState, creatureInstanceId: string, rand
     throw new TraceWildRuleError('conflict')
   }
   const member = activeMember(battle)
-  if (member.instanceId !== creatureInstanceId || member.skillUsedStage) throw new TraceWildRuleError('conflict')
+  if (member.instanceId !== creatureInstanceId || member.skillUsedStage || member.skillSealedStages > 0) {
+    throw new TraceWildRuleError('conflict')
+  }
   const definition = skillByCreatureId(member.creatureId)
   if (definition === undefined || member.energy < definition.energyCost) throw new TraceWildRuleError('invalid-action')
   member.energy -= definition.energyCost
@@ -1327,8 +1443,8 @@ function castActiveSkill(state: TraceWildState, creatureInstanceId: string, rand
       animationFrames.push(...resolveConvertedBoard(battle, random))
       break
     case 'lumen-foliomoth':
-      for (const ally of livingMembers(battle)) healMember(ally, ally.maxHp * 0.08 * scale)
-      shieldMember(member, member.maxHp * 0.1 * scale)
+      healParty(battle, battle.partyMaxHp * 0.08 * scale)
+      shieldParty(battle, member.maxHp * 0.1 * scale)
       break
     case 'lumen-lensel': {
       const wild = creatureById(battleEncounterCreatureId(battle))!
@@ -1346,7 +1462,7 @@ function castActiveSkill(state: TraceWildState, creatureInstanceId: string, rand
       for (let hit = 0; hit < 3; hit += 1) damage += applyRawHit(battle, member, 0.55 * scale)
       break
     case 'forge-rivetclaw':
-      shieldMember(member, member.maxHp * 0.18 * scale)
+      shieldParty(battle, member.maxHp * 0.18 * scale)
       member.counterPower = 0.8 * scale
       break
     case 'forge-solderling':
@@ -1384,24 +1500,22 @@ function castActiveSkill(state: TraceWildState, creatureInstanceId: string, rand
       animationFrames.push(...resolveConvertedBoard(battle, random))
       break
     case 'aegis-veribud':
-      for (const ally of livingMembers(battle)) healMember(ally, ally.maxHp * 0.1 * scale)
+      healParty(battle, battle.partyMaxHp * 0.1 * scale)
       break
     case 'aegis-loop-tortoise':
-      for (const ally of livingMembers(battle)) shieldMember(ally, ally.maxHp * 0.2 * scale)
+      shieldParty(battle, battle.partyMaxHp * 0.2 * scale)
       break
     case 'aegis-anchorbee':
       battle.enemyDelayed = Math.max(1, battle.enemyDelayed)
       battle.boardLockActions = Math.max(3, battle.boardLockActions)
       break
     case 'aegis-steady-ram':
-      shieldMember(member, member.maxHp * 0.1 * scale)
+      shieldParty(battle, member.maxHp * 0.1 * scale)
       damage += applyRawHit(battle, member, 1.4 * scale)
       break
     case 'aegis-dawnguard':
-      for (const ally of livingMembers(battle)) {
-        healMember(ally, ally.maxHp * 0.16 * scale)
-        shieldMember(ally, ally.maxHp * 0.08 * scale)
-      }
+      healParty(battle, battle.partyMaxHp * 0.16 * scale)
+      shieldParty(battle, battle.partyMaxHp * 0.08 * scale)
       break
     case 'glitch-null-nibbler':
       battle.wildShield = 0
@@ -1419,7 +1533,8 @@ function castActiveSkill(state: TraceWildState, creatureInstanceId: string, rand
       break
     case 'glitch-crashfox':
       damage += applyRawHit(battle, member, 2.2 * scale)
-      member.hp = Math.max(1, member.hp - Math.round(member.hp * 0.08))
+      battle.partyHp = Math.max(1, battle.partyHp - Math.max(1, Math.round(member.hp * 0.08)))
+      syncLegacyPartyHealth(battle)
       break
     case 'glitch-overflow-maw': {
       const resolution = resolveForcedTiles(battle.board, selectedIndexes(battle.board, 'glitch', 12), random)
@@ -1489,7 +1604,7 @@ function attemptCapture(
   random: RandomSource,
 ): 'capture-success' | 'capture-failed' | 'battle-lost' {
   const battle = state.battle
-  if (battle === undefined || battle.mode !== 'wild' || !battle.captureWindow || battle.captureAttempts >= MAX_CAPTURE_ATTEMPTS) {
+  if (battle === undefined || battle.mode !== 'wild' || !battle.captureWindow) {
     throw new TraceWildRuleError('conflict')
   }
   if (state.cores[quality] <= 0) throw new TraceWildRuleError('invalid-action')
@@ -1513,11 +1628,18 @@ function attemptCapture(
     delete state.battle
     return 'capture-success'
   }
-  encounter.captureAttempts += 1
+  encounter.captureAttempts = Math.min(MAX_CAPTURE_ATTEMPTS, encounter.captureAttempts + 1)
   battle.captureAttempts = encounter.captureAttempts
-  battle.captureWindow = false
   state.stats.failedCaptures += 1
   appendBattleLog(battle, { turn: battle.turn, kind: 'capture-failed' })
+  const remainingCores = CAPTURE_CORE_QUALITIES.reduce((sum, current) => sum + state.cores[current], 0)
+  if (remainingCores > 0) {
+    // A failed throw stays inside the capture phase. The player may select a
+    // different core, retry, or explicitly continue the battle.
+    battle.captureWindow = true
+    return 'capture-failed'
+  }
+  battle.captureWindow = false
   const outcome = beginBossPhase(battle, random)
   if (outcome !== 'battle-lost') return 'capture-failed'
   logEntry(state, { at: now, kind: 'defeat', creatureId: wild.id, ecology: wild.ecology }, random)
@@ -1684,7 +1806,13 @@ export function applyTraceWildAction(
       const battleId = next.battle?.id
       const frames = castActiveSkill(next, action.creatureInstanceId, random)
       if (battleId !== undefined && frames.length > 0) animation = { kind: 'match', battleId, actor: 'player', frames }
-      notice = 'skill-cast'
+      if (next.battle?.partyHp === 0) {
+        logBattleDefeat(next, now, random)
+        delete next.battle
+        notice = 'battle-lost'
+      } else {
+        notice = 'skill-cast'
+      }
       break
     }
     case 'battle-skip-stage': {
@@ -1859,9 +1987,13 @@ function restoreBoard(value: unknown): MatchTile[] | undefined {
     const row = record(raw)
     if (row === undefined || !isEcology(row.ecology) || !isSpecial(row.special)) return undefined
     const lockedActions = safeInt(row.lockedActions, 0, 2)
-    board.push(lockedActions > 0
-      ? { ecology: row.ecology, special: row.special, lockedActions }
-      : { ecology: row.ecology, special: row.special })
+    const hazardActions = safeInt(row.hazardActions, 0, 3)
+    board.push({
+      ecology: row.ecology,
+      special: row.special,
+      ...(lockedActions > 0 ? { lockedActions } : {}),
+      ...(hazardActions > 0 ? { hazardActions } : {}),
+    })
   }
   return findFirstLegalBattleSwap(board) === undefined ? undefined : board
 }
@@ -1906,16 +2038,21 @@ function restoreBattle(root: Record<string, unknown>, state: TraceWildState): Ba
       overcharge: safeInt(row.overcharge, 0, 5),
       stageDamage: safeInt(row.stageDamage, 0, 9_999_999),
       frozenStages: safeInt(row.frozenStages, 0, 1),
+      skillSealedStages: safeInt(row.skillSealedStages, 0, 1),
     })
   }
   const activeIndex = safeInt(raw.activeIndex, 0, party.length - 1)
-  if (party[activeIndex]!.hp <= 0 || party.every(member => member.hp <= 0)) return undefined
+  const partyMaxHp = party.reduce((sum, member) => sum + member.maxHp, 0)
+  const legacyPartyHp = party.reduce((sum, member) => sum + member.hp, 0)
+  const partyHp = Math.min(partyMaxHp, safeInt(raw.partyHp, legacyPartyHp, partyMaxHp))
+  if (partyHp <= 0) return undefined
   const id = typeof raw.id === 'string' && /^battle_[a-z0-9_]{8,64}$/.test(raw.id) ? raw.id : ''
   if (id === '') return undefined
-  const enemyIntent = raw.enemyIntent
-  if (enemyIntent !== 'strike' && enemyIntent !== 'guard' && enemyIntent !== 'disrupt'
-    && enemyIntent !== 'corrupt' && enemyIntent !== 'mark' && enemyIntent !== 'sweep'
-    && enemyIntent !== 'lock' && enemyIntent !== 'freeze') return undefined
+  const rawEnemyIntent = raw.enemyIntent === 'sweep' ? 'strike' : raw.enemyIntent
+  if (rawEnemyIntent !== 'strike' && rawEnemyIntent !== 'guard' && rawEnemyIntent !== 'disrupt'
+    && rawEnemyIntent !== 'corrupt' && rawEnemyIntent !== 'mark'
+    && rawEnemyIntent !== 'lock' && rawEnemyIntent !== 'freeze') return undefined
+  const enemyIntent: EnemyIntent = rawEnemyIntent
   const partyAverageLevel = party.reduce((sum, member) => sum + member.level, 0) / party.length
   const battleLevel = encounter?.level ?? towerProfile!.level
   const battleQuality = encounter?.quality ?? towerProfile!.quality
@@ -1925,8 +2062,14 @@ function restoreBattle(root: Record<string, unknown>, state: TraceWildState): Ba
   const wildMaxHp = towerProfile === undefined
     ? Math.max(1, safeInt(raw.wildMaxHp, fallbackWildStats.hp, 9_999_999))
     : fallbackWildStats.hp
-  const enemyTargetScope = raw.enemyTargetScope
-  if (enemyTargetScope !== 'single' && enemyTargetScope !== 'all' && enemyTargetScope !== 'self') return undefined
+  const defaultTarget = enemyTargetFor({ activeIndex }, enemyIntent)
+  const persistedTargetIndex = Number.isSafeInteger(raw.enemyTargetIndex)
+    && (raw.enemyTargetIndex as number) >= 0 && (raw.enemyTargetIndex as number) < party.length
+    ? raw.enemyTargetIndex as number
+    : undefined
+  const restoredTarget = defaultTarget.scope === 'member' && persistedTargetIndex !== undefined
+    ? { scope: defaultTarget.scope, index: persistedTargetIndex }
+    : defaultTarget
   const rawContributions = Array.isArray(raw.lastTeamContributions) ? raw.lastTeamContributions.slice(0, 3) : []
   const lastTeamContributions = rawContributions.flatMap(value => {
     const row = record(value)
@@ -1937,7 +2080,7 @@ function restoreBattle(root: Record<string, unknown>, state: TraceWildState): Ba
   const captureWindow = mode === 'wild' && raw.captureWindow === true
   const actionsRemaining = safeInt(raw.actionsRemaining, BASE_ACTIONS_PER_CREATURE, MAX_ACTIONS_PER_CREATURE)
   const turnOwner = !captureWindow && raw.turnOwner === 'boss' ? 'boss' : 'player'
-  return {
+  const restored: BattleState = {
     id,
     encounterId,
     wildCreatureId: wild.id,
@@ -1947,6 +2090,13 @@ function restoreBattle(root: Record<string, unknown>, state: TraceWildState): Ba
       ?? bossSkillTierForThreat(threatPoints(battleLevel, battleQuality)),
     board,
     party,
+    partyHp,
+    partyMaxHp,
+    partyShield: safeInt(
+      raw.partyShield,
+      party.reduce((sum, member) => sum + member.shield, 0),
+      partyMaxHp,
+    ),
     turnOwner,
     activeIndex,
     actionsRemaining,
@@ -1958,6 +2108,8 @@ function restoreBattle(root: Record<string, unknown>, state: TraceWildState): Ba
       : 0,
     bossEnergy: safeInt(raw.bossEnergy, 0, BOSS_SKILL_ENERGY_LIMIT),
     bossAttackCharge: safeNumber(raw.bossAttackCharge, 0, 0, 32),
+    pendingBossDamage: 0,
+    bossDamageScale: Math.max(880, safeInt(raw.bossDamageScale, 1000, 1120)),
     bossBonusActionsGranted: safeInt(raw.bossBonusActionsGranted, 0, MAX_BOSS_BONUS_ACTIONS),
     bossSkillArmed: raw.bossSkillArmed === true,
     lastBossAttack: safeInt(raw.lastBossAttack, 0, 9_999_999),
@@ -1977,11 +2129,8 @@ function restoreBattle(root: Record<string, unknown>, state: TraceWildState): Ba
     wildLevel: battleLevel,
     wildQuality: battleQuality,
     enemyIntent,
-    enemyTargetScope,
-    ...(Number.isSafeInteger(raw.enemyTargetIndex) && (raw.enemyTargetIndex as number) >= 0
-      && (raw.enemyTargetIndex as number) < party.length
-      ? { enemyTargetIndex: raw.enemyTargetIndex as number }
-      : {}),
+    enemyTargetScope: restoredTarget.scope,
+    ...(restoredTarget.index === undefined ? {} : { enemyTargetIndex: restoredTarget.index }),
     enemyMarks: safeInt(raw.enemyMarks, 0, 3),
     enemyBurn: safeNumber(raw.enemyBurn, 0, 0, 4.2),
     enemyDelayed: safeInt(raw.enemyDelayed, 0, 1),
@@ -2001,6 +2150,11 @@ function restoreBattle(root: Record<string, unknown>, state: TraceWildState): Ba
     turn: Math.max(1, safeInt(raw.turn, 1, 999999)),
     log: [{ turn: 0, kind: 'start', creatureId: wild.id, ecology: wild.ecology }],
   }
+  restored.pendingBossDamage = turnOwner === 'boss'
+    ? enemyTeamDamageForCharge(restored, wild.ecology)
+    : 0
+  syncLegacyPartyHealth(restored)
+  return restored
 }
 
 /** Tolerant, bounded loader with schema-v1/v2 migration. Invalid or future data starts a fresh profile. */

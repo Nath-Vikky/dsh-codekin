@@ -31,6 +31,11 @@ Restart DSH Web after installation, then open **DSH Settings → Codekin** and e
 The launcher is draggable and toggles the compact portrait game window. When idle supplies are
 ready, the launcher changes into a gently animated gift reminder.
 
+Codekin saves progress at `$DSH_HOME/codekinsave/state.json`. Existing installs automatically move
+the former `tracewild/state.json` save on first launch. Uninstalling from the dsh-web plugin manager
+is a confirmed one-click operation and preserves progress by default. For a complete removal, first
+use **DSH Settings → Codekin → Delete local save**, then uninstall the plugin.
+
 This preview adopts the Alpha client-module split and the official browser-authentication cookie.
 Every Codekin state, action, event-stream, and image route rejects unauthenticated requests before
 touching game state.
@@ -73,9 +78,9 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
 - A two-step release flow in Squad that returns one same-quality growth material regardless of the Codekin's level.
 - Three base actions per active Codekin; direct match-four refunds an action and match-five adds one.
 - A wild-battle turn may be ended early to preserve a low-runtime capture target.
-- Damage from all three squad stages is queued and resolved as one team strike at the end of the cycle.
-- Wild Codekin use separate Boss scaling and can telegraph single-target attacks, party-wide attacks,
-  tile locks, freezes, and phase shields according to their level and quality.
+- The three Codekin share one squad runtime pool. Stage damage is queued and resolved through a prominent team-strike total at the end of the cycle.
+- Wild Codekin use separate Boss scaling and can telegraph hazard panels, protocol seals, tile locks,
+  freezes, board reroutes, and phase shields according to their level and quality.
 - Matching a Codekin's attribute builds command points, and every Codekin has one passive plus one active ability.
 - Match-four, match-five, and intersecting clears create row, column, burst, and origin tiles.
 - Reward popups, item details, visible material experience values, and explicit confirmations for irreversible roster actions.
@@ -86,16 +91,16 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
 Swap adjacent tiles to queue compute damage and charge matching squad members. Each squad member
 normally contributes three actions; a direct match-four refunds an action and a match-five grants an
 extra action. The three squad stages are displayed separately, then resolve as one team strike. Wild
-Bosses have their own multi-action cycle and may use single-target or party-wide attacks, locks,
-freezes, shields, and quality-dependent mechanics. A player may end the current stage early to avoid
+Bosses have their own multi-action cycle, strike one shared squad runtime pool, and use hazard panels,
+protocol seals, locks, freezes, shields, board reroutes, and quality-dependent mechanics. A player may end the current stage early to avoid
 defeating a weakened capture target. Encounter duration, level, and quality respond to effective DSH
 activity while map population and regional balancing prevent one activity type from occupying every
 spawn slot.
 
 ## Data behavior
 
-Game progress is stored locally by the plugin. Codekin records bounded game events and aggregate
-runtime outcomes; it does not store prompt text, assistant responses, tool arguments, commands,
+Game progress is stored locally at `$DSH_HOME/codekinsave/state.json`. Codekin records bounded game
+events and aggregate runtime outcomes; it does not store prompt text, assistant responses, tool arguments, commands,
 workspace paths, or raw error bodies. It does not submit prompts, invoke tools, alter model requests,
 or modify conversations.
 

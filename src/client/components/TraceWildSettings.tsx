@@ -14,6 +14,8 @@ export function TraceWildSettings({ t }: TraceWildSettingsProps) {
   const [online, setOnline] = useState(true)
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [deleteArmed, setDeleteArmed] = useState(false)
+  const [deleted, setDeleted] = useState(false)
 
   const refresh = useCallback(async (signal?: AbortSignal): Promise<void> => {
     try {
@@ -46,6 +48,24 @@ export function TraceWildSettings({ t }: TraceWildSettingsProps) {
     try {
       setSnapshot(await connection.act({ type: 'set-enabled', enabled: !enabled }))
       setOnline(true)
+      setDeleted(false)
+    } catch {
+      setFailed(true)
+      await refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const clearLocalData = async (): Promise<void> => {
+    if (busy || snapshot === undefined || !deleteArmed) return
+    setBusy(true)
+    setFailed(false)
+    try {
+      setSnapshot(await connection.clearLocalData())
+      setOnline(true)
+      setDeleted(true)
+      setDeleteArmed(false)
     } catch {
       setFailed(true)
       await refresh()
@@ -83,10 +103,49 @@ export function TraceWildSettings({ t }: TraceWildSettingsProps) {
           <span>{enabled ? t('settingsOn') : t('settingsOff')}</span>
         </button>
       </div>
+      <div className={`${css.settingsCard} ${css.settingsStorageCard}`}>
+        <div>
+          <strong>{t('settingsStorage')}</strong>
+          <code>codekinsave/state.json</code>
+          <span>{t('settingsStorageHint')}</span>
+        </div>
+        {deleteArmed
+          ? (
+              <div className={css.settingsDeleteActions}>
+                <button
+                  type="button"
+                  disabled={busy || snapshot === undefined || !online}
+                  onClick={() => { setDeleteArmed(false) }}
+                >
+                  {t('settingsDeleteCancel')}
+                </button>
+                <button
+                  type="button"
+                  className={css.settingsDeleteConfirm}
+                  disabled={busy || snapshot === undefined || !online}
+                  onClick={() => { void clearLocalData() }}
+                >
+                  {t('settingsDeleteConfirm')}
+                </button>
+              </div>
+            )
+          : (
+              <button
+                type="button"
+                className={css.settingsDeleteButton}
+                disabled={busy || snapshot === undefined || !online}
+                onClick={() => { setDeleteArmed(true) }}
+              >
+                {t('settingsDeleteData')}
+              </button>
+            )}
+      </div>
 
       <p className={failed || !online ? css.settingsError : css.settingsStatus} role="status">
         {failed || !online
           ? t('settingsUnavailable')
+          : deleted
+            ? t('settingsDeleted')
           : snapshot === undefined
             ? t('settingsLoading')
             : enabled

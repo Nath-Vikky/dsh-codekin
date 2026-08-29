@@ -4,6 +4,7 @@ import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import {
   applyTraceSignal,
   applyTraceWildAction,
+  createInitialTraceWildState,
   expireTraceWildEncounters,
   settleTraceWildIdleRewards,
 } from '../core/engine.ts'
@@ -115,6 +116,20 @@ export class TraceWildService {
       ...(result.notice === undefined ? {} : { notice: result.notice }),
       ...(result.animation === undefined ? {} : { animation: result.animation }),
     }
+  }
+
+  clearLocalData(): TraceWildActionResponse {
+    const now = this.now()
+    const next = createInitialTraceWildState(now)
+    // A cleared profile stays paused so an event cannot recreate the save
+    // between this explicit cleanup and a subsequent plugin uninstall.
+    next.enabled = false
+    this.persistence.clear()
+    this.stateValue = next
+    this.classifier = new TraceWildEventClassifier()
+    const snapshot = this.snapshot()
+    this.publish(snapshot)
+    return { ok: true, ...snapshot }
   }
 
   private publish(snapshot = this.snapshot()): void {

@@ -58,13 +58,23 @@ export interface MatchTile {
     ecology: TraceEcology;
     special: TileSpecial;
     lockedActions?: number;
+    /** Boss-injected damage panel. Clearing it hurts the shared party pool. */
+    hazardActions?: number;
 }
+export type MatchDamageEffectiveness = 'advantage' | 'neutral' | 'resisted';
 export interface MatchCascadeFrame {
     chain: number;
     before: MatchTile[];
     after: MatchTile[];
     removed: number[];
     fallRows: number[];
+    /** Damage accumulated by the acting side during this cascade step. */
+    damage?: number;
+    /** Running damage total accumulated by the acting side. */
+    totalDamage?: number;
+    effectiveness?: MatchDamageEffectiveness;
+    /** Shared-party damage caused by dangerous panels in this step. */
+    hazardDamage?: number;
 }
 export interface TraceWildBattleAnimation {
     kind: 'match';
@@ -94,16 +104,17 @@ export interface BattlePartyMember {
     overcharge: number;
     stageDamage: number;
     frozenStages: number;
+    skillSealedStages: number;
 }
-export type EnemyIntent = 'strike' | 'sweep' | 'guard' | 'disrupt' | 'corrupt' | 'mark' | 'lock' | 'freeze';
-export type EnemyTargetScope = 'single' | 'all' | 'self';
+export type EnemyIntent = 'strike' | 'guard' | 'disrupt' | 'corrupt' | 'mark' | 'lock' | 'freeze';
+export type EnemyTargetScope = 'team' | 'member' | 'board' | 'self';
 export interface BattleContribution {
     instanceId: string;
     amount: number;
 }
 export interface BattleLogEntry {
     turn: number;
-    kind: 'start' | 'match' | 'combo' | 'armor-break' | 'skill' | 'heal' | 'shield' | 'enemy' | 'enemy-sweep' | 'enemy-shield' | 'enemy-delay' | 'enemy-lock' | 'enemy-freeze' | 'boss-match' | 'boss-combo' | 'boss-energy' | 'boss-action-refund' | 'boss-action-bonus' | 'boss-skill' | 'stage-skip' | 'frozen-skip' | 'phase-shift' | 'switch' | 'action-refund' | 'action-bonus' | 'team-strike' | 'capture-failed' | 'wild-defeated' | 'defeat';
+    kind: 'start' | 'match' | 'combo' | 'armor-break' | 'skill' | 'heal' | 'shield' | 'enemy' | 'enemy-sweep' | 'enemy-shield' | 'enemy-delay' | 'enemy-lock' | 'enemy-freeze' | 'enemy-hazard' | 'enemy-seal' | 'hazard-damage' | 'boss-match' | 'boss-combo' | 'boss-energy' | 'boss-action-refund' | 'boss-action-bonus' | 'boss-skill' | 'stage-skip' | 'frozen-skip' | 'phase-shift' | 'switch' | 'action-refund' | 'action-bonus' | 'team-strike' | 'capture-failed' | 'wild-defeated' | 'defeat';
     amount?: number;
     creatureId?: string;
     ecology?: TraceEcology;
@@ -118,6 +129,10 @@ export interface BattleState {
     bossSkillTier: 1 | 2 | 3 | 4 | 5;
     board: MatchTile[];
     party: BattlePartyMember[];
+    /** Authoritative shared HP pool. Member HP fields are compatibility projections only. */
+    partyHp: number;
+    partyMaxHp: number;
+    partyShield: number;
     turnOwner: 'player' | 'boss';
     activeIndex: number;
     actionsRemaining: number;
@@ -125,6 +140,10 @@ export interface BattleState {
     bossActionsTaken: number;
     bossEnergy: number;
     bossAttackCharge: number;
+    /** Exact damage accumulated during the current Boss board phase. */
+    pendingBossDamage: number;
+    /** Per-phase attack variance in thousandths, fixed before the first Boss action. */
+    bossDamageScale: number;
     bossBonusActionsGranted: number;
     bossSkillArmed: boolean;
     lastBossAttack: number;

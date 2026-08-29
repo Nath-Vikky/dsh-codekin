@@ -62,12 +62,17 @@ function chooseEcology(random: RandomSource, allowed: (ecology: TraceEcology) =>
   return TRACE_ECOLOGIES[start]!
 }
 
-function tile(ecology: TraceEcology, special: TileSpecial = 'none', lockedActions = 0): MatchTile {
-  return lockedActions > 0 ? { ecology, special, lockedActions } : { ecology, special }
+function tile(ecology: TraceEcology, special: TileSpecial = 'none', lockedActions = 0, hazardActions = 0): MatchTile {
+  return {
+    ecology,
+    special,
+    ...(lockedActions > 0 ? { lockedActions } : {}),
+    ...(hazardActions > 0 ? { hazardActions } : {}),
+  }
 }
 
 function cloneBoard(board: readonly MatchTile[]): MatchTile[] {
-  return board.map(item => tile(item.ecology, item.special, item.lockedActions))
+  return board.map(item => tile(item.ecology, item.special, item.lockedActions, item.hazardActions))
 }
 
 function groupsInBoard(board: readonly MatchTile[]): MatchGroup[] {
@@ -300,7 +305,12 @@ function collapseAndFill(
   const survivors: ({ tile: MatchTile; source: number } | undefined)[] = board.map((current, index) => {
     const planned = plans.get(index)
     if (removed.has(index)) return undefined
-    return { tile: planned === undefined ? current : tile(current.ecology, planned, current.lockedActions), source: index }
+    return {
+      tile: planned === undefined
+        ? current
+        : tile(current.ecology, planned, current.lockedActions, current.hazardActions),
+      source: index,
+    }
   })
   const fallRows = Array.from({ length: MATCH_BOARD_CELLS }, () => 0)
   for (let column = 0; column < MATCH_BOARD_SIZE; column += 1) {
@@ -346,7 +356,14 @@ function resolveFrom(
     const counts = emptyCounts()
     for (const index of expanded.indexes) counts[board[index]!.ecology] += 1
     const before = cloneBoard(board)
-    for (const [index, special] of plans) before[index] = tile(before[index]!.ecology, special, before[index]!.lockedActions)
+    for (const [index, special] of plans) {
+      before[index] = tile(
+        before[index]!.ecology,
+        special,
+        before[index]!.lockedActions,
+        before[index]!.hazardActions,
+      )
+    }
     const fallRows = collapseAndFill(board, expanded.indexes, plans, random)
     frames.push({
       chain,
@@ -424,7 +441,8 @@ export function convertRandomBattleTiles(
 ): MatchTile[] {
   const board = cloneBoard(boardValue)
   const candidates = board.map((current, index) => (
-    current.special === 'none' && (current.lockedActions ?? 0) === 0 && current.ecology !== ecology ? index : -1
+    current.special === 'none' && (current.lockedActions ?? 0) === 0 && (current.hazardActions ?? 0) === 0
+      && current.ecology !== ecology ? index : -1
   ))
     .filter(index => index >= 0)
   const limit = Math.min(Math.max(0, Math.floor(count)), candidates.length)

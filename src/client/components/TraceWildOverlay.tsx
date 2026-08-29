@@ -18,7 +18,7 @@ import {
   totalXpForLevel,
   xpToNextLevel,
 } from '../../core/balance.ts'
-import { areAdjacentTiles } from '../../core/match3.ts'
+import { MATCH_BOARD_SIZE, areAdjacentTiles } from '../../core/match3.ts'
 import { skillByCreatureId } from '../../core/skills.ts'
 import { MAX_TOWER_FLOOR, towerFloorProfile } from '../../core/tower.ts'
 import type {
@@ -1342,7 +1342,7 @@ function tileLabel(tile: MatchTile, index: number, t: TraceWildOverlayProps['t']
   const special = tile.special === 'none' ? '' : ` · ${t(SPECIAL_KEYS[tile.special])}`
   const locked = (tile.lockedActions ?? 0) > 0 ? ` · ${t('lockedTile', { actions: tile.lockedActions ?? 0 })}` : ''
   const hazard = (tile.hazardActions ?? 0) > 0 ? ` · ${t('hazardTile', { actions: tile.hazardActions ?? 0 })}` : ''
-  return `${ecology}${special}${locked}${hazard} · ${Math.floor(index / 7) + 1},${index % 7 + 1}`
+  return `${ecology}${special}${locked}${hazard} · ${Math.floor(index / MATCH_BOARD_SIZE) + 1},${index % MATCH_BOARD_SIZE + 1}`
 }
 
 interface TileGesture {
@@ -1369,15 +1369,15 @@ interface DamageReadout {
 }
 
 function swipeTarget(index: number, deltaX: number, deltaY: number): number | undefined {
-  const row = Math.floor(index / 7)
-  const column = index % 7
+  const row = Math.floor(index / MATCH_BOARD_SIZE)
+  const column = index % MATCH_BOARD_SIZE
   if (Math.abs(deltaX) >= Math.abs(deltaY)) {
-    if (deltaX > 0 && column < 6) return index + 1
+    if (deltaX > 0 && column < MATCH_BOARD_SIZE - 1) return index + 1
     if (deltaX < 0 && column > 0) return index - 1
     return undefined
   }
-  if (deltaY > 0 && row < 6) return index + 7
-  if (deltaY < 0 && row > 0) return index - 7
+  if (deltaY > 0 && row < MATCH_BOARD_SIZE - 1) return index + MATCH_BOARD_SIZE
+  if (deltaY < 0 && row > 0) return index - MATCH_BOARD_SIZE
   return undefined
 }
 
@@ -1389,7 +1389,7 @@ function swapMotionClass(index: number, motion: SwapMotion | undefined): string 
       ? css.tileSwapRight ?? ''
       : delta === -1
         ? css.tileSwapLeft ?? ''
-        : delta === 7
+        : delta === MATCH_BOARD_SIZE
           ? css.tileSwapDown ?? ''
           : css.tileSwapUp ?? ''
   }
@@ -1397,7 +1397,7 @@ function swapMotionClass(index: number, motion: SwapMotion | undefined): string 
     ? css.tileSwapLeft ?? ''
     : delta === -1
       ? css.tileSwapRight ?? ''
-      : delta === 7
+    : delta === MATCH_BOARD_SIZE
         ? css.tileSwapUp ?? ''
         : css.tileSwapDown ?? ''
 }
@@ -1799,7 +1799,7 @@ function BattleView(props: {
                 const creature = creatureById(member.creatureId)
                 const skill = skillByCreatureId(member.creatureId)
                 if (creature === undefined || skill === undefined) return null
-                const isActive = index === battle.activeIndex
+                const isActive = battle.turnOwner === 'player' && index === battle.activeIndex
                 const skillReady = member.energy >= skill.energyCost && !member.skillUsedStage && member.skillSealedStages === 0
                 const canCast = battle.turnOwner === 'player' && isActive && battle.partyHp > 0 && battle.actionsRemaining > 0
                   && !battle.captureWindow && skillReady
@@ -1861,6 +1861,21 @@ function BattleView(props: {
               <strong>{battle.turnOwner === 'boss'
                 ? `${creatureName(wild, props.zh)} · ${props.t('bossTurn')}`
                 : `${creatureName(activeDefinition, props.zh)} · ${props.t('activeTurn')}`}</strong>
+              {battle.turnOwner === 'player' && (
+                <button
+                  type="button"
+                  className={css.turnSkipButton}
+                  disabled={locked}
+                  title={battle.captureWindow ? props.t('abandonCapture') : props.t('skipStageHint')}
+                  onClick={() => {
+                    void props.act(battle.captureWindow || battle.actionsRemaining === 0
+                      ? { type: 'battle-continue' }
+                      : { type: 'battle-skip-stage' })
+                  }}
+                >
+                  {props.t('skipTurn')}
+                </button>
+              )}
               <span className={css.actionDots} aria-label={`${battle.turnOwner === 'boss' ? props.t('bossMoves') : props.t('movesRemaining')} ${battle.turnOwner === 'boss' ? battle.bossActionsRemaining : battle.actionsRemaining}`}>
                 {[0, 1, 2, 3, 4].map(index => <i key={index} className={index < (battle.turnOwner === 'boss' ? battle.bossActionsRemaining : battle.actionsRemaining) ? css.actionDotActive : ''} />)}
               </span>
@@ -1877,12 +1892,12 @@ function BattleView(props: {
                 const dragging = gesture?.index === index
                 const fallDistance = fallRows?.[index] ?? 0
                 const tileStyle = {
-                  '--tile-row': Math.floor(index / 7),
+                  '--tile-row': Math.floor(index / MATCH_BOARD_SIZE),
                   '--drag-x': `${dragging ? gesture.offsetX : 0}px`,
                   '--drag-y': `${dragging ? gesture.offsetY : 0}px`,
                   '--fall-y': `${fallDistance * -110}%`,
                   '--fall-duration': `${240 + fallDistance * 34}ms`,
-                  '--fall-delay': `${(index % 7) * 9}ms`,
+                  '--fall-delay': `${(index % MATCH_BOARD_SIZE) * 8}ms`,
                 } as CSSProperties
                 return (
                   <button
@@ -1968,45 +1983,13 @@ function BattleView(props: {
                       </button>
                     ))}
                   </div>
-                  <button
-                    type="button"
-                    className={css.captureAbandon}
-                    disabled={locked}
-                    onClick={() => { void props.act({ type: 'battle-continue' }) }}
-                  >
-                    {props.t('abandonCapture')}
-                  </button>
                 </section>
               )}
             </div>
             <p className={css.boardHelp}>{props.t('boardHelp')}</p>
           </div>
 
-          {battle.mode === 'wild' ? (
-            <>
-              {battle.turnOwner === 'player' && !battle.captureWindow && battle.actionsRemaining > 0 && (
-                <button
-                  type="button"
-                  className={`${css.continueButton} ${css.skipStageButton} ${css.battleUtilityAction}`}
-                  disabled={locked}
-                  title={props.t('skipStageHint')}
-                  onClick={() => { void props.act({ type: 'battle-skip-stage' }) }}
-                >
-                  {props.t('skipStage')}
-                </button>
-              )}
-              {battle.turnOwner === 'player' && !battle.captureWindow && battle.actionsRemaining === 0 && (
-                <button
-                  type="button"
-                  className={`${css.continueButton} ${css.battleUtilityAction}`}
-                  disabled={locked}
-                  onClick={() => { void props.act({ type: 'battle-continue' }) }}
-                >
-                  {props.t('skipFrozen')}
-                </button>
-              )}
-            </>
-          ) : (
+          {battle.mode === 'tower' && (
             <div className={css.towerBattleStatus}>
               <span className={css.towerBattleMark} aria-hidden="true">▲</span>
               <div>
@@ -2014,16 +1997,6 @@ function BattleView(props: {
                 <small>{props.t('towerBattleReward', { floor: battle.towerFloor ?? 1 })}</small>
               </div>
               <b>{props.t('towerSkillTier', { tier: battle.bossSkillTier })}</b>
-              {battle.turnOwner === 'player' && battle.actionsRemaining === 0 && (
-                <button
-                  type="button"
-                  className={css.continueButton}
-                  disabled={locked}
-                  onClick={() => { void props.act({ type: 'battle-continue' }) }}
-                >
-                  {props.t('skipFrozen')}
-                </button>
-              )}
             </div>
           )}
 

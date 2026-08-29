@@ -83,6 +83,7 @@ export declare const zh: {
     readonly captureFailed: "本次收容未成功；仍可更换核心继续尝试。";
     readonly battleLost: "出战编队失去战斗能力，已安全撤回。";
     readonly skillReleased: "主动协议已释放。";
+    readonly skipTurn: "SKIP";
     readonly skipStage: "结束本码灵行动";
     readonly skipStageHint: "保留目标运行值，直接交给下一只码灵；队伍走完后仍会结算已累计的总算力。";
     readonly battleStageSkipped: "当前码灵结束了行动";

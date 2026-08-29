@@ -1,7 +1,7 @@
 import { TRACE_ECOLOGIES } from './catalog.ts'
 import type { MatchCascadeFrame, MatchTile, RandomSource, TileSpecial, TraceEcology } from './types.ts'
 
-export const MATCH_BOARD_SIZE = 7
+export const MATCH_BOARD_SIZE = 8
 export const MATCH_BOARD_CELLS = MATCH_BOARD_SIZE * MATCH_BOARD_SIZE
 export const MAX_MATCH_CASCADES = 12
 

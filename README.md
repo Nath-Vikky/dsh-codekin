@@ -57,7 +57,7 @@ preview cannot replace the current stable npm package.
 
 Use DSH normally. Completed activity can award one capture core and create at most one encounter.
 Open Codekin to collect idle supplies, inspect the regional map, choose a wild target, arrange a
-three-member squad, and enter a 7×7 command match battle. Winning yields growth material; weakening
+three-member squad, and enter an 8×8 command match battle. Winning yields growth material; weakening
 a target opens a capture decision whose odds combine remaining runtime with capture-core quality.
 Progress, encounters, inventory, squads, and tower state remain local to the plugin.
 
@@ -69,7 +69,7 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
 - Up to seven wild map residents, with long-lived common finds and shorter windows for high-level rare encounters.
 - Mixed DSH activity replenishes the least represented matching region; after one region grows beyond five residents, repeated single-attribute activity is diverted to a scarcer region.
 - Ordinary wild levels stay between the lowest and highest levels in the complete roster; Nova and Origin appear as over-level special challenges.
-- A 2D region map, 7×7 match-three battles, capture, a three-Codekin squad, and a creature index.
+- A 2D region map, 8×8 match-three battles, capture, a three-Codekin squad, and a creature index.
 - An Endless Stack Tower with increasingly strong Boss levels, qualities, mechanics, and per-floor growth rewards.
 - Five attribute tiles arranged in a closed advantage loop, with strong and resisted damage.
 - Level 1–100 progression, five qualities of growth material, idle supplies, and local persistence.

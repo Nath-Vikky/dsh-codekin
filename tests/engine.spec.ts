@@ -17,12 +17,20 @@ import {
   restoreTraceWildState,
   settleTraceWildIdleRewards,
 } from '../src/core/engine.ts'
-import { findFirstLegalBattleSwap } from '../src/core/match3.ts'
+import { findFirstLegalBattleSwap, MATCH_BOARD_CELLS } from '../src/core/match3.ts'
 import { CREATURE_SKILLS } from '../src/core/skills.ts'
 import { towerFloorProfile } from '../src/core/tower.ts'
 import type { TraceWildState } from '../src/core/types.ts'
 
 const low = (): number => 0
+
+function seededRandom(seedValue: number): () => number {
+  let seed = seedValue >>> 0
+  return () => {
+    seed = (Math.imul(seed, 1_664_525) + 1_013_904_223) >>> 0
+    return seed / 0x1_0000_0000
+  }
+}
 
 function battleState(): TraceWildState {
   let state = applyTraceWildAction(
@@ -201,9 +209,13 @@ describe('TraceWild match battle', () => {
     expect(towerFloorProfile(80)).toMatchObject({ quality: 'origin', skillTier: 5, startingBossEnergy: 12 })
   })
 
-  it('creates a playable 7x7 board and advances after the active creature spends its actions', () => {
+  it('creates a playable 8x8 board and gives every Boss cascade non-zero cumulative damage', () => {
     let state = battleState()
-    expect(state.battle?.board).toHaveLength(49)
+    expect(state.battle?.board).toHaveLength(MATCH_BOARD_CELLS)
+    state.battle!.party[0]!.maxHp = 1_000
+    state.battle!.party[0]!.hp = 1_000
+    state.battle!.partyMaxHp = 1_000
+    state.battle!.partyHp = 1_000
     state.battle!.wildHp = 9999
     state.battle!.wildMaxHp = 9999
     let moves = 0
@@ -213,7 +225,7 @@ describe('TraceWild match battle', () => {
       const result = applyTraceWildAction(state, { type: 'battle-swap', ...swap! }, low, 220 + moves)
       expect(result.animation?.frames[0]).toMatchObject({ chain: 1 })
       expect(result.animation?.frames[0]?.removed.length).toBeGreaterThanOrEqual(3)
-      expect(result.animation?.frames[0]?.fallRows).toHaveLength(49)
+      expect(result.animation?.frames[0]?.fallRows).toHaveLength(MATCH_BOARD_CELLS)
       expect(Math.max(...(result.animation?.frames[0]?.fallRows ?? []))).toBeGreaterThan(0)
       expect(result.animation?.frames[0]).toMatchObject({
         damage: expect.any(Number),
@@ -228,8 +240,9 @@ describe('TraceWild match battle', () => {
     expect(state.battle?.bossActionsRemaining).toBe(3)
     let bossMoves = 0
     let bossDamageTotal = 0
+    const bossRandom = seededRandom(0xc0de_0088)
     while (state.battle?.turnOwner === 'boss' && bossMoves < 10) {
-      const result = applyTraceWildAction(state, { type: 'battle-continue' }, low, 260 + bossMoves)
+      const result = applyTraceWildAction(state, { type: 'battle-continue' }, bossRandom, 260 + bossMoves)
       expect(result.animation?.frames.length).toBeGreaterThan(0)
       for (const frame of result.animation?.frames ?? []) {
         expect(frame).toMatchObject({
@@ -237,7 +250,8 @@ describe('TraceWild match battle', () => {
           totalDamage: expect.any(Number),
           effectiveness: expect.stringMatching(/^(advantage|neutral|resisted)$/),
         })
-        expect(frame.totalDamage).toBeGreaterThanOrEqual(bossDamageTotal)
+        expect(frame.damage).toBeGreaterThan(0)
+        expect(frame.totalDamage).toBeGreaterThan(bossDamageTotal)
         bossDamageTotal = frame.totalDamage ?? bossDamageTotal
       }
       state = result.state
@@ -263,6 +277,19 @@ describe('TraceWild match battle', () => {
     const result = applyTraceWildAction(state, { type: 'battle-skip-stage' }, low, 225)
     expect(result.state.battle).toMatchObject({ captureWindow: true, wildHp: 40, actionsRemaining: 0 })
     expect(result.state.battle?.log.at(-1)).toMatchObject({ kind: 'stage-skip' })
+  })
+
+  it('uses the same turn skip during an endless-tower battle', () => {
+    let state = applyTraceWildAction(
+      createInitialTraceWildState(100),
+      { type: 'choose-starter', creatureId: 'aegis-veribud' },
+      low,
+      150,
+    ).state
+    state = applyTraceWildAction(state, { type: 'start-tower' }, low, 200).state
+    const result = applyTraceWildAction(state, { type: 'battle-skip-stage' }, low, 210)
+    expect(result.state.battle).toMatchObject({ mode: 'tower', turnOwner: 'boss', actionsRemaining: 0 })
+    expect(result.state.battle?.log.some(row => row.kind === 'stage-skip')).toBe(true)
   })
 
   it('charges and casts the active creature skill without consuming a swap', () => {
@@ -315,6 +342,10 @@ describe('TraceWild match battle', () => {
       { ...first, instanceId: 'pet_test_sweep_00000001' },
       { ...first, instanceId: 'pet_test_sweep_00000002' },
     )
+    for (const member of state.battle!.party) {
+      member.maxHp = 1_000
+      member.hp = 1_000
+    }
     state.battle!.partyMaxHp = state.battle!.party.reduce((sum, member) => sum + member.maxHp, 0)
     state.battle!.partyHp = state.battle!.partyMaxHp
     state.battle!.enemyIntent = 'strike'
@@ -325,8 +356,9 @@ describe('TraceWild match battle', () => {
     const before = state.battle!.partyHp
     state = applyTraceWildAction(state, { type: 'battle-continue' }, low, 245).state
     let bossMoves = 0
+    const bossRandom = seededRandom(0xc0de_0099)
     while (state.battle?.turnOwner === 'boss' && bossMoves < 10) {
-      state = applyTraceWildAction(state, { type: 'battle-continue' }, low, 246 + bossMoves).state
+      state = applyTraceWildAction(state, { type: 'battle-continue' }, bossRandom, 246 + bossMoves).state
       bossMoves += 1
     }
     expect(state.battle?.partyHp).toBeLessThan(before)
@@ -365,6 +397,12 @@ describe('TraceWild match battle', () => {
     const overLevelBoss = wildStats(creature, 22, 'origin', 1, 1)
     expect(overLevelBoss.hp).toBeGreaterThan(equalLevelBoss.hp * 1.3)
     expect(overLevelBoss.attack).toBeGreaterThan(equalLevelBoss.attack)
+
+    const common = CREATURE_CATALOG.find(row => row.id === 'aegis-veribud')!
+    const levelOnePartyHp = playerStats(common.stats, 1, 'pebble').hp * 3
+    const levelTwelveBoss = wildStats(common, 12, 'pebble', 3, 1)
+    expect(levelTwelveBoss.hp).toBeGreaterThan(levelOnePartyHp * 2.5)
+    expect(levelTwelveBoss.attack).toBeGreaterThan(playerStats(common.stats, 1, 'pebble').attack)
 
     const saved = createInitialTraceWildState(600)
     saved.schemaVersion = 3

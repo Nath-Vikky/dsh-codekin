@@ -7,7 +7,7 @@ import type {
   TraceWildSnapshot,
 } from '../core/types.ts'
 import { TRACE_ECOLOGIES } from '../core/catalog.ts'
-import { MATCH_BOARD_CELLS, MAX_MATCH_CASCADES, areAdjacentTiles } from '../core/match3.ts'
+import { MATCH_BOARD_CELLS, MATCH_BOARD_SIZE, MAX_MATCH_CASCADES, areAdjacentTiles } from '../core/match3.ts'
 
 const API = '/api/tracewild'
 
@@ -68,7 +68,7 @@ function battleAnimation(value: unknown): TraceWildBattleAnimation {
     })
     if (new Set(removed).size !== removed.length) throw new TypeError('invalid animation')
     const fallRows = frame.fallRows.map(distance => {
-      if (!Number.isSafeInteger(distance) || (distance as number) < 0 || (distance as number) > 7) {
+      if (!Number.isSafeInteger(distance) || (distance as number) < 0 || (distance as number) > MATCH_BOARD_SIZE) {
         throw new TypeError('invalid animation')
       }
       return distance as number

@@ -45,19 +45,19 @@ export const QUALITY_ORDER = Object.freeze([
 ] as const satisfies readonly IndividualQuality[])
 
 export const PLAYER_QUALITY_BASE_MULTIPLIERS: Readonly<Record<IndividualQuality, number>> = Object.freeze({
-  pebble: 0.82,
-  pulse: 0.91,
+  pebble: 0.76,
+  pulse: 0.87,
   prism: 1,
-  nova: 1.1,
-  origin: 1.22,
+  nova: 1.14,
+  origin: 1.3,
 })
 
 export const PLAYER_QUALITY_GROWTH_BONUSES: Readonly<Record<IndividualQuality, number>> = Object.freeze({
-  pebble: 0.48,
-  pulse: 0.6,
-  prism: 0.74,
-  nova: 0.91,
-  origin: 1.1,
+  pebble: 0.38,
+  pulse: 0.54,
+  prism: 0.72,
+  nova: 0.96,
+  origin: 1.2,
 })
 
 /** @deprecated Use PLAYER_QUALITY_BASE_MULTIPLIERS for new balance work. */
@@ -130,33 +130,33 @@ const IDLE_QUALITY_WEIGHTS = Object.freeze([
 
 const WILD_HP_QUALITY: Readonly<Record<IndividualQuality, number>> = Object.freeze({
   pebble: 1,
-  pulse: 1.15,
-  prism: 1.35,
-  nova: 1.6,
-  origin: 1.95,
+  pulse: 1.2,
+  prism: 1.48,
+  nova: 1.85,
+  origin: 2.35,
 })
 
 const WILD_ATTACK_QUALITY: Readonly<Record<IndividualQuality, number>> = Object.freeze({
   pebble: 1,
-  pulse: 1.07,
-  prism: 1.16,
-  nova: 1.28,
-  origin: 1.42,
+  pulse: 1.08,
+  prism: 1.18,
+  nova: 1.31,
+  origin: 1.46,
 })
 
 const WILD_DEFENSE_QUALITY: Readonly<Record<IndividualQuality, number>> = Object.freeze({
   pebble: 1,
-  pulse: 1.04,
-  prism: 1.09,
-  nova: 1.15,
-  origin: 1.22,
+  pulse: 1.06,
+  prism: 1.13,
+  nova: 1.22,
+  origin: 1.34,
 })
 
 const WILD_BASE_HP: Readonly<Record<TraceRarity, number>> = Object.freeze({
-  common: 48,
-  uncommon: 52,
-  rare: 57,
-  apex: 63,
+  common: 58,
+  uncommon: 64,
+  rare: 72,
+  apex: 82,
 })
 
 const SPECIES_CAPTURE_CAP: Readonly<Record<TraceRarity, number>> = Object.freeze({
@@ -376,13 +376,16 @@ export function wildStats(
   const partyAverageLevel = Math.min(100, Math.max(1, Math.round(partyAverageLevelValue)))
   const levelGap = Math.max(0, level - partyAverageLevel)
   const qualityThreat = qualityIndex(quality)
-  const partyBossFactor = 1 + 0.7 * (partySize - 1)
-  const hpLevelFactor = 1 + 0.018 * growth + 0.00006 * growth * growth
-  const attackLevelFactor = 1 + 0.012 * growth + 0.000035 * growth * growth
-  const defenseLevelFactor = 1 + 0.008 * growth + 0.000025 * growth * growth
-  const hpGapPressure = 1 + Math.min(0.55, levelGap * (0.009 + 0.00225 * qualityThreat))
-  const attackGapPressure = 1 + Math.min(0.4, levelGap * (0.006 + 0.00175 * qualityThreat))
-  const defenseGapPressure = 1 + Math.min(0.28, levelGap * (0.004 + 0.00125 * qualityThreat))
+  // One wild Codekin is a shared-HP boss. Scaling its durability linearly with
+  // squad size keeps a full team from deleting it simply by owning three
+  // times as many action stages, while solo starters remain viable.
+  const partyBossFactor = partySize
+  const hpLevelFactor = 1 + 0.023 * growth + 0.0001 * growth * growth
+  const attackLevelFactor = 1 + 0.014 * growth + 0.000045 * growth * growth
+  const defenseLevelFactor = 1 + 0.01 * growth + 0.000035 * growth * growth
+  const hpGapPressure = 1 + Math.min(0.9, levelGap * (0.014 + 0.003 * qualityThreat))
+  const attackGapPressure = 1 + Math.min(0.45, levelGap * (0.007 + 0.0015 * qualityThreat))
+  const defenseGapPressure = 1 + Math.min(0.4, levelGap * (0.006 + 0.00125 * qualityThreat))
   return {
     hp: Math.max(1, Math.round(
       WILD_BASE_HP[definition.rarity] * hpLevelFactor * WILD_HP_QUALITY[quality] * partyBossFactor * hpGapPressure,

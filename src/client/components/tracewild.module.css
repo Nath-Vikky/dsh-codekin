@@ -275,18 +275,29 @@
 .boardColumn, .partyColumn { min-width: 0; }
 .boardColumn { border: 1px solid #d9eee817; border-radius: 17px; background: #151e25; padding: 5px; }
 .turnSummary { min-height: 29px; display: flex; align-items: center; gap: 6px; margin-bottom: 3px; padding: 0 4px; color: #dce9e5; font-size: 9px; }
+.turnSummary > strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .turnSummaryBoss { margin-inline: -2px; padding-inline: 6px; border: 1px solid #d9898930; border-radius: 9px; background: linear-gradient(90deg, #5d27352b, #33253d24); color: #ffd9d1; }
 .ecologyPip { width: 23px; height: 23px; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 50%; background: #1b252c; font-size: 12px; }
 .pip_lumen { color: #d9b866; } .pip_forge { color: #ce7565; } .pip_relay { color: #6faec5; } .pip_aegis { color: #6fba91; } .pip_glitch { color: #aa78bd; }
 .actionDots { margin-left: auto; display: flex; gap: 5px; }
 .actionDots i { width: 17px; height: 5px; border: 1px solid #52636a; border-radius: 4px; background: #222d34; transform: skewX(-18deg); }
 .actionDots .actionDotActive { border-color: #7fcdb7; background: #7fcdb7; }
+.turnSkipButton {
+  min-width: 43px; min-height: 23px; margin-left: auto; border: 1px solid #78ad9e72; border-radius: 999px;
+  background: linear-gradient(145deg, #f8fcfa, #dcebe5); color: #41766a; padding: 4px 9px;
+  box-shadow: inset 0 1px #fff, 0 3px 8px #55766b20; cursor: pointer;
+  font: 950 7px/1 ui-monospace, monospace; letter-spacing: .12em;
+  transition: transform .15s cubic-bezier(.22,1,.36,1), border-color .15s ease, box-shadow .15s ease;
+}
+.turnSkipButton:hover:not(:disabled) { transform: translateY(-1px); border-color: #4f9b87; box-shadow: inset 0 1px #fff, 0 5px 10px #4e82732d; }
+.turnSkipButton:disabled { cursor: wait; opacity: .5; }
+.turnSkipButton + .actionDots { margin-left: 0; }
 .cascadePill { margin-left: 2px; border: 1px solid #b6d4cc30; border-radius: 999px; background: #202c32; color: #b8d9d0; padding: 4px 7px; font: 750 7px/1 ui-sans-serif, system-ui, sans-serif; animation: cascadeIn .2s cubic-bezier(.34,1.56,.64,1); }
 @keyframes cascadeIn { from { opacity: 0; transform: translateY(3px) scale(.85); } }
 
 .matchBoard {
   width: min(100%, clamp(260px, calc(100vh - 400px), 346px)); aspect-ratio: 1; margin: 0 auto; padding: 5px;
-  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: repeat(7, minmax(0, 1fr)); gap: 3px;
+  display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: repeat(8, minmax(0, 1fr)); gap: 3px;
   border: 1px solid #d9eee81f; border-radius: 18px;
   background: #0d1318; box-shadow: inset 0 1px #ffffff08, 0 8px 22px #0004;
   touch-action: none; user-select: none; -webkit-user-select: none; -webkit-user-drag: none;
@@ -302,7 +313,7 @@
   touch-action: none; user-select: none; -webkit-user-drag: none;
 }
 .matchTile::after { content: ''; position: absolute; left: 21%; right: 21%; top: 11%; height: 18%; border-radius: 50%; background: #ffffff32; filter: blur(1px); pointer-events: none; }
-.matchTile > span { position: relative; z-index: 2; font: 850 clamp(13px, 4vw, 21px)/1 ui-sans-serif, system-ui, sans-serif; text-shadow: 0 1px 2px #0006; pointer-events: none; }
+.matchTile > span { position: relative; z-index: 2; font: 850 clamp(11px, 3.4vw, 19px)/1 ui-sans-serif, system-ui, sans-serif; text-shadow: 0 1px 2px #0006; pointer-events: none; }
 .matchTile > b { position: absolute; right: 3px; top: 2px; color: #fff; font: 900 10px/1 ui-monospace, monospace; text-shadow: 0 1px 3px #000; }
 .matchTile > em { position: absolute; z-index: 4; right: 3px; bottom: 2px; width: 14px; height: 14px; border: 1px solid #e9f4ffb5; border-radius: 4px; display: grid; place-items: center; background: #26334ce6; color: #ecf5ff; font: 900 9px/1 ui-monospace, monospace; box-shadow: 0 0 7px #9dc2ff8a; pointer-events: none; }
 .matchTile:hover { filter: brightness(1.08); transform: translateY(-1px); }
@@ -384,8 +395,6 @@
 .continueButton { grid-column: 1 / -1; width: 100%; border: 1px solid #8dc7b552; border-radius: 9px; background: #20332f; color: #cce9e1; padding: 7px; cursor: pointer; font: 750 8px/1 ui-sans-serif, system-ui, sans-serif; }
 .continueButton:hover { background: #29403b; border-color: #9ddbc9; }
 .continueButton:disabled { opacity: .4; cursor: not-allowed; }
-.skipStageButton { border-color: #c7a46d52; background: #332b20; color: #ead9b8; }
-.skipStageButton:hover { border-color: #d8bd89; background: #403526; }
 .towerBattleStatus { min-height: 38px; border: 1px solid #aaa1d334; border-radius: 13px; background: linear-gradient(120deg, #232431, #171f26); padding: 6px 8px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; }
 .towerBattleMark { width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid #aca3d15e; border-radius: 8px; background: #333248; color: #d7d1ee; font-size: 10px; }
 .towerBattleStatus > div { min-width: 0; display: grid; gap: 2px; } .towerBattleStatus strong { color: #ddd9ee; font-size: 8px; } .towerBattleStatus small { color: #83939c; font-size: 6px; }
@@ -1196,8 +1205,6 @@
 .capturePanel > div:first-child span, .capturePanel p { color: #70847f; }
 .captureButtons button { background: #ffffffc7; box-shadow: inset 0 1px #fff; }
 .captureButtons span { color: #556d69; }
-.skipStageButton { border-color: #c9a95b59; background: #fff8e8c9; color: #806b37; }
-.skipStageButton:hover { border-color: #b99743; background: #fffaf0; }
 .skillButton { border-color: #9978aa3b; background: #f2eaf5; color: #7c5789; }
 .towerBattleStatus strong { color: #5b5f8f; } .towerBattleStatus small { color: #71837f; }
 .towerBattleStatus > b { border-color: #7d82b23d; color: #676a98; }
@@ -1433,7 +1440,15 @@
 .partyPortrait::after { content: ''; position: absolute; z-index: 1; inset: 3px; border-radius: 8px; background: #f5f8f6; }
 .partyPortrait .sprite_small { position: relative; z-index: 2; width: 45px; height: 45px; margin-top: 5px; filter: drop-shadow(0 3px 3px #52635e35); }
 .partyEnergyRing { position: absolute; z-index: 3; inset: 1px; border: 1px solid #ffffffcc; border-radius: 9px; pointer-events: none; }
-.partyCombatantActive { transform: translateY(-2px); border-color: #62ae94a3; box-shadow: 0 9px 20px #4d89742b, inset 0 1px #fff; opacity: 1; }
+.partyCombatantActive {
+  transform: translateY(-2px); border-color: #48a98bea;
+  box-shadow: 0 0 0 2px #69c9aa42, 0 0 22px #48b89161, 0 9px 20px #4d89742b, inset 0 1px #fff;
+  opacity: 1; animation: activeCombatantGlow 1.15s ease-in-out infinite alternate;
+}
+.partyCombatantActive .partyPortrait { box-shadow: 0 0 0 3px #70cfb244, 0 0 16px #56bd9b6b, 0 6px 14px #5f736c29; }
+@keyframes activeCombatantGlow {
+  to { border-color: #79d8bae8; box-shadow: 0 0 0 3px #80dabb54, 0 0 28px #54c39a7a, 0 10px 22px #4d897438, inset 0 1px #fff; }
+}
 .partyCombatantReady { border-bottom-color: #b786d4a6; }
 .partyCombatantReady .partyPortrait { box-shadow: 0 6px 14px #6d668328, 0 0 0 3px #b887d51c; }
 .partyCombatantSealed { filter: saturate(.62); }
@@ -1478,7 +1493,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .totalDamageHud > strong, .totalDamageHud > em, .matchTileHazard::before { animation: none; }
+  .totalDamageHud > strong, .totalDamageHud > em, .matchTileHazard::before, .partyCombatantActive { animation: none; }
 }
 
 /* Battle HUD v4 — centered enemy stage and an in-board capture phase. */
@@ -1572,13 +1587,6 @@
 .captureCoreGrid span { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: #526964; font-size: 7px; font-weight: 850; }
 .captureCoreGrid b { color: currentColor; font: 950 13px/1 ui-monospace, monospace; }
 .captureCoreGrid small { color: #7c8d89; font: 800 7px/1 ui-monospace, monospace; }
-.captureAbandon, .battleUtilityAction {
-  min-height: 34px; border: 1px solid #95aaa44c; border-radius: 11px; background: #ffffffb8;
-  color: #657a75; cursor: pointer; font-size: 8px; font-weight: 800;
-}
-.captureAbandon:hover:not(:disabled), .battleUtilityAction:hover:not(:disabled) { border-color: #6d9389; background: #fff; }
-.captureAbandon:disabled { cursor: wait; opacity: .55; }
-.battleUtilityAction { width: 100%; }
 .captureBoardIntro > header strong { animation: captureTitlePulse .72s cubic-bezier(.2,1.45,.36,1) both; }
 @keyframes captureBoardEnter { from { opacity: 0; transform: scale(.92); } }
 @keyframes captureTitlePulse { 0% { opacity: 0; transform: translateY(10px) scale(.72); } 55% { opacity: 1; transform: scale(1.12); } }

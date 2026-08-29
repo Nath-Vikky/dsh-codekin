@@ -37,6 +37,7 @@ import {
 } from './balance.ts'
 import {
   MATCH_BOARD_CELLS,
+  MATCH_BOARD_SIZE,
   createMatchBoard,
   chooseBossBattleSwap,
   convertRandomBattleTiles,
@@ -427,8 +428,12 @@ function qualityMultiplier(member: BattlePartyMember): number {
 
 function playerOffenseLevelFactor(member: BattlePartyMember, battle: BattleState): number {
   const levelDelta = member.level - battle.wildLevel
-  if (levelDelta < 0) return Math.max(0.45, Math.exp(levelDelta / 34))
-  return Math.min(1.15, 1 + levelDelta * 0.003)
+  if (levelDelta < 0) return Math.max(0.3, Math.exp(levelDelta / 20))
+  return Math.min(1.12, 1 + levelDelta * 0.0025)
+}
+
+function playerDefenseFactor(defense: number): number {
+  return 90 / (90 + Math.max(0, defense) * 2.4)
 }
 
 function syncLegacyPartyHealth(battle: BattleState): void {
@@ -489,7 +494,8 @@ function applyWildDamage(battle: BattleState, rawAmount: number, contributor?: B
 
 function applyRawHit(battle: BattleState, member: BattlePartyMember, power: number): number {
   const stats = memberStats(member)
-  const defended = stats.attack * power * playerOffenseLevelFactor(member, battle) * 100 / (100 + battle.wildDefense)
+  const defended = stats.attack * power * playerOffenseLevelFactor(member, battle)
+    * playerDefenseFactor(battle.wildDefense)
   return applyWildDamage(battle, defended, member)
 }
 
@@ -540,7 +546,7 @@ function damageForStep(
   const stats = memberStats(member)
   const hasForktail = livingMembers(battle).some(row => row.creatureId === 'relay-forktail')
   const hasAtlas = livingMembers(battle).some(row => row.creatureId === 'lumen-atlashart')
-  let combo = Math.min(2, 1 + 0.2 * (chain - 1) + (hasForktail ? 0.05 * (chain - 1) : 0))
+  let combo = Math.min(2.25, 1 + 0.22 * (chain - 1) + (hasForktail ? 0.05 * (chain - 1) : 0))
   if (hasAtlas && chain === 1 && battle.party.some(row => row.creatureId === 'lumen-atlashart' && row.passiveRound !== battle.round)) {
     combo = Math.max(combo, 1.15)
   }
@@ -551,7 +557,7 @@ function damageForStep(
     if (count <= 0) continue
     const element = battle.affinityFloorActions > 0 ? Math.max(1.2, affinity(ecology, wild.ecology)) : affinity(ecology, wild.ecology)
     const contribution = stats.attack * (count / 3) * combo * element
-      * playerOffenseLevelFactor(member, battle) * 100 / (100 + battle.wildDefense)
+      * playerOffenseLevelFactor(member, battle) * playerDefenseFactor(battle.wildDefense)
     total += contribution
     const effectiveness: MatchDamageEffectiveness = element > 1 ? 'advantage' : element < 1 ? 'resisted' : 'neutral'
     effectivenessDamage[effectiveness] += contribution
@@ -589,9 +595,10 @@ function convertOnePassiveTile(
 
 function createGuaranteedMatch(boardValue: readonly MatchTile[], ecology: TraceEcology): MatchTile[] {
   const board = boardValue.map(current => ({ ...current }))
-  for (let row = 0; row < 7; row += 1) {
-    for (let column = 0; column <= 4; column += 1) {
-      const indexes = [row * 7 + column, row * 7 + column + 1, row * 7 + column + 2]
+  for (let row = 0; row < MATCH_BOARD_SIZE; row += 1) {
+    for (let column = 0; column <= MATCH_BOARD_SIZE - 3; column += 1) {
+      const start = row * MATCH_BOARD_SIZE + column
+      const indexes = [start, start + 1, start + 2]
       if (indexes.every(index => board[index]!.special === 'none' && (board[index]!.hazardActions ?? 0) === 0)) {
         for (const index of indexes) board[index] = { ecology, special: 'none' }
         return board
@@ -896,17 +903,23 @@ function enemyDamageEffectiveness(
   return multiplier > 1.05 ? 'advantage' : multiplier < 0.95 ? 'resisted' : 'neutral'
 }
 
-function enemyTeamDamageForCharge(battle: BattleState, wildEcology: TraceEcology): number {
-  if (battle.bossAttackCharge <= 0 || battle.partyHp <= 0) return 0
-  const power = Math.min(1.55, Math.max(0.55, 0.35 + 0.22 * battle.bossAttackCharge))
-  const partyPressure = 1 + 0.55 * Math.max(0, battle.party.length - 1)
-  const roll = battle.wildAttack * power * (battle.bossDamageScale / 1000)
-    * partyPressure * partyAffinity(battle, wildEcology) * 100 / (100 + partyDefense(battle))
-  return Math.max(1, Math.round(Math.min(
-    roll,
-    battle.partyMaxHp * 0.3,
-    battle.partyHp + battle.partyShield,
-  )))
+function enemyDamageForStep(
+  battle: BattleState,
+  wildEcology: TraceEcology,
+  matchedTiles: number,
+  chain: number,
+): number {
+  if (matchedTiles <= 0 || battle.partyHp <= 0) return 0
+  const combo = Math.min(2.4, 1 + 0.25 * Math.max(0, chain - 1))
+  const tilePower = Math.pow(matchedTiles / 3, 0.9)
+  // Shared party HP grows almost linearly with squad size. Boss pressure grows
+  // more gently so a solo starter remains playable while a full squad cannot
+  // dilute every enemy action threefold.
+  const partyPressure = 0.48 + 0.46 * Math.max(0, battle.party.length - 1)
+  const defenseFactor = 95 / (95 + Math.max(0, partyDefense(battle)) * 2.2)
+  const roll = battle.wildAttack * tilePower * combo * (battle.bossDamageScale / 1000)
+    * partyPressure * partyAffinity(battle, wildEcology) * defenseFactor
+  return Math.max(1, Math.round(roll))
 }
 
 function applyEnemyTeamHit(battle: BattleState, amount: number): number {
@@ -1325,18 +1338,19 @@ function performBossBoardAction(
   for (let index = 0; index < resolution.steps.length; index += 1) {
     const step = resolution.steps[index]!
     const count = TRACE_ECOLOGIES.reduce((sum, ecology) => sum + step.counts[ecology], 0)
-    const combo = Math.min(2, 1 + 0.2 * (step.chain - 1))
+    const combo = Math.min(2.4, 1 + 0.25 * (step.chain - 1))
     matched += count
     ownColor += step.counts[wild.ecology]
-    battle.bossAttackCharge = Math.min(32, battle.bossAttackCharge + count / 3 * combo)
-    const totalDamage = enemyTeamDamageForCharge(battle, wild.ecology)
+    const chargeGain = count / 3 * combo
+    battle.bossAttackCharge = Math.min(32, battle.bossAttackCharge + chargeGain)
+    const stepDamage = enemyDamageForStep(battle, wild.ecology, count, step.chain)
+    battle.pendingBossDamage = Math.min(9_999_999, battle.pendingBossDamage + stepDamage)
     const frame = resolution.frames[index]
     if (frame !== undefined) {
-      frame.damage = Math.max(0, totalDamage - battle.pendingBossDamage)
-      frame.totalDamage = totalDamage
+      frame.damage = stepDamage
+      frame.totalDamage = battle.pendingBossDamage
       frame.effectiveness = enemyDamageEffectiveness(battle, wild.ecology)
     }
-    battle.pendingBossDamage = totalDamage
   }
   battle.lastBossMatch = matched
   const energyGain = Math.min(8, ownColor)
@@ -1395,7 +1409,7 @@ function continueBattle(
 
 function skipPlayerStage(battle: BattleState, random: RandomSource): BattleOutcome {
   const active = battle.party[battle.activeIndex]
-  if (battle.mode !== 'wild' || battle.turnOwner !== 'player' || battle.captureWindow
+  if (battle.turnOwner !== 'player' || battle.captureWindow
     || battle.actionsRemaining <= 0 || active === undefined || battle.partyHp <= 0) {
     throw new TraceWildRuleError('conflict')
   }
@@ -2151,7 +2165,7 @@ function restoreBattle(root: Record<string, unknown>, state: TraceWildState): Ba
     log: [{ turn: 0, kind: 'start', creatureId: wild.id, ecology: wild.ecology }],
   }
   restored.pendingBossDamage = turnOwner === 'boss'
-    ? enemyTeamDamageForCharge(restored, wild.ecology)
+    ? safeInt(raw.pendingBossDamage, 0, partyHp + restored.partyShield)
     : 0
   syncLegacyPartyHealth(restored)
   return restored

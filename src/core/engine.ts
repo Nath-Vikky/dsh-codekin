@@ -429,12 +429,11 @@ function qualityMultiplier(member: BattlePartyMember): number {
 
 function playerOffenseLevelFactor(member: BattlePartyMember, battle: BattleState): number {
   const levelDelta = member.level - battle.wildLevel
-  if (levelDelta < 0) return Math.max(0.3, Math.exp(levelDelta / 20))
-  return Math.min(1.12, 1 + levelDelta * 0.0025)
+  return Math.min(1.16, Math.max(0.55, Math.pow(2, levelDelta / 50)))
 }
 
 function playerDefenseFactor(defense: number): number {
-  return 90 / (90 + Math.max(0, defense) * 2.4)
+  return 1_400 / (1_400 + Math.max(0, defense) * 2.4)
 }
 
 function syncLegacyPartyHealth(battle: BattleState): void {
@@ -547,7 +546,7 @@ function damageForStep(
   const stats = memberStats(member)
   const hasForktail = livingMembers(battle).some(row => row.creatureId === 'relay-forktail')
   const hasAtlas = livingMembers(battle).some(row => row.creatureId === 'lumen-atlashart')
-  let combo = Math.min(2.25, 1 + 0.22 * (chain - 1) + (hasForktail ? 0.05 * (chain - 1) : 0))
+  let combo = Math.min(2.25, 1 + 0.25 * (chain - 1) + (hasForktail ? 0.04 * (chain - 1) : 0))
   if (hasAtlas && chain === 1 && battle.party.some(row => row.creatureId === 'lumen-atlashart' && row.passiveRound !== battle.round)) {
     combo = Math.max(combo, 1.15)
   }
@@ -904,6 +903,16 @@ function enemyDamageEffectiveness(
   return multiplier > 1.05 ? 'advantage' : multiplier < 0.95 ? 'resisted' : 'neutral'
 }
 
+function bossPhaseDamageCap(battle: BattleState): number {
+  const partyAverageLevel = battle.party.reduce((sum, member) => sum + member.level, 0) / battle.party.length
+  const levelPressure = Math.min(0.08, Math.max(0, battle.wildLevel - partyAverageLevel) * 0.004)
+  const qualityPressure = qualityIndex(battle.wildQuality) * 0.035
+  const skillPressure = (battle.bossSkillTier - 1) * 0.01
+  return Math.max(1, Math.round(
+    battle.partyMaxHp * Math.min(0.6, 0.34 + qualityPressure + skillPressure + levelPressure),
+  ))
+}
+
 function enemyDamageForStep(
   battle: BattleState,
   wildEcology: TraceEcology,
@@ -911,16 +920,20 @@ function enemyDamageForStep(
   chain: number,
 ): number {
   if (matchedTiles <= 0 || battle.partyHp <= 0) return 0
-  const combo = Math.min(2.4, 1 + 0.25 * Math.max(0, chain - 1))
+  const combo = Math.min(2.25, 1 + 0.25 * Math.max(0, chain - 1))
   const tilePower = Math.pow(matchedTiles / 3, 0.9)
-  // Shared party HP grows almost linearly with squad size. Boss pressure grows
-  // more gently so a solo starter remains playable while a full squad cannot
-  // dilute every enemy action threefold.
-  const partyPressure = 0.48 + 0.46 * Math.max(0, battle.party.length - 1)
-  const defenseFactor = 95 / (95 + Math.max(0, partyDefense(battle)) * 2.2)
+  // Full squads have more shared runtime and nine player actions per cycle.
+  // This pressure term rises with party size, but much slower than shared HP,
+  // preserving the value of building a team without making solo starts free.
+  const partyPressure = 0.42 + 0.42 * Math.max(0, battle.party.length - 1)
+  const defenseFactor = 1_400 / (1_400 + Math.max(0, partyDefense(battle)) * 2.2)
   const roll = battle.wildAttack * tilePower * combo * (battle.bossDamageScale / 1000)
     * partyPressure * partyAffinity(battle, wildEcology) * defenseFactor
-  return Math.max(1, Math.round(roll))
+  // Cascades and 4/5-match action bonuses may produce up to seven Boss swaps.
+  // Keep every visible damage tick positive while bounding a full-HP knockout
+  // to explicit high-threat pressure instead of a lucky refill cascade.
+  const remainingBudget = Math.max(1, bossPhaseDamageCap(battle) - battle.pendingBossDamage)
+  return Math.max(1, Math.min(Math.round(roll), remainingBudget))
 }
 
 function applyEnemyTeamHit(battle: BattleState, amount: number): number {
@@ -1250,7 +1263,7 @@ function beginBossPhase(battle: BattleState, random: RandomSource): BattleOutcom
   battle.bossActionsTaken = 0
   battle.bossAttackCharge = 0
   battle.pendingBossDamage = 0
-  battle.bossDamageScale = 880 + Math.floor(boundedRandom(random) * 241)
+  battle.bossDamageScale = 930 + Math.floor(boundedRandom(random) * 141)
   battle.bossBonusActionsGranted = 0
   battle.lastBossMatch = 0
   return 'none'
@@ -2168,7 +2181,7 @@ function restoreBattle(root: Record<string, unknown>, state: TraceWildState): Ba
     bossEnergy: safeInt(raw.bossEnergy, 0, BOSS_SKILL_ENERGY_LIMIT),
     bossAttackCharge: safeNumber(raw.bossAttackCharge, 0, 0, 32),
     pendingBossDamage: 0,
-    bossDamageScale: Math.max(880, safeInt(raw.bossDamageScale, 1000, 1120)),
+    bossDamageScale: Math.max(900, safeInt(raw.bossDamageScale, 1000, 1100)),
     bossBonusActionsGranted: safeInt(raw.bossBonusActionsGranted, 0, MAX_BOSS_BONUS_ACTIONS),
     bossSkillArmed: raw.bossSkillArmed === true,
     lastBossAttack: safeInt(raw.lastBossAttack, 0, 9_999_999),

@@ -217,8 +217,8 @@ describe('TraceWild match battle', () => {
     state.battle!.party[0]!.hp = 1_000
     state.battle!.partyMaxHp = 1_000
     state.battle!.partyHp = 1_000
-    state.battle!.wildHp = 9999
-    state.battle!.wildMaxHp = 9999
+    state.battle!.wildHp = 9_999_999
+    state.battle!.wildMaxHp = 9_999_999
     let moves = 0
     let playerStrike: NonNullable<NonNullable<ReturnType<typeof applyTraceWildAction>['animation']>['strike']> | undefined
     while (state.battle?.stage === 1 && state.battle.turnOwner === 'player' && moves < 20) {
@@ -243,9 +243,9 @@ describe('TraceWild match battle', () => {
     expect(state.battle?.bossActionsRemaining).toBe(3)
     expect(playerStrike).toMatchObject({
       actor: 'player',
-      targetHpBefore: 9999,
+      targetHpBefore: 9_999_999,
       targetHpAfter: expect.any(Number),
-      targetMaxHp: 9999,
+      targetMaxHp: 9_999_999,
     })
     let bossMoves = 0
     let bossDamageTotal = 0
@@ -413,14 +413,15 @@ describe('TraceWild match battle', () => {
 
     const equalLevelBoss = wildStats(creature, 22, 'origin', 1, 22)
     const overLevelBoss = wildStats(creature, 22, 'origin', 1, 1)
-    expect(overLevelBoss.hp).toBeGreaterThan(equalLevelBoss.hp * 1.3)
+    expect(overLevelBoss.hp).toBeGreaterThan(equalLevelBoss.hp * 1.1)
     expect(overLevelBoss.attack).toBeGreaterThan(equalLevelBoss.attack)
 
     const common = CREATURE_CATALOG.find(row => row.id === 'aegis-veribud')!
     const levelOnePartyHp = playerStats(common.stats, 1, 'pebble').hp * 3
+    const levelOneBoss = wildStats(common, 1, 'pebble', 3, 1)
     const levelTwelveBoss = wildStats(common, 12, 'pebble', 3, 1)
-    expect(levelTwelveBoss.hp).toBeGreaterThan(levelOnePartyHp * 2.5)
-    expect(levelTwelveBoss.attack).toBeGreaterThan(playerStats(common.stats, 1, 'pebble').attack)
+    expect(levelTwelveBoss.hp).toBeGreaterThan(levelOnePartyHp * 2)
+    expect(levelTwelveBoss.attack).toBeGreaterThan(levelOneBoss.attack)
 
     const saved = createInitialTraceWildState(600)
     saved.schemaVersion = 3

@@ -1144,10 +1144,10 @@ function SquadView(props: {
                 <span>{props.t(ECOLOGY_KEYS[creature.ecology])} · {props.t(RARITY_KEYS[creature.rarity])}</span>
                 <small>{props.t('level')} {captured.level} · {props.t('quality')} {props.t(CORE_KEYS[captured.quality])} · {props.t('wins')} {captured.wins}</small>
                 <span className={css.creatureStats}>
-                  <span><b>{stats.hp}</b>{props.t('statRuntime')}</span>
-                  <span><b>{stats.attack}</b>{props.t('statCompute')}</span>
-                  <span><b>{stats.defense}</b>{props.t('statGuard')}</span>
-                  <span><b>{stats.speed}</b>{props.t('statResponse')}</span>
+                  <span><b>{stats.hp.toLocaleString()}</b>{props.t('statRuntime')}</span>
+                  <span><b>{stats.attack.toLocaleString()}</b>{props.t('statCompute')}</span>
+                  <span><b>{stats.defense.toLocaleString()}</b>{props.t('statGuard')}</span>
+                  <span><b>{stats.speed.toLocaleString()}</b>{props.t('statResponse')}</span>
                 </span>
               </button>
             </article>
@@ -1836,9 +1836,9 @@ function BattleView(props: {
               <i style={{ width: `${percent(displayedWildHp, battle.wildMaxHp)}%` }} />
             </div>
             <small>
-              {props.t('health')} {displayedWildHp}/{battle.wildMaxHp} · {props.t('armor')} {battle.wildArmor}
-              {battle.wildShield > 0 ? ` · ${props.t('shield')} ${battle.wildShield}` : ''}
-              {battle.pendingTeamDamage > 0 ? ` · ${props.t('pendingDamage')} ${battle.pendingTeamDamage}` : ''}
+              {props.t('health')} {displayedWildHp.toLocaleString()}/{battle.wildMaxHp.toLocaleString()} · {props.t('armor')} {battle.wildArmor}
+              {battle.wildShield > 0 ? ` · ${props.t('shield')} ${battle.wildShield.toLocaleString()}` : ''}
+              {battle.pendingTeamDamage > 0 ? ` · ${props.t('pendingDamage')} ${battle.pendingTeamDamage.toLocaleString()}` : ''}
             </small>
             <div className={css.energyBar}><i style={{ width: `${percent(battle.bossEnergy, 24)}%` }} /></div>
             <small>
@@ -1933,7 +1933,7 @@ function BattleView(props: {
                 />
               </div>
               {battle.partyShield > 0 && <small>{props.t('shield')} +{battle.partyShield}</small>}
-              {partyDamagePreview > 0 && <small className={css.teamDamageForecast}>{props.t('pendingDamage')} -{partyDamagePreview}</small>}
+              {partyDamagePreview > 0 && <small className={css.teamDamageForecast}>{props.t('pendingDamage')} -{partyDamagePreview.toLocaleString()}</small>}
             </div>
           </div>
 

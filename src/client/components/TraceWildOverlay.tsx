@@ -658,11 +658,19 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
       return response
     } catch (error) {
       setBattleTransition(undefined)
+      const battleAction = action.type.startsWith('battle-') || action.type === 'capture'
+        || action.type === 'flee' || action.type === 'start-battle' || action.type === 'start-tower'
       if (error instanceof TraceWildConnectionError && error.code === 'invalid-action') {
-        setNotice(action.type === 'claim-idle-reward' ? t('rewardUnavailable') : t('invalidSwap'))
+        setNotice(action.type === 'claim-idle-reward'
+          ? t('rewardUnavailable')
+          : battleAction
+            ? t('battleActionUnavailable')
+            : t('invalidSwap'))
       } else {
         setNotice(error instanceof TraceWildConnectionError && error.code === 'conflict'
-          ? t('invalidSwap')
+          ? battleAction
+            ? t('battleActionUnavailable')
+            : t('invalidSwap')
           : t('disconnected'))
         await refresh()
       }

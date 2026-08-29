@@ -122,6 +122,12 @@ function snapshot(value: unknown): TraceWildSnapshot {
     || !Array.isArray(row.state.dex) || !Array.isArray(row.state.squad)) {
     throw new TypeError('invalid snapshot')
   }
+  // Host and Client can briefly straddle different plugin builds during a
+  // linked-package refresh. Never let a new 8×8 Client reinterpret a persisted
+  // 7×7 battle: its coordinates would render incorrectly and actions would be
+  // sent against a different topology. A restarted current Host safely drops
+  // the incompatible in-progress battle while preserving the profile.
+  if (row.state.battle !== undefined) matchBoard(row.state.battle.board)
   return structuredClone(row as TraceWildSnapshot)
 }
 

@@ -90,6 +90,17 @@ export declare const zh: {
     readonly battleStageSkipped: "当前码灵结束了行动";
     readonly noCores: "没有可用核心；完成 DSH 回合会获得新的核心。";
     readonly battleHint: "三只码灵共享运行值；双方基础 3 次行动，直消 4 颗返还行动，直消 5 颗增加行动。队伍总攻后进入 Boss 自动三消阶段。";
+    readonly signalRepair: "运行修复";
+    readonly signalGuard: "缓存护盾";
+    readonly signalSync: "智算同步";
+    readonly signalOverclock: "编译超频";
+    readonly signalBreach: "异常穿透";
+    readonly signalRuleLumen: "智算信号：黄珠获得 18% 同步增幅";
+    readonly signalRuleForge: "编译信号：红珠随颗数与连锁超频";
+    readonly signalRuleRelay: "网络信号：蓝珠转为共享防护层";
+    readonly signalRuleAegis: "防护信号：绿珠转为共享运行值恢复";
+    readonly signalRuleGlitch: "异常信号：紫珠穿透大部分防御";
+    readonly signalBossRule: "Boss 仍保留部分攻击。";
     readonly captureLocked: "完成队伍总攻并将目标运行值压到 50% 以下，才会出现捕捉窗口。";
     readonly captureReady: "目标已进入可捕捉状态。";
     readonly capturePhaseTitle: "选择收容核心";

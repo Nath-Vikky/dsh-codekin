@@ -65,6 +65,7 @@ import type {
   EnemyIntent,
   MatchCascadeFrame,
   MatchDamageEffectiveness,
+  MatchSignalEffect,
   MatchTile,
   RandomSource,
   TileSpecial,
@@ -533,6 +534,7 @@ function settleTeamStrike(battle: BattleState): boolean {
 interface MatchStepDamage {
   total: number
   effectiveness: MatchDamageEffectiveness
+  signalEffect?: MatchSignalEffect
 }
 
 function damageForStep(
@@ -544,6 +546,8 @@ function damageForStep(
   const wild = creatureById(battleEncounterCreatureId(battle))
   if (wild === undefined) throw new TraceWildRuleError('conflict')
   const stats = memberStats(member)
+  const activeEcology = creatureById(member.creatureId)?.ecology
+  if (activeEcology === undefined) throw new TraceWildRuleError('conflict')
   const hasForktail = livingMembers(battle).some(row => row.creatureId === 'relay-forktail')
   const hasAtlas = livingMembers(battle).some(row => row.creatureId === 'lumen-atlashart')
   let combo = Math.min(2.25, 1 + 0.25 * (chain - 1) + (hasForktail ? 0.04 * (chain - 1) : 0))
@@ -551,24 +555,77 @@ function damageForStep(
     combo = Math.max(combo, 1.15)
   }
   let total = 0
+  let signalEffect: MatchSignalEffect | undefined
   const effectivenessDamage: Record<MatchDamageEffectiveness, number> = { advantage: 0, neutral: 0, resisted: 0 }
   for (const ecology of TRACE_ECOLOGIES) {
     const count = counts[ecology]
     if (count <= 0) continue
     const element = battle.affinityFloorActions > 0 ? Math.max(1.2, affinity(ecology, wild.ecology)) : affinity(ecology, wild.ecology)
-    const contribution = stats.attack * (count / 3) * combo * element
+    const baseContribution = stats.attack * (count / 3) * combo * element
       * playerOffenseLevelFactor(member, battle) * playerDefenseFactor(battle.wildDefense)
+    let contribution = baseContribution
+    if (ecology === activeEcology) {
+      if (ecology === 'aegis') {
+        contribution = 0
+        signalEffect = {
+          kind: 'repair', ecology,
+          amount: Math.min(
+            Math.round(battle.partyMaxHp * 0.045),
+            Math.max(1, Math.round(stats.defense * (count / 3) * combo * (0.26 + Math.max(0, count - 3) * 0.02))),
+          ),
+        }
+      } else if (ecology === 'relay') {
+        contribution = 0
+        signalEffect = {
+          kind: 'guard', ecology,
+          amount: Math.min(
+            Math.round(battle.partyMaxHp * 0.045),
+            Math.max(1, Math.round(stats.speed * (count / 3) * combo * (0.28 + Math.max(0, count - 3) * 0.02))),
+          ),
+        }
+      } else if (ecology === 'lumen') {
+        contribution *= 1.18
+        signalEffect = { kind: 'sync', ecology, amount: Math.max(1, Math.round(contribution - baseContribution)) }
+      } else if (ecology === 'forge') {
+        contribution *= Math.min(1.32, 1.12 + Math.max(0, count - 3) * 0.035 + Math.max(0, chain - 1) * 0.025)
+        signalEffect = { kind: 'overclock', ecology, amount: Math.max(1, Math.round(contribution - baseContribution)) }
+      } else {
+        contribution = stats.attack * (count / 3) * combo * element
+          * playerOffenseLevelFactor(member, battle) * playerDefenseFactor(battle.wildDefense * 0.4) * 1.03
+        signalEffect = { kind: 'breach', ecology, amount: Math.max(1, Math.round(contribution - baseContribution)) }
+      }
+    }
     total += contribution
+    if (contribution <= 0) continue
     const effectiveness: MatchDamageEffectiveness = element > 1 ? 'advantage' : element < 1 ? 'resisted' : 'neutral'
     effectivenessDamage[effectiveness] += contribution
   }
   if (member.creatureId === 'glitch-crashfox' && battle.partyHp * 2 < battle.partyMaxHp) total *= 1.25
   if (member.creatureId === 'relay-duplex-hare' && battle.round % 2 === 1) total *= 1.1
-  const effectiveness = (Object.entries(effectivenessDamage) as [MatchDamageEffectiveness, number][])
-    .sort((left, right) => right[1] - left[1]
-      || ['advantage', 'neutral', 'resisted'].indexOf(left[0]) - ['advantage', 'neutral', 'resisted'].indexOf(right[0]))[0]?.[0]
-    ?? 'neutral'
-  return { total: Math.max(1, Math.round(total)), effectiveness }
+  const effectiveness = total <= 0
+    ? 'neutral'
+    : (Object.entries(effectivenessDamage) as [MatchDamageEffectiveness, number][])
+        .sort((left, right) => right[1] - left[1]
+          || ['advantage', 'neutral', 'resisted'].indexOf(left[0]) - ['advantage', 'neutral', 'resisted'].indexOf(right[0]))[0]?.[0]
+      ?? 'neutral'
+  return {
+    total: Math.max(0, Math.round(total)), effectiveness,
+    ...(signalEffect === undefined ? {} : { signalEffect }),
+  }
+}
+
+function applyPlayerSignalEffect(battle: BattleState, effect: MatchSignalEffect): MatchSignalEffect {
+  if (effect.kind === 'repair') {
+    const amount = healParty(battle, effect.amount)
+    if (amount > 0) appendBattleLog(battle, { turn: battle.turn, kind: 'heal', amount })
+    return { ...effect, amount }
+  }
+  if (effect.kind === 'guard') {
+    const amount = shieldParty(battle, effect.amount)
+    if (amount > 0) appendBattleLog(battle, { turn: battle.turn, kind: 'shield', amount })
+    return { ...effect, amount }
+  }
+  return effect
 }
 
 function battleEncounterCreatureId(battle: BattleState): string {
@@ -739,7 +796,18 @@ function applyResolution(
     const pendingBefore = battle.pendingTeamDamage
     for (const ecology of TRACE_ECOLOGIES) totals[ecology] += step.counts[ecology]
     const stepDamage = damageForStep(battle, active, step.counts, step.chain)
-    const damage = applyWildDamage(battle, stepDamage.total)
+    const damage = stepDamage.total > 0 ? applyWildDamage(battle, stepDamage.total) : 0
+    const rawSignalEffect = stepDamage.signalEffect
+    const scaledSignalEffect = rawSignalEffect === undefined
+      || rawSignalEffect.kind === 'repair' || rawSignalEffect.kind === 'guard'
+      ? rawSignalEffect
+      : {
+          ...rawSignalEffect,
+          amount: stepDamage.total <= 0 ? 0 : Math.round(rawSignalEffect.amount * damage / stepDamage.total),
+        }
+    const signalEffect = scaledSignalEffect === undefined
+      ? undefined
+      : applyPlayerSignalEffect(battle, scaledSignalEffect)
     totalDamage += damage
     totalDamage += applyMatchPassives(
       battle, step.counts, step.chain, step.maxGroup, step.specialCount, damage, random,
@@ -761,6 +829,7 @@ function applyResolution(
       frame.damage = Math.max(0, battle.pendingTeamDamage - pendingBefore)
       frame.totalDamage = battle.pendingTeamDamage
       frame.effectiveness = stepDamage.effectiveness
+      if (signalEffect !== undefined) frame.signalEffect = signalEffect
       const hazardDamage = Math.max(0, partyBeforeHazard - battle.partyHp)
       if (hazardDamage > 0) frame.hazardDamage = hazardDamage
     }
@@ -895,14 +964,6 @@ function partyAffinity(battle: BattleState, wildEcology: TraceEcology): number {
   }, 0) / battle.party.length
 }
 
-function enemyDamageEffectiveness(
-  battle: BattleState,
-  wildEcology: TraceEcology,
-): MatchDamageEffectiveness {
-  const multiplier = partyAffinity(battle, wildEcology)
-  return multiplier > 1.05 ? 'advantage' : multiplier < 0.95 ? 'resisted' : 'neutral'
-}
-
 function bossPhaseDamageCap(battle: BattleState): number {
   const partyAverageLevel = battle.party.reduce((sum, member) => sum + member.level, 0) / battle.party.length
   const levelPressure = Math.min(0.08, Math.max(0, battle.wildLevel - partyAverageLevel) * 0.004)
@@ -916,24 +977,124 @@ function bossPhaseDamageCap(battle: BattleState): number {
 function enemyDamageForStep(
   battle: BattleState,
   wildEcology: TraceEcology,
-  matchedTiles: number,
+  counts: Readonly<Record<TraceEcology, number>>,
   chain: number,
-): number {
-  if (matchedTiles <= 0 || battle.partyHp <= 0) return 0
+): MatchStepDamage {
+  if (battle.partyHp <= 0) return { total: 0, effectiveness: 'neutral' }
   const combo = Math.min(2.25, 1 + 0.25 * Math.max(0, chain - 1))
-  const tilePower = Math.pow(matchedTiles / 3, 0.9)
   // Full squads have more shared runtime and nine player actions per cycle.
   // This pressure term rises with party size, but much slower than shared HP,
   // preserving the value of building a team without making solo starts free.
   const partyPressure = 0.42 + 0.42 * Math.max(0, battle.party.length - 1)
-  const defenseFactor = 1_400 / (1_400 + Math.max(0, partyDefense(battle)) * 2.2)
-  const roll = battle.wildAttack * tilePower * combo * (battle.bossDamageScale / 1000)
-    * partyPressure * partyAffinity(battle, wildEcology) * defenseFactor
-  // Cascades and 4/5-match action bonuses may produce up to seven Boss swaps.
-  // Keep every visible damage tick positive while bounding a full-HP knockout
-  // to explicit high-threat pressure instead of a lucky refill cascade.
-  const remainingBudget = Math.max(1, bossPhaseDamageCap(battle) - battle.pendingBossDamage)
-  return Math.max(1, Math.min(Math.round(roll), remainingBudget))
+  const defense = partyDefense(battle)
+  let total = 0
+  let signalEffect: MatchSignalEffect | undefined
+  const effectivenessDamage: Record<MatchDamageEffectiveness, number> = { advantage: 0, neutral: 0, resisted: 0 }
+  for (const ecology of TRACE_ECOLOGIES) {
+    const count = counts[ecology]
+    if (count <= 0) continue
+    const element = partyAffinity(battle, ecology)
+    const tilePower = Math.pow(count / 3, 0.9)
+    const baseContribution = battle.wildAttack * tilePower * combo * (battle.bossDamageScale / 1000)
+      * partyPressure * element * (1_400 / (1_400 + Math.max(0, defense) * 2.2))
+    let contribution = baseContribution
+    if (ecology === wildEcology) {
+      if (ecology === 'aegis') {
+        // Boss signal panels keep half their attack pressure in addition to
+        // their elite sustain; support-ecology turns must still threaten the
+        // shared player runtime pool.
+        contribution *= 0.5
+        signalEffect = {
+          kind: 'repair', ecology,
+          amount: Math.max(1, Math.round(battle.wildMaxHp * Math.min(0.06, 0.012 * (count / 3) * combo))),
+        }
+      } else if (ecology === 'relay') {
+        contribution *= 0.5
+        signalEffect = {
+          kind: 'guard', ecology,
+          amount: Math.max(1, Math.round(battle.wildMaxHp * Math.min(0.05, 0.01 * (count / 3) * combo))),
+        }
+      } else if (ecology === 'lumen') {
+        contribution *= 1.25
+        signalEffect = { kind: 'sync', ecology, amount: Math.max(1, Math.round(contribution - baseContribution)) }
+      } else if (ecology === 'forge') {
+        contribution *= Math.min(1.4, 1.16 + Math.max(0, count - 3) * 0.04 + Math.max(0, chain - 1) * 0.03)
+        signalEffect = { kind: 'overclock', ecology, amount: Math.max(1, Math.round(contribution - baseContribution)) }
+      } else {
+        contribution = battle.wildAttack * tilePower * combo * (battle.bossDamageScale / 1000)
+          * partyPressure * element * (1_400 / (1_400 + Math.max(0, defense * 0.35) * 2.2)) * 1.05
+        signalEffect = { kind: 'breach', ecology, amount: Math.max(1, Math.round(contribution - baseContribution)) }
+      }
+    }
+    total += contribution
+    if (contribution <= 0) continue
+    const effectiveness: MatchDamageEffectiveness = element > 1.05 ? 'advantage' : element < 0.95 ? 'resisted' : 'neutral'
+    effectivenessDamage[effectiveness] += contribution
+  }
+  const effectiveness = total <= 0
+    ? 'neutral'
+    : (Object.entries(effectivenessDamage) as [MatchDamageEffectiveness, number][])
+        .sort((left, right) => right[1] - left[1]
+          || ['advantage', 'neutral', 'resisted'].indexOf(left[0]) - ['advantage', 'neutral', 'resisted'].indexOf(right[0]))[0]?.[0]
+      ?? 'neutral'
+  return {
+    total: Math.max(0, Math.round(total)), effectiveness,
+    ...(signalEffect === undefined ? {} : { signalEffect }),
+  }
+}
+
+function applyBossSignalEffect(battle: BattleState, effect: MatchSignalEffect): MatchSignalEffect {
+  if (effect.kind === 'repair') {
+    const before = battle.wildHp
+    battle.wildHp = Math.min(battle.wildMaxHp, battle.wildHp + effect.amount)
+    return { ...effect, amount: battle.wildHp - before }
+  }
+  if (effect.kind === 'guard') {
+    const before = battle.wildShield
+    battle.wildShield = Math.min(Math.round(battle.wildMaxHp * 0.4), battle.wildShield + effect.amount)
+    return { ...effect, amount: battle.wildShield - before }
+  }
+  return effect
+}
+
+function projectedBossActionsAfterSwap(battle: BattleState, beforeActions: number, directMaxGroup: number): number {
+  if (directMaxGroup >= 5 && battle.bossBonusActionsGranted < MAX_BOSS_BONUS_ACTIONS) {
+    return Math.min(MAX_BOSS_ACTIONS, beforeActions + 1)
+  }
+  if (directMaxGroup >= 4) return beforeActions
+  return Math.max(0, beforeActions - 1)
+}
+
+function allocateBossStepDamage(rawValues: readonly number[], budgetValue: number): number[] {
+  const positiveCount = rawValues.filter(value => value > 0).length
+  const rawTotal = rawValues.reduce((sum, value) => sum + Math.max(0, value), 0)
+  if (rawTotal <= 0 || positiveCount === 0 || budgetValue <= 0) return rawValues.map(() => 0)
+  const target = Math.min(rawTotal, Math.floor(budgetValue))
+  if (target < positiveCount) {
+    const selected = new Set(rawValues
+      .map((value, index) => ({ value, index }))
+      .filter(row => row.value > 0)
+      .sort((left, right) => right.value - left.value || left.index - right.index)
+      .slice(0, target)
+      .map(row => row.index))
+    return rawValues.map((_, index) => selected.has(index) ? 1 : 0)
+  }
+  if (target >= rawTotal) return rawValues.map(value => Math.max(0, value))
+  let remainingTarget = target
+  let remainingWeight = rawTotal
+  let remainingPositive = positiveCount
+  return rawValues.map(rawValue => {
+    const value = Math.max(0, rawValue)
+    if (value <= 0) return 0
+    remainingPositive -= 1
+    const upper = remainingTarget - remainingPositive
+    const allocated = remainingPositive === 0
+      ? remainingTarget
+      : Math.max(1, Math.min(upper, Math.round(remainingTarget * value / remainingWeight)))
+    remainingTarget -= allocated
+    remainingWeight -= value
+    return allocated
+  })
 }
 
 function applyEnemyTeamHit(battle: BattleState, amount: number): number {
@@ -1378,6 +1539,17 @@ function performBossBoardAction(
   const resolution = resolveBattleSwap(battle.board, swap.from, swap.to, random)
   if (resolution === undefined) throw new TraceWildRuleError('conflict')
   battle.board = resolution.board
+  const beforeActions = battle.bossActionsRemaining
+  const directMaxGroup = resolution.steps[0]?.maxGroup ?? 0
+  const projectedActions = projectedBossActionsAfterSwap(battle, beforeActions, directMaxGroup)
+  const futureSwapCapacity = Math.max(0, MAX_BOSS_SWAPS_PER_PHASE - battle.bossActionsTaken - 1)
+  const expectedActionSlots = 1 + Math.min(projectedActions, futureSwapCapacity)
+  const remainingPhaseBudget = Math.max(0, bossPhaseDamageCap(battle) - battle.pendingBossDamage)
+  const actionBudget = Math.ceil(remainingPhaseBudget / Math.max(1, expectedActionSlots))
+  const rawStepDamage = resolution.steps.map(step => (
+    enemyDamageForStep(battle, wild.ecology, step.counts, step.chain)
+  ))
+  const allocatedStepDamage = allocateBossStepDamage(rawStepDamage.map(step => step.total), actionBudget)
   let matched = 0
   let ownColor = 0
   for (let index = 0; index < resolution.steps.length; index += 1) {
@@ -1388,13 +1560,24 @@ function performBossBoardAction(
     ownColor += step.counts[wild.ecology]
     const chargeGain = count / 3 * combo
     battle.bossAttackCharge = Math.min(32, battle.bossAttackCharge + chargeGain)
-    const stepDamage = enemyDamageForStep(battle, wild.ecology, count, step.chain)
+    const stepDamage = allocatedStepDamage[index] ?? 0
     battle.pendingBossDamage = Math.min(9_999_999, battle.pendingBossDamage + stepDamage)
     const frame = resolution.frames[index]
     if (frame !== undefined) {
       frame.damage = stepDamage
       frame.totalDamage = battle.pendingBossDamage
-      frame.effectiveness = enemyDamageEffectiveness(battle, wild.ecology)
+      frame.effectiveness = rawStepDamage[index]?.effectiveness ?? 'neutral'
+      const rawDamage = rawStepDamage[index]
+      const signalEffect = rawDamage?.signalEffect
+      if (rawDamage !== undefined && signalEffect !== undefined) {
+        const scaledEffect = signalEffect.kind === 'repair' || signalEffect.kind === 'guard'
+          ? signalEffect
+          : {
+              ...signalEffect,
+              amount: rawDamage.total <= 0 ? 0 : Math.round(signalEffect.amount * stepDamage / rawDamage.total),
+            }
+        frame.signalEffect = applyBossSignalEffect(battle, scaledEffect)
+      }
     }
   }
   battle.lastBossMatch = matched
@@ -1407,11 +1590,9 @@ function performBossBoardAction(
   if (resolution.steps.length > 1) {
     appendBattleLog(battle, { turn: battle.turn, kind: 'boss-combo', amount: resolution.steps.length })
   }
-  const beforeActions = battle.bossActionsRemaining
   battle.bossActionsTaken += 1
-  const directMaxGroup = resolution.steps[0]?.maxGroup ?? 0
+  battle.bossActionsRemaining = projectedActions
   if (directMaxGroup >= 5 && battle.bossBonusActionsGranted < MAX_BOSS_BONUS_ACTIONS) {
-    battle.bossActionsRemaining = Math.min(MAX_BOSS_ACTIONS, beforeActions + 1)
     if (battle.bossActionsRemaining > beforeActions) battle.bossBonusActionsGranted += 1
     appendBattleLog(battle, {
       turn: battle.turn,
@@ -1419,10 +1600,7 @@ function performBossBoardAction(
       amount: battle.bossActionsRemaining - beforeActions,
     })
   } else if (directMaxGroup >= 4) {
-    battle.bossActionsRemaining = beforeActions
     appendBattleLog(battle, { turn: battle.turn, kind: 'boss-action-refund', amount: beforeActions })
-  } else {
-    battle.bossActionsRemaining = Math.max(0, beforeActions - 1)
   }
   if (battle.bossActionsTaken >= MAX_BOSS_SWAPS_PER_PHASE) battle.bossActionsRemaining = 0
   const completion = battle.bossActionsRemaining === 0

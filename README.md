@@ -71,7 +71,9 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
 - Ordinary wild levels stay between the lowest and highest levels in the complete roster; Nova and Origin appear as over-level special challenges.
 - A 2D region map, 8×8 match-three battles, capture, a three-Codekin squad, and a creature index.
 - An Endless Stack Tower with increasingly strong Boss levels, qualities, mechanics, and per-floor growth rewards.
-- Five attribute tiles arranged in a closed advantage loop, with strong and resisted damage.
+- Five attribute tiles arranged in a closed advantage loop. On a matching Codekin's turn they become
+  distinct signal roles: runtime repair, shared guard, Compute sync, Compile overclock, or Glitch breach;
+  on every other turn they remain ordinary damage panels.
 - Level 1–100 progression, five qualities of growth material, idle supplies, and local persistence.
 - A compact growth target selector keeps training usable even with a large roster.
 - A persisted enable switch under DSH Settings → Codekin; disabling pauses event rewards and idle time without deleting progress.
@@ -88,7 +90,9 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
 
 ## Battle and encounter rules
 
-Swap adjacent tiles to queue compute damage and charge matching squad members. Each squad member
+Swap adjacent tiles to queue compute damage and charge matching squad members. Matching Guard and
+Network panels trade their normal damage for recovery and shielding, while Compute, Compile, and Glitch
+panels specialize in synchronized, chain-scaled, and defense-piercing damage. Each squad member
 normally contributes three actions; a direct match-four refunds an action and a match-five grants an
 extra action. The three squad stages are displayed separately, then resolve as one team strike. Wild
 Bosses have their own multi-action cycle, strike one shared squad runtime pool, and use hazard panels,

@@ -1638,6 +1638,40 @@
 @keyframes enemyActionAlertIn { from { opacity: 0; transform: translateY(-7px) scale(.97); } }
 @keyframes enemyActionAlertScan { 48%, 100% { transform: translateX(340%); } }
 @keyframes enemyActionAlertPulse { to { opacity: .55; transform: scale(.72); box-shadow: 0 0 0 2px #fff1, 0 0 4px #fff; } }
+.signalEffectHud {
+  position: absolute; z-index: 18; left: 50%; bottom: 11px; min-width: 126px; min-height: 34px;
+  display: grid; grid-template-columns: 25px minmax(0, 1fr) auto; align-items: center; gap: 6px;
+  transform: translateX(-50%); border: 1px solid #ffffffd1; border-radius: 999px; padding: 4px 9px 4px 5px;
+  background: #f8fffcf2; color: #3f7465; box-shadow: 0 8px 22px #335c5047, inset 0 1px #fff;
+  pointer-events: none; animation: signalEffectIn .62s cubic-bezier(.16,1,.3,1) both;
+}
+.signalEffectHud > span {
+  width: 25px; height: 25px; display: grid; place-items: center; border-radius: 50%;
+  background: currentColor; color: #fff; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 16%, transparent);
+}
+.signalEffectHud > strong { font: 900 8px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .04em; white-space: nowrap; }
+.signalEffectHud > b { color: currentColor; font: 1000 13px/1 ui-monospace, monospace; }
+.signalEffect_repair { color: #3b9f72; }
+.signalEffect_guard { color: #3b84bd; }
+.signalEffect_sync { color: #c49124; }
+.signalEffect_overclock { color: #d94f55; }
+.signalEffect_breach { color: #8a5cb1; }
+.signalEffectBoss { border-color: #ffc0c9; box-shadow: 0 8px 22px #8b30434c, inset 0 1px #fff; }
+@keyframes signalEffectIn {
+  0% { opacity: 0; transform: translate(-50%, 9px) scale(.82); }
+  25%, 76% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -7px) scale(.96); }
+}
+.signalRule {
+  margin: 3px auto 0; width: fit-content; max-width: 96%; border: 1px solid currentColor;
+  border-radius: 999px; padding: 3px 8px; background: #ffffff9e; text-align: center;
+  font: 750 7px/1.35 ui-sans-serif, system-ui, sans-serif;
+}
+.signalRule_lumen { color: #9a791d; }
+.signalRule_forge { color: #b54f54; }
+.signalRule_relay { color: #397ca5; }
+.signalRule_aegis { color: #398765; }
+.signalRule_glitch { color: #795397; }
 .captureBoardOverlay {
   position: absolute; z-index: 20; inset: 5px; display: grid; align-content: center; gap: 11px;
   border: 1px solid #fffef0e8; border-radius: 17px; padding: 18px 16px;
@@ -1705,7 +1739,7 @@
   .wildBanner .sprite_medium, .wildBanner .enemyAura, .captureBoardOverlay, .captureCoreGrid button,
   .captureBoardIntro > header strong, .battleTransition, .battleTransition::before, .battleTransition::after,
   .battleTransition > span, .attackWave, .attackImpact, .wildWasHit .sprite_medium,
-  .enemyActionAlert, .enemyActionAlert::after, .enemyActionAlert > i { animation: none; }
+  .enemyActionAlert, .enemyActionAlert::after, .enemyActionAlert > i, .signalEffectHud { animation: none; }
 }
 
 /* Runtime performance: keep the soft surface language without repeatedly

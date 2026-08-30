@@ -51,8 +51,6 @@ export interface TraceWildRouteGroup {
   close(): void
 }
 
-export type TraceWildRequestRejection = (request: IncomingMessage) => 401 | 403 | undefined
-
 const ASSET_FILES = new Set([
   'sprites/codekin-launcher-v1.webp',
   ...CREATURE_CATALOG.map(creature => `sprites/${creature.id}.webp`),
@@ -79,15 +77,55 @@ function failure(res: ServerResponse, status: number, error: TraceWildFailureRes
   sendJson(res, status, { ok: false, error } satisfies TraceWildFailureResponse)
 }
 
-function rejectUntrusted(
-  req: IncomingMessage,
-  res: ServerResponse,
-  requestRejection: TraceWildRequestRejection,
-): boolean {
-  const status = requestRejection(req)
-  if (status === undefined) return false
-  res.writeHead(status, securityHeaders())
-  res.end(status === 401 ? 'unauthorized' : 'forbidden')
+function requestHeader(req: IncomingMessage, name: keyof IncomingMessage['headers']): string | undefined {
+  const value = req.headers[name]
+  return typeof value === 'string' ? value : undefined
+}
+
+function isLoopbackHostname(hostname: string): boolean {
+  if (hostname === 'localhost' || hostname === '[::1]') return true
+  const parts = hostname.split('.')
+  return parts.length === 4
+    && parts[0] === '127'
+    && parts.every(part => /^\d{1,3}$/.test(part) && Number(part) <= 255)
+}
+
+function loopbackAuthority(req: IncomingMessage): URL | undefined {
+  const host = requestHeader(req, 'host')
+  if (host === undefined || host.length === 0 || host.length > 255 || /[\s\\/@?#]/u.test(host)) return undefined
+  try {
+    const parsed = new URL(`http://${host}`)
+    return isLoopbackHostname(parsed.hostname) ? parsed : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Local Web trust fence kept inside Codekin so it does not depend on private
+ * or version-specific Connection internals. This is a DNS-rebinding and
+ * browser-origin fence, not user authentication.
+ */
+function rejectUntrusted(req: IncomingMessage, res: ServerResponse): boolean {
+  const authority = loopbackAuthority(req)
+  const site = requestHeader(req, 'sec-fetch-site')
+  const origin = requestHeader(req, 'origin')
+  let trusted = authority !== undefined
+    && site !== 'cross-site'
+    && (req.headers['sec-fetch-site'] === undefined || site !== undefined)
+    && (req.headers.origin === undefined || origin !== undefined)
+  if (authority !== undefined && trusted && origin !== undefined) {
+    try {
+      const parsed = new URL(origin)
+      trusted = (parsed.protocol === 'http:' || parsed.protocol === 'https:')
+        && parsed.host === authority.host
+    } catch {
+      trusted = false
+    }
+  }
+  if (trusted) return false
+  res.writeHead(403, securityHeaders())
+  res.end('forbidden')
   return true
 }
 
@@ -163,13 +201,12 @@ function readBody(req: IncomingMessage, signal: AbortSignal): Promise<unknown> {
 function stateRoute(
   service: TraceWildService,
   lifecycle: TraceWildRouteLifecycle,
-  requestRejection: TraceWildRequestRejection,
 ): WebRoute {
   return {
     kind: 'exact',
     path: `${TRACEWILD_API_PREFIX}/state`,
     handler(req, res) {
-      if (rejectUntrusted(req, res, requestRejection)) return
+      if (rejectUntrusted(req, res)) return
       if (req.method !== 'GET') {
         res.writeHead(405, securityHeaders())
         res.end()
@@ -187,13 +224,12 @@ function stateRoute(
 function actionRoute(
   service: TraceWildService,
   lifecycle: TraceWildRouteLifecycle,
-  requestRejection: TraceWildRequestRejection,
 ): WebRoute {
   return {
     kind: 'exact',
     path: `${TRACEWILD_API_PREFIX}/action`,
     async handler(req, res) {
-      if (rejectUntrusted(req, res, requestRejection)) return
+      if (rejectUntrusted(req, res)) return
       if (req.method !== 'POST') {
         res.writeHead(405, securityHeaders())
         res.end()
@@ -229,13 +265,12 @@ function actionRoute(
 function saveRoute(
   service: TraceWildService,
   lifecycle: TraceWildRouteLifecycle,
-  requestRejection: TraceWildRequestRejection,
 ): WebRoute {
   return {
     kind: 'exact',
     path: `${TRACEWILD_API_PREFIX}/save`,
     async handler(req, res) {
-      if (rejectUntrusted(req, res, requestRejection)) return
+      if (rejectUntrusted(req, res)) return
       if (req.method !== 'DELETE') {
         res.writeHead(405, securityHeaders())
         res.end()
@@ -274,13 +309,12 @@ function saveRoute(
 function eventsRoute(
   service: TraceWildService,
   lifecycle: TraceWildRouteLifecycle,
-  requestRejection: TraceWildRequestRejection,
 ): WebRoute {
   return {
     kind: 'exact',
     path: `${TRACEWILD_API_PREFIX}/events`,
     handler(req, res) {
-      if (rejectUntrusted(req, res, requestRejection)) return
+      if (rejectUntrusted(req, res)) return
       if (req.method !== 'GET') {
         res.writeHead(405, securityHeaders())
         res.end()
@@ -332,13 +366,12 @@ function eventsRoute(
 function assetRoute(
   assetDirectory: string,
   lifecycle: TraceWildRouteLifecycle,
-  requestRejection: TraceWildRequestRejection,
 ): WebRoute {
   return {
     kind: 'prefix',
     path: `${TRACEWILD_API_PREFIX}/assets`,
     async handler(req, res) {
-      if (rejectUntrusted(req, res, requestRejection)) return
+      if (rejectUntrusted(req, res)) return
       if (req.method !== 'GET') {
         res.writeHead(405, securityHeaders())
         res.end()
@@ -379,16 +412,15 @@ function assetRoute(
 export function createTraceWildRoutes(
   service: TraceWildService,
   assetDirectory: string,
-  requestRejection: TraceWildRequestRejection,
 ): TraceWildRouteGroup {
   const lifecycle = new TraceWildRouteLifecycle()
   return {
     routes: [
-      stateRoute(service, lifecycle, requestRejection),
-      actionRoute(service, lifecycle, requestRejection),
-      saveRoute(service, lifecycle, requestRejection),
-      eventsRoute(service, lifecycle, requestRejection),
-      assetRoute(assetDirectory, lifecycle, requestRejection),
+      stateRoute(service, lifecycle),
+      actionRoute(service, lifecycle),
+      saveRoute(service, lifecycle),
+      eventsRoute(service, lifecycle),
+      assetRoute(assetDirectory, lifecycle),
     ],
     close: () => { lifecycle.close() },
   }

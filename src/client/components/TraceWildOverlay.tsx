@@ -26,6 +26,7 @@ import type {
   CreatureDefinition,
   EnemyIntent,
   MatchDamageEffectiveness,
+  MatchSignalEffect,
   MatchTile,
   TraceEcology,
   TraceLogEntry,
@@ -716,11 +717,16 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
       const battleAction = action.type.startsWith('battle-') || action.type === 'capture'
         || action.type === 'flee' || action.type === 'start-battle' || action.type === 'start-tower'
       if (error instanceof TraceWildConnectionError && error.code === 'invalid-action') {
-        setNotice(action.type === 'claim-idle-reward'
-          ? t('rewardUnavailable')
-          : battleAction
-            ? t('battleActionUnavailable')
-            : t('invalidSwap'))
+        // A legal adjacent swap that forms no match is ordinary board input:
+        // the pieces spring back and the action is not consumed. Do not make
+        // that feel like a stale Host/plugin error.
+        if (action.type !== 'battle-swap') {
+          setNotice(action.type === 'claim-idle-reward'
+            ? t('rewardUnavailable')
+            : battleAction
+              ? t('battleActionUnavailable')
+              : t('invalidSwap'))
+        }
       } else {
         setNotice(error instanceof TraceWildConnectionError && error.code === 'conflict'
           ? battleAction
@@ -1419,6 +1425,16 @@ const INTENT_KEYS: Record<EnemyIntent, TraceWildLocaleKey> = {
   corrupt: 'intentCorrupt', mark: 'intentMark', lock: 'intentLock', freeze: 'intentFreeze',
 }
 
+const SIGNAL_EFFECT_KEYS: Record<MatchSignalEffect['kind'], TraceWildLocaleKey> = {
+  repair: 'signalRepair', guard: 'signalGuard', sync: 'signalSync',
+  overclock: 'signalOverclock', breach: 'signalBreach',
+}
+
+const SIGNAL_RULE_KEYS: Record<TraceEcology, TraceWildLocaleKey> = {
+  lumen: 'signalRuleLumen', forge: 'signalRuleForge', relay: 'signalRuleRelay',
+  aegis: 'signalRuleAegis', glitch: 'signalRuleGlitch',
+}
+
 function tileLabel(tile: MatchTile, index: number, t: TraceWildOverlayProps['t']): string {
   const ecology = t(ECOLOGY_KEYS[tile.ecology])
   const special = tile.special === 'none' ? '' : ` · ${t(SPECIAL_KEYS[tile.special])}`
@@ -1448,6 +1464,11 @@ interface DamageReadout {
   current?: number
   effectiveness?: MatchDamageEffectiveness
   settled: boolean
+}
+
+interface SignalReadout extends MatchSignalEffect {
+  key: number
+  actor: 'player' | 'boss'
 }
 
 interface AttackPresentation extends TraceWildBattleStrike {
@@ -1507,6 +1528,7 @@ function BattleView(props: {
   const [fallRows, setFallRows] = useState<readonly number[]>()
   const [activeChain, setActiveChain] = useState<number>()
   const [damageReadout, setDamageReadout] = useState<DamageReadout>()
+  const [signalReadout, setSignalReadout] = useState<SignalReadout>()
   const [captureIntro, setCaptureIntro] = useState(false)
   const [partyHitKey, setPartyHitKey] = useState(0)
   const [attackPresentation, setAttackPresentation] = useState<AttackPresentation>()
@@ -1573,6 +1595,7 @@ function BattleView(props: {
     setClearingTiles(undefined)
     setFallRows(undefined)
     setActiveChain(undefined)
+    setSignalReadout(undefined)
     setVisualBoard(battle.board.map(tile => ({ ...tile })))
     setAttackPresentation(undefined)
     setDisplayedWildHp(battle.wildHp)
@@ -1645,9 +1668,10 @@ function BattleView(props: {
     if (animation.battleId !== battle.id) return
     const epoch = ++animationEpoch.current
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    setSignalReadout(undefined)
     for (const frame of animation.frames) {
       if (animationEpoch.current !== epoch) return
-      if (frame.damage !== undefined && frame.totalDamage !== undefined) {
+      if (frame.damage !== undefined && frame.damage > 0 && frame.totalDamage !== undefined) {
         setDamageReadout({
           key: Date.now() + frame.chain,
           actor: animation.actor === 'boss' ? 'boss' : 'player',
@@ -1657,6 +1681,13 @@ function BattleView(props: {
           settled: false,
         })
       }
+      setSignalReadout(frame.signalEffect === undefined
+        ? undefined
+        : {
+            ...frame.signalEffect,
+            key: Date.now() + frame.chain,
+            actor: animation.actor === 'boss' ? 'boss' : 'player',
+          })
       setFallRows(undefined)
       setVisualBoard(frame.before.map(tile => ({ ...tile })))
       setClearingTiles(new Set(frame.removed))
@@ -1676,6 +1707,7 @@ function BattleView(props: {
     }
     if (animationEpoch.current !== epoch) return
     setActiveChain(undefined)
+    setSignalReadout(undefined)
     const finalBoard = finalBattle?.board ?? animation.frames.at(-1)?.after ?? battle.board
     setVisualBoard(finalBoard.map(tile => ({ ...tile })))
     if (animation.strike !== undefined) {
@@ -1758,6 +1790,7 @@ function BattleView(props: {
       setClearingTiles(undefined)
       setFallRows(undefined)
       setActiveChain(undefined)
+      setSignalReadout(undefined)
       setAnimating(false)
     })
   }
@@ -1833,6 +1866,7 @@ function BattleView(props: {
         setClearingTiles(undefined)
         setFallRows(undefined)
         setActiveChain(undefined)
+        setSignalReadout(undefined)
         setAnimating(false)
       })
     }, 130)
@@ -1845,6 +1879,7 @@ function BattleView(props: {
       setClearingTiles(undefined)
       setFallRows(undefined)
       setActiveChain(undefined)
+      setSignalReadout(undefined)
       setAnimating(false)
     })
   }
@@ -2069,6 +2104,18 @@ function BattleView(props: {
                   <span>ENEMY TURN</span>
                 </div>
               )}
+              {signalReadout !== undefined && (
+                <div
+                  key={signalReadout.key}
+                  className={`${css.signalEffectHud} ${css[`signalEffect_${signalReadout.kind}`]} ${signalReadout.actor === 'boss' ? css.signalEffectBoss : ''}`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  <span>{TILE_SYMBOLS[signalReadout.ecology]}</span>
+                  <strong>{props.t(SIGNAL_EFFECT_KEYS[signalReadout.kind])}</strong>
+                  <b>{signalReadout.amount > 0 ? `+${signalReadout.amount.toLocaleString()}` : 'MAX'}</b>
+                </div>
+              )}
               <div
                 className={css.matchBoard}
                 role="grid"
@@ -2184,6 +2231,10 @@ function BattleView(props: {
               )}
             </div>
             <p className={css.boardHelp}>{props.t('boardHelp')}</p>
+            <p className={`${css.signalRule} ${css[`signalRule_${battle.turnOwner === 'boss' ? wild.ecology : activeDefinition.ecology}`]}`}>
+              {props.t(SIGNAL_RULE_KEYS[battle.turnOwner === 'boss' ? wild.ecology : activeDefinition.ecology])}
+              {battle.turnOwner === 'boss' ? ` ${props.t('signalBossRule')}` : ''}
+            </p>
           </div>
 
           {battle.mode === 'tower' && (

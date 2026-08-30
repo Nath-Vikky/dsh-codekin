@@ -1,6 +1,7 @@
 import type {
   MatchTile,
   MatchDamageEffectiveness,
+  MatchSignalEffect,
   TraceWildAction,
   TraceWildActionResponse,
   TraceWildBattleAnimation,
@@ -43,6 +44,7 @@ export class TraceWildConnectionError extends Error {
 }
 
 const TILE_SPECIALS = ['none', 'row', 'column', 'burst', 'origin'] as const
+const MATCH_SIGNAL_EFFECTS = ['repair', 'guard', 'sync', 'overclock', 'breach'] as const
 
 function plainRecord(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)
@@ -109,6 +111,22 @@ function battleAnimation(value: unknown): TraceWildBattleAnimation {
       || (frame.hazardDamage as number) < 1 || (frame.hazardDamage as number) > 9_999_999)) {
       throw new TypeError('invalid animation')
     }
+    let signalEffect: MatchSignalEffect | undefined
+    if (frame.signalEffect !== undefined) {
+      const rawEffect = plainRecord(frame.signalEffect)
+      const effectKeys = Object.keys(rawEffect)
+      if (effectKeys.length !== 3
+        || effectKeys.some(key => key !== 'kind' && key !== 'ecology' && key !== 'amount')
+        || !MATCH_SIGNAL_EFFECTS.includes(rawEffect.kind as never)
+        || !TRACE_ECOLOGIES.includes(rawEffect.ecology as never)
+        || !Number.isSafeInteger(rawEffect.amount) || (rawEffect.amount as number) < 0
+        || (rawEffect.amount as number) > 9_999_999) throw new TypeError('invalid animation')
+      signalEffect = {
+        kind: rawEffect.kind as MatchSignalEffect['kind'],
+        ecology: rawEffect.ecology as MatchSignalEffect['ecology'],
+        amount: rawEffect.amount as number,
+      }
+    }
     return {
       chain: frame.chain as number,
       before: matchBoard(frame.before),
@@ -120,6 +138,7 @@ function battleAnimation(value: unknown): TraceWildBattleAnimation {
         totalDamage: frame.totalDamage as number,
         effectiveness: frame.effectiveness as MatchDamageEffectiveness,
       } : {}),
+      ...(signalEffect === undefined ? {} : { signalEffect }),
       ...(frame.hazardDamage === undefined ? {} : { hazardDamage: frame.hazardDamage as number }),
     }
   })

@@ -17,7 +17,14 @@ import {
   restoreTraceWildState,
   settleTraceWildIdleRewards,
 } from '../src/core/engine.ts'
-import { findFirstLegalBattleSwap, MATCH_BOARD_CELLS } from '../src/core/match3.ts'
+import {
+  MATCH_BOARD_CELLS,
+  MATCH_BOARD_SIZE,
+  areAdjacentTiles,
+  createMatchBoard,
+  findFirstLegalBattleSwap,
+  resolveBattleSwap,
+} from '../src/core/match3.ts'
 import { CREATURE_SKILLS } from '../src/core/skills.ts'
 import { towerFloorProfile } from '../src/core/tower.ts'
 import type { TraceWildState } from '../src/core/types.ts'
@@ -44,6 +51,24 @@ function battleState(): TraceWildState {
     activeMinutes: 0, enhanced: true, variant: 'missing',
   }, low)
   return applyTraceWildAction(state, { type: 'start-battle', encounterId: state.encounters[0]!.id }, low, 210).state
+}
+
+function matchingSwapFor(ecology: 'lumen' | 'forge' | 'relay' | 'aegis' | 'glitch'): {
+  board: NonNullable<TraceWildState['battle']>['board']
+  from: number
+  to: number
+} {
+  for (let seed = 1; seed < 200; seed += 1) {
+    const board = createMatchBoard(seededRandom(0x5100 + seed))
+    for (let from = 0; from < MATCH_BOARD_CELLS; from += 1) {
+      for (const to of [from + 1, from + MATCH_BOARD_SIZE]) {
+        if (!areAdjacentTiles(from, to)) continue
+        const resolution = resolveBattleSwap(board, from, to, seededRandom(0x7100 + seed))
+        if ((resolution?.steps[0]?.counts[ecology] ?? 0) >= 3) return { board, from, to }
+      }
+    }
+  }
+  throw new Error(`no ${ecology} swap found`)
 }
 
 describe('TraceWild match battle', () => {
@@ -252,6 +277,7 @@ describe('TraceWild match battle', () => {
     let bossStrike: typeof playerStrike
     const bossRandom = seededRandom(0xc0de_0088)
     while (state.battle?.turnOwner === 'boss' && bossMoves < 10) {
+      const actionStart = bossDamageTotal
       const result = applyTraceWildAction(state, { type: 'battle-continue' }, bossRandom, 260 + bossMoves)
       expect(result.animation?.frames.length).toBeGreaterThan(0)
       for (const frame of result.animation?.frames ?? []) {
@@ -264,6 +290,7 @@ describe('TraceWild match battle', () => {
         expect(frame.totalDamage).toBeGreaterThan(bossDamageTotal)
         bossDamageTotal = frame.totalDamage ?? bossDamageTotal
       }
+      expect(bossDamageTotal - actionStart).toBeGreaterThan(1)
       if (result.animation?.strike !== undefined) bossStrike = result.animation.strike
       state = result.state
       bossMoves += 1
@@ -284,6 +311,46 @@ describe('TraceWild match battle', () => {
       targetMaxHp: 1000,
     })
     expect(state.battle?.log.some(row => row.kind === 'boss-match')).toBe(true)
+  })
+
+  it('turns only the active matching ecology into its five signal roles', () => {
+    const roles = [
+      ['lumen', 'lumen-indeximp', 'sync'],
+      ['forge', 'forge-sparkmite', 'overclock'],
+      ['relay', 'relay-pingfly', 'guard'],
+      ['aegis', 'aegis-veribud', 'repair'],
+      ['glitch', 'glitch-null-nibbler', 'breach'],
+    ] as const
+    for (const [ecology, creatureId, kind] of roles) {
+      const state = battleState()
+      const battle = state.battle!
+      const candidate = matchingSwapFor(ecology)
+      battle.board = candidate.board
+      battle.party[0]!.creatureId = creatureId
+      battle.partyHp = Math.floor(battle.partyMaxHp / 2)
+      battle.partyShield = 0
+      battle.wildArmor = 0
+      const beforePartyHp = battle.partyHp
+      const result = applyTraceWildAction(state, {
+        type: 'battle-swap', from: candidate.from, to: candidate.to,
+      }, seededRandom(0x9900), 250)
+      const effect = result.animation?.frames.find(frame => frame.signalEffect?.ecology === ecology)?.signalEffect
+      expect(effect).toMatchObject({ ecology, kind, amount: expect.any(Number) })
+      if (kind === 'repair') expect(result.state.battle!.partyHp).toBeGreaterThan(beforePartyHp)
+      if (kind === 'guard') expect(result.state.battle!.partyShield).toBeGreaterThan(0)
+      if (kind !== 'repair' && kind !== 'guard') expect(effect!.amount).toBeGreaterThan(0)
+    }
+
+    const state = battleState()
+    const candidate = matchingSwapFor('aegis')
+    state.battle!.board = candidate.board
+    state.battle!.party[0]!.creatureId = 'lumen-indeximp'
+    state.battle!.wildArmor = 0
+    const response = applyTraceWildAction(state, {
+      type: 'battle-swap', from: candidate.from, to: candidate.to,
+    }, seededRandom(0xa100), 251)
+    expect(response.animation?.frames.some(frame => frame.signalEffect?.ecology === 'aegis')).toBe(false)
+    expect(response.animation?.frames[0]?.damage).toBeGreaterThan(0)
   })
 
   it('lets a player end a wild Codekin stage without dealing more damage', () => {

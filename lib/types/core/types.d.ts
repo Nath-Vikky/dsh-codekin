@@ -62,6 +62,13 @@ export interface MatchTile {
     hazardActions?: number;
 }
 export type MatchDamageEffectiveness = 'advantage' | 'neutral' | 'resisted';
+export type MatchSignalEffectKind = 'repair' | 'guard' | 'sync' | 'overclock' | 'breach';
+export interface MatchSignalEffect {
+    kind: MatchSignalEffectKind;
+    ecology: TraceEcology;
+    /** Applied healing/shielding, or the extra damage contributed by this signal role. */
+    amount: number;
+}
 export interface MatchCascadeFrame {
     chain: number;
     before: MatchTile[];
@@ -73,6 +80,8 @@ export interface MatchCascadeFrame {
     /** Running damage total accumulated by the acting side. */
     totalDamage?: number;
     effectiveness?: MatchDamageEffectiveness;
+    /** Matching the acting Codekin's ecology turns that panel color into its signal role. */
+    signalEffect?: MatchSignalEffect;
     /** Shared-party damage caused by dangerous panels in this step. */
     hazardDamage?: number;
 }

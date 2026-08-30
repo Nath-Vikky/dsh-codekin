@@ -228,7 +228,7 @@
 .fighterName { width: min(280px, 100%); display: flex; justify-content: space-between; color: #e0ece8; font-size: 12px; }
 .fighterName span { color: #809dac; } .battleVs { color: #ffcd62; font: 900 23px/1 ui-monospace, monospace; text-align: center; }
 .hpBar { position: relative; width: min(280px, 90%); height: 8px; border: 1px solid #ffffff0d; border-radius: 999px; background: #263139; overflow: hidden; }
-.hpBar i, .hpBar em { position: absolute; inset: 0 auto 0 0; display: block; height: 100%; border-radius: inherit; transition: width .28s cubic-bezier(.22,1,.36,1); }
+.hpBar i, .hpBar em { position: absolute; inset: 0 auto 0 0; display: block; height: 100%; border-radius: inherit; transition: width .58s cubic-bezier(.22,1,.36,1); }
 .hpBar i { z-index: 1; background: linear-gradient(90deg, #62b989, #9bca78); }
 .hpWild i { background: linear-gradient(90deg, #d4a35d, #e5bd72); }
 .hpWild em { z-index: 2; background: linear-gradient(90deg, #ce6680, #d76c7d); box-shadow: 2px 0 0 #fff4a55c; }
@@ -1470,6 +1470,20 @@
 .sharedHpHeader { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .sharedHpHeader span { color: #4f7068; font: 900 7px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .09em; }
 .sharedHpHeader strong { color: #375d53; font: 900 9px/1 ui-monospace, monospace; }
+.sharedHpNumbers { display: flex; align-items: center; justify-content: flex-end; gap: 7px; min-width: 0; }
+.sharedHpNumbers small, .wildHpNumbers > span {
+  border: 1px solid #7bb8d89c; border-radius: 999px; padding: 2px 5px;
+  background: linear-gradient(135deg, #e7f7ff, #cde8f7); color: #347ba3;
+  box-shadow: inset 0 1px #fff, 0 0 8px #62add33b;
+  font: 900 6.5px/1 ui-monospace, monospace; white-space: nowrap;
+}
+.hpHealingValue {
+  border: 1px solid #f19ab7a3; border-radius: 999px; padding: 2px 5px;
+  background: linear-gradient(135deg, #fff0f6, #ffd4e3); color: #c94e7d;
+  box-shadow: inset 0 1px #fff, 0 0 8px #e9719d42;
+  font: 950 6.5px/1 ui-monospace, monospace; font-style: normal; white-space: nowrap;
+  animation: healingValueIn .42s cubic-bezier(.2,1.35,.36,1) both;
+}
 .sharedPartyVitals .hpBar { width: 100%; height: 10px; border-radius: 999px; }
 .sharedPartyVitals > small { color: #5f7e76; font: 800 7px/1 ui-sans-serif, system-ui, sans-serif; white-space: nowrap; }
 .hpTeam i { background: linear-gradient(90deg, #41ad84, #82d29b 72%, #b8df82); box-shadow: inset 0 1px #fff7; }
@@ -1477,6 +1491,29 @@
   z-index: 2; background: linear-gradient(90deg, #ffd35c, #f4b63f);
   border-radius: 0 999px 999px 0; box-shadow: inset 0 1px #fff9, 0 0 8px #efb53c72;
   transition: left .28s cubic-bezier(.22,1,.36,1), width .28s cubic-bezier(.22,1,.36,1);
+}
+.hpHealingBudget {
+  position: absolute; z-index: 3; top: 0; bottom: 0; display: block; min-width: 2px;
+  border-radius: 999px; background: linear-gradient(90deg, #ff9bb8, #f477a7);
+  box-shadow: inset 0 1px #fff9, 0 0 10px #f36c9a8c;
+  transform-origin: left center; animation: healingBudgetIn .22s cubic-bezier(.2,1,.36,1) both;
+  transition: opacity .58s ease, transform .58s cubic-bezier(.22,1,.36,1);
+}
+.hpHealingSettling { opacity: 0; transform: scaleX(.18); }
+.hpShieldBar {
+  position: absolute; z-index: 4; inset: 0 0 0 auto; display: block; height: 100%; min-width: 2px;
+  border-left: 2px solid #effbff; border-radius: 999px;
+  background: linear-gradient(90deg, #72c9f0, #3d91d4 72%, #2674bd);
+  box-shadow: inset 0 1px #ffffffb8, -2px 0 7px #46a8db5c, 0 0 9px #438fce45;
+  transition: width .58s cubic-bezier(.22,1,.36,1), opacity .24s ease;
+}
+.hpShieldActive { animation: hpShieldPulse .52s cubic-bezier(.2,1,.36,1) both; }
+@keyframes healingBudgetIn { from { opacity: 0; transform: scaleX(.25); } }
+@keyframes healingValueIn { from { opacity: 0; transform: translateY(3px) scale(.75); } }
+@keyframes hpShieldPulse {
+  0% { filter: brightness(1); }
+  38% { filter: brightness(1.4); box-shadow: inset 0 1px #fff, -3px 0 10px #65c9faab, 0 0 14px #4ea9e68c; }
+  100% { filter: brightness(1); }
 }
 .teamDamageForecast { color: #b47a19 !important; justify-self: end; font-weight: 950 !important; }
 
@@ -1531,6 +1568,8 @@
 .wildVitals .fighterName { display: flex; align-items: baseline; justify-content: center; gap: 7px; }
 .wildVitals .fighterName strong { font-size: 10px; }
 .wildVitals .fighterName span { font-size: 7px; }
+.wildHpNumbers { min-height: 15px; display: flex; align-items: center; justify-content: center; gap: 7px; }
+.wildHpNumbers > strong { color: #4b6963; font: 900 7px/1 ui-monospace, monospace; white-space: nowrap; }
 .wildVitals small { font-size: 6.5px; line-height: 1.2; }
 .wildVitals .energyBar { height: 3px; }
 .enemyIntent { right: 8px; top: 8px; }
@@ -1638,30 +1677,27 @@
 @keyframes enemyActionAlertIn { from { opacity: 0; transform: translateY(-7px) scale(.97); } }
 @keyframes enemyActionAlertScan { 48%, 100% { transform: translateX(340%); } }
 @keyframes enemyActionAlertPulse { to { opacity: .55; transform: scale(.72); box-shadow: 0 0 0 2px #fff1, 0 0 4px #fff; } }
-.signalEffectHud {
-  position: absolute; z-index: 18; left: 50%; bottom: 11px; min-width: 126px; min-height: 34px;
-  display: grid; grid-template-columns: 25px minmax(0, 1fr) auto; align-items: center; gap: 6px;
-  transform: translateX(-50%); border: 1px solid #ffffffd1; border-radius: 999px; padding: 4px 9px 4px 5px;
-  background: #f8fffcf2; color: #3f7465; box-shadow: 0 8px 22px #335c5047, inset 0 1px #fff;
-  pointer-events: none; animation: signalEffectIn .62s cubic-bezier(.16,1,.3,1) both;
+.turnSignalEffect {
+  min-width: 0; max-width: 112px; min-height: 22px; margin-left: auto; padding: 3px 6px 3px 3px;
+  display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 4px;
+  border: 1px solid currentColor; border-radius: 999px; background: #ffffffda;
+  box-shadow: inset 0 1px #fff, 0 4px 10px color-mix(in srgb, currentColor 20%, transparent);
+  overflow: hidden; pointer-events: none; animation: turnSignalIn .5s cubic-bezier(.16,1,.3,1) both;
 }
-.signalEffectHud > span {
-  width: 25px; height: 25px; display: grid; place-items: center; border-radius: 50%;
-  background: currentColor; color: #fff; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 16%, transparent);
+.turnSignalEffect > i {
+  width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%;
+  background: currentColor; color: #fff; font: 900 8px/1 ui-sans-serif, system-ui, sans-serif; font-style: normal;
 }
-.signalEffectHud > strong { font: 900 8px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .04em; white-space: nowrap; }
-.signalEffectHud > b { color: currentColor; font: 1000 13px/1 ui-monospace, monospace; }
+.turnSignalEffect > b { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: currentColor; font: 900 6.5px/1 ui-sans-serif, system-ui, sans-serif; white-space: nowrap; }
+.turnSignalEffect > em { color: currentColor; font: 1000 8px/1 ui-monospace, monospace; font-style: normal; white-space: nowrap; }
+.turnSignalEffect + .turnSkipButton, .turnSignalEffect + .actionDots { margin-left: 0; }
 .signalEffect_repair { color: #3b9f72; }
 .signalEffect_guard { color: #3b84bd; }
 .signalEffect_sync { color: #c49124; }
 .signalEffect_overclock { color: #d94f55; }
 .signalEffect_breach { color: #8a5cb1; }
-.signalEffectBoss { border-color: #ffc0c9; box-shadow: 0 8px 22px #8b30434c, inset 0 1px #fff; }
-@keyframes signalEffectIn {
-  0% { opacity: 0; transform: translate(-50%, 9px) scale(.82); }
-  25%, 76% { opacity: 1; transform: translate(-50%, 0) scale(1); }
-  100% { opacity: 0; transform: translate(-50%, -7px) scale(.96); }
-}
+.turnSignalEffectBoss { border-color: #e48da1; background: #fff3f6e8; }
+@keyframes turnSignalIn { from { opacity: 0; transform: translateX(7px) scale(.86); } }
 .signalRule {
   margin: 3px auto 0; width: fit-content; max-width: 96%; border: 1px solid currentColor;
   border-radius: 999px; padding: 3px 8px; background: #ffffff9e; text-align: center;
@@ -1739,7 +1775,8 @@
   .wildBanner .sprite_medium, .wildBanner .enemyAura, .captureBoardOverlay, .captureCoreGrid button,
   .captureBoardIntro > header strong, .battleTransition, .battleTransition::before, .battleTransition::after,
   .battleTransition > span, .attackWave, .attackImpact, .wildWasHit .sprite_medium,
-  .enemyActionAlert, .enemyActionAlert::after, .enemyActionAlert > i, .signalEffectHud { animation: none; }
+  .enemyActionAlert, .enemyActionAlert::after, .enemyActionAlert > i, .turnSignalEffect,
+  .hpHealingBudget, .hpShieldActive { animation: none; transition-duration: .01ms; }
 }
 
 /* Runtime performance: keep the soft surface language without repeatedly

@@ -1471,6 +1471,14 @@ interface SignalReadout extends MatchSignalEffect {
   actor: 'player' | 'boss'
 }
 
+interface HealingReadout {
+  key: number
+  actor: 'player' | 'boss'
+  from: number
+  to: number
+  settling: boolean
+}
+
 interface AttackPresentation extends TraceWildBattleStrike {
   key: number
   phase: 'flight' | 'impact'
@@ -1529,11 +1537,18 @@ function BattleView(props: {
   const [activeChain, setActiveChain] = useState<number>()
   const [damageReadout, setDamageReadout] = useState<DamageReadout>()
   const [signalReadout, setSignalReadout] = useState<SignalReadout>()
+  const [healingReadout, setHealingReadout] = useState<HealingReadout>()
   const [captureIntro, setCaptureIntro] = useState(false)
   const [partyHitKey, setPartyHitKey] = useState(0)
   const [attackPresentation, setAttackPresentation] = useState<AttackPresentation>()
   const [displayedWildHp, setDisplayedWildHp] = useState(battle.wildHp)
   const [displayedPartyHp, setDisplayedPartyHp] = useState(battle.partyHp)
+  const [displayedWildShield, setDisplayedWildShield] = useState(battle.wildShield)
+  const [displayedPartyShield, setDisplayedPartyShield] = useState(battle.partyShield)
+  const displayedWildHpRef = useRef(battle.wildHp)
+  const displayedPartyHpRef = useRef(battle.partyHp)
+  const displayedWildShieldRef = useRef(battle.wildShield)
+  const displayedPartyShieldRef = useRef(battle.partyShield)
   const gestureRef = useRef<TileGesture>()
   const draggedTileElement = useRef<HTMLButtonElement>()
   const bossActionInFlight = useRef(false)
@@ -1552,6 +1567,22 @@ function BattleView(props: {
   const activeDefinition = active === undefined ? undefined : creatureById(active.creatureId)
   const locked = props.busy || animating
   const boardLocked = locked || battle.turnOwner === 'boss' || battle.captureWindow || battle.actionsRemaining <= 0
+  const showWildHp = useCallback((value: number): void => {
+    displayedWildHpRef.current = value
+    setDisplayedWildHp(value)
+  }, [])
+  const showPartyHp = useCallback((value: number): void => {
+    displayedPartyHpRef.current = value
+    setDisplayedPartyHp(value)
+  }, [])
+  const showWildShield = useCallback((value: number): void => {
+    displayedWildShieldRef.current = value
+    setDisplayedWildShield(value)
+  }, [])
+  const showPartyShield = useCallback((value: number): void => {
+    displayedPartyShieldRef.current = value
+    setDisplayedPartyShield(value)
+  }, [])
   const resetDraggedTile = useCallback((element = draggedTileElement.current): void => {
     element?.style.setProperty('--drag-x', '0px')
     element?.style.setProperty('--drag-y', '0px')
@@ -1596,14 +1627,19 @@ function BattleView(props: {
     setFallRows(undefined)
     setActiveChain(undefined)
     setSignalReadout(undefined)
+    setHealingReadout(undefined)
     setVisualBoard(battle.board.map(tile => ({ ...tile })))
     setAttackPresentation(undefined)
-    setDisplayedWildHp(battle.wildHp)
-    setDisplayedPartyHp(battle.partyHp)
-  }, [battle.id])
+    showWildHp(battle.wildHp)
+    showPartyHp(battle.partyHp)
+    showWildShield(battle.wildShield)
+    showPartyShield(battle.partyShield)
+  }, [battle.id, showPartyHp, showPartyShield, showWildHp, showWildShield])
 
-  useEffect(() => { setDisplayedWildHp(battle.wildHp) }, [battle.id, battle.wildHp])
-  useEffect(() => { setDisplayedPartyHp(battle.partyHp) }, [battle.id, battle.partyHp])
+  useEffect(() => { showWildHp(battle.wildHp) }, [battle.id, battle.wildHp, showWildHp])
+  useEffect(() => { showPartyHp(battle.partyHp) }, [battle.id, battle.partyHp, showPartyHp])
+  useEffect(() => { showWildShield(battle.wildShield) }, [battle.id, battle.wildShield, showWildShield])
+  useEffect(() => { showPartyShield(battle.partyShield) }, [battle.id, battle.partyShield, showPartyShield])
 
   useEffect(() => {
     if (!animating) setVisualBoard(battle.board.map(tile => ({ ...tile })))
@@ -1669,8 +1705,11 @@ function BattleView(props: {
     const epoch = ++animationEpoch.current
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     setSignalReadout(undefined)
+    setHealingReadout(undefined)
     for (const frame of animation.frames) {
       if (animationEpoch.current !== epoch) return
+      const signalKey = Date.now() + frame.chain
+      const frameEffect = frame.signalEffect
       if (frame.damage !== undefined && frame.damage > 0 && frame.totalDamage !== undefined) {
         setDamageReadout({
           key: Date.now() + frame.chain,
@@ -1681,19 +1720,49 @@ function BattleView(props: {
           settled: false,
         })
       }
-      setSignalReadout(frame.signalEffect === undefined
+      setSignalReadout(frameEffect === undefined
         ? undefined
         : {
-            ...frame.signalEffect,
-            key: Date.now() + frame.chain,
+            ...frameEffect,
+            key: signalKey,
             actor: animation.actor === 'boss' ? 'boss' : 'player',
           })
+      if (frameEffect?.kind === 'repair' && frameEffect.amount > 0) {
+        const actor = animation.actor === 'boss' ? 'boss' : 'player'
+        const from = actor === 'boss' ? displayedWildHpRef.current : displayedPartyHpRef.current
+        const maximum = actor === 'boss' ? battle.wildMaxHp : battle.partyMaxHp
+        setHealingReadout({
+          key: signalKey,
+          actor,
+          from,
+          to: Math.min(maximum, from + frameEffect.amount),
+          settling: false,
+        })
+      } else {
+        setHealingReadout(undefined)
+      }
       setFallRows(undefined)
       setVisualBoard(frame.before.map(tile => ({ ...tile })))
       setClearingTiles(new Set(frame.removed))
       setActiveChain(frame.chain)
-      await pause(reducedMotion ? 20 : animation.actor === 'boss' ? 230 : 190)
+      await pause(reducedMotion
+        ? 20
+        : frameEffect?.kind === 'repair'
+          ? animation.actor === 'boss' ? 340 : 300
+          : animation.actor === 'boss' ? 230 : 190)
       if (animationEpoch.current !== epoch) return
+      if (frameEffect?.kind === 'repair' && frameEffect.amount > 0) {
+        const actor = animation.actor === 'boss' ? 'boss' : 'player'
+        const current = actor === 'boss' ? displayedWildHpRef.current : displayedPartyHpRef.current
+        const maximum = actor === 'boss' ? battle.wildMaxHp : battle.partyMaxHp
+        const target = Math.min(maximum, current + frameEffect.amount)
+        setHealingReadout(value => value?.key === signalKey ? { ...value, settling: true } : value)
+        if (actor === 'boss') showWildHp(target)
+        else showPartyHp(target)
+      } else if (frameEffect?.kind === 'guard' && frameEffect.amount > 0) {
+        if (animation.actor === 'boss') showWildShield(displayedWildShieldRef.current + frameEffect.amount)
+        else showPartyShield(displayedPartyShieldRef.current + frameEffect.amount)
+      }
       setClearingTiles(undefined)
       setVisualBoard(frame.after.map(tile => ({ ...tile })))
       setFallRows(frame.fallRows)
@@ -1708,6 +1777,7 @@ function BattleView(props: {
     if (animationEpoch.current !== epoch) return
     setActiveChain(undefined)
     setSignalReadout(undefined)
+    setHealingReadout(undefined)
     const finalBoard = finalBattle?.board ?? animation.frames.at(-1)?.after ?? battle.board
     setVisualBoard(finalBoard.map(tile => ({ ...tile })))
     if (animation.strike !== undefined) {
@@ -1740,7 +1810,10 @@ function BattleView(props: {
     }
   }
 
-  const playStrike = async (strike: TraceWildBattleStrike): Promise<void> => {
+  const playStrike = async (
+    strike: TraceWildBattleStrike,
+    finalBattle: TraceWildSnapshot['state']['battle'],
+  ): Promise<void> => {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const key = Date.now()
     setAttackPresentation({ ...strike, key, phase: 'flight' })
@@ -1748,9 +1821,11 @@ function BattleView(props: {
     await pause(reducedMotion ? 40 : 540)
     setAttackPresentation({ ...strike, key, phase: 'impact' })
     if (strike.actor === 'player') {
-      setDisplayedWildHp(strike.targetHpAfter)
+      showWildHp(strike.targetHpAfter)
+      showWildShield(finalBattle?.wildShield ?? 0)
     } else {
-      setDisplayedPartyHp(strike.targetHpAfter)
+      showPartyHp(strike.targetHpAfter)
+      showPartyShield(finalBattle?.partyShield ?? 0)
       setPartyHitKey(value => value + 1)
     }
     previousBattle.current = strike.actor === 'player'
@@ -1774,7 +1849,7 @@ function BattleView(props: {
       setSwapMotion(undefined)
     }
     await playCascade(animation, finalBattle)
-    if (animation.strike !== undefined) await playStrike(animation.strike)
+    if (animation.strike !== undefined) await playStrike(animation.strike, finalBattle)
   }
 
   const runBossAction = (): void => {
@@ -1791,6 +1866,7 @@ function BattleView(props: {
       setFallRows(undefined)
       setActiveChain(undefined)
       setSignalReadout(undefined)
+      setHealingReadout(undefined)
       setAnimating(false)
     })
   }
@@ -1819,11 +1895,15 @@ function BattleView(props: {
     : battle.pendingBossDamage
   const predictedHp = playerStrikeLanded
     ? displayedWildHp
-    : Math.max(0, displayedWildHp - Math.max(0, battle.pendingTeamDamage - battle.wildShield))
+    : Math.max(0, displayedWildHp - Math.max(0, battle.pendingTeamDamage - displayedWildShield))
   const predictedPartyHp = bossStrikeLanded
     ? displayedPartyHp
-    : Math.max(0, displayedPartyHp - Math.max(0, bossDamageForecast - battle.partyShield))
+    : Math.max(0, displayedPartyHp - Math.max(0, bossDamageForecast - displayedPartyShield))
   const partyDamagePreview = Math.max(0, displayedPartyHp - predictedPartyHp)
+  const amplificationSignal = signalReadout !== undefined
+    && signalReadout.kind !== 'repair' && signalReadout.kind !== 'guard'
+    ? signalReadout
+    : undefined
   const enemyTarget = battle.enemyTargetScope === 'team'
     ? props.t('targetTeam')
     : battle.enemyTargetScope === 'self'
@@ -1867,6 +1947,7 @@ function BattleView(props: {
         setFallRows(undefined)
         setActiveChain(undefined)
         setSignalReadout(undefined)
+        setHealingReadout(undefined)
         setAnimating(false)
       })
     }, 130)
@@ -1880,6 +1961,7 @@ function BattleView(props: {
       setFallRows(undefined)
       setActiveChain(undefined)
       setSignalReadout(undefined)
+      setHealingReadout(undefined)
       setAnimating(false)
     })
   }
@@ -1954,7 +2036,7 @@ function BattleView(props: {
           <button type="button" className={css.flee} disabled={locked || battle.turnOwner === 'boss'} onClick={() => { void props.act({ type: 'flee' }) }}>{props.t('flee')}</button>
         </header>
 
-        <div className={`${css.wildBanner} ${encounter?.enhanced === true || battle.mode === 'tower' ? css.fighterEnhanced : ''} ${playerStrikeLanded ? css.wildWasHit : ''}`} key={`${battle.id}-${displayedWildHp}`}>
+        <div className={`${css.wildBanner} ${encounter?.enhanced === true || battle.mode === 'tower' ? css.fighterEnhanced : ''} ${playerStrikeLanded ? css.wildWasHit : ''}`} key={battle.id}>
           <div className={css.enemyAura} aria-hidden="true" />
           <CreatureSprite creature={wild} size="medium" eager />
           <div className={css.wildVitals}>
@@ -1965,10 +2047,32 @@ function BattleView(props: {
             <div className={`${css.hpBar} ${css.hpWild}`}>
               <em style={{ width: `${percent(predictedHp, battle.wildMaxHp)}%` }} />
               <i style={{ width: `${percent(displayedWildHp, battle.wildMaxHp)}%` }} />
+              {healingReadout?.actor === 'boss' && (
+                <span
+                  key={healingReadout.key}
+                  className={`${css.hpHealingBudget} ${healingReadout.settling ? css.hpHealingSettling : ''}`}
+                  style={{
+                    left: `${percent(healingReadout.from, battle.wildMaxHp)}%`,
+                    width: `${percent(healingReadout.to - healingReadout.from, battle.wildMaxHp)}%`,
+                  }}
+                />
+              )}
+              {displayedWildShield > 0 && (
+                <b
+                  className={`${css.hpShieldBar} ${signalReadout?.actor === 'boss' && signalReadout.kind === 'guard' ? css.hpShieldActive : ''}`}
+                  style={{ width: `${percent(displayedWildShield, battle.wildMaxHp)}%` }}
+                />
+              )}
+            </div>
+            <div className={css.wildHpNumbers}>
+              {healingReadout?.actor === 'boss' && (
+                <em className={css.hpHealingValue}>+{(healingReadout.to - healingReadout.from).toLocaleString()}</em>
+              )}
+              {displayedWildShield > 0 && <span>{props.t('shield')} +{displayedWildShield.toLocaleString()}</span>}
+              <strong>{props.t('health')} {displayedWildHp.toLocaleString()}/{battle.wildMaxHp.toLocaleString()}</strong>
             </div>
             <small>
-              {props.t('health')} {displayedWildHp.toLocaleString()}/{battle.wildMaxHp.toLocaleString()} · {props.t('armor')} {battle.wildArmor}
-              {battle.wildShield > 0 ? ` · ${props.t('shield')} ${battle.wildShield.toLocaleString()}` : ''}
+              {props.t('armor')} {battle.wildArmor}
               {battle.pendingTeamDamage > 0 ? ` · ${props.t('pendingDamage')} ${battle.pendingTeamDamage.toLocaleString()}` : ''}
             </small>
             <div className={css.energyBar}><i style={{ width: `${percent(battle.bossEnergy, 24)}%` }} /></div>
@@ -2052,7 +2156,13 @@ function BattleView(props: {
             <div className={css.sharedPartyVitals}>
               <div className={css.sharedHpHeader}>
                 <span>{props.t('teamRuntime')}</span>
-                <strong>{displayedPartyHp.toLocaleString()} / {battle.partyMaxHp.toLocaleString()}</strong>
+                <div className={css.sharedHpNumbers}>
+                  {healingReadout?.actor === 'player' && (
+                    <em className={css.hpHealingValue}>+{(healingReadout.to - healingReadout.from).toLocaleString()}</em>
+                  )}
+                  {displayedPartyShield > 0 && <small>{props.t('shield')} +{displayedPartyShield.toLocaleString()}</small>}
+                  <strong>{displayedPartyHp.toLocaleString()} / {battle.partyMaxHp.toLocaleString()}</strong>
+                </div>
               </div>
               <div className={`${css.hpBar} ${css.hpTeam}`}>
                 <i style={{ width: `${percent(displayedPartyHp, battle.partyMaxHp)}%` }} />
@@ -2062,8 +2172,23 @@ function BattleView(props: {
                     width: `${percent(displayedPartyHp - predictedPartyHp, battle.partyMaxHp)}%`,
                   }}
                 />
+                {healingReadout?.actor === 'player' && (
+                  <span
+                    key={healingReadout.key}
+                    className={`${css.hpHealingBudget} ${healingReadout.settling ? css.hpHealingSettling : ''}`}
+                    style={{
+                      left: `${percent(healingReadout.from, battle.partyMaxHp)}%`,
+                      width: `${percent(healingReadout.to - healingReadout.from, battle.partyMaxHp)}%`,
+                    }}
+                  />
+                )}
+                {displayedPartyShield > 0 && (
+                  <b
+                    className={`${css.hpShieldBar} ${signalReadout?.actor === 'player' && signalReadout.kind === 'guard' ? css.hpShieldActive : ''}`}
+                    style={{ width: `${percent(displayedPartyShield, battle.partyMaxHp)}%` }}
+                  />
+                )}
               </div>
-              {battle.partyShield > 0 && <small>{props.t('shield')} +{battle.partyShield}</small>}
               {partyDamagePreview > 0 && <small className={css.teamDamageForecast}>{props.t('pendingDamage')} -{partyDamagePreview.toLocaleString()}</small>}
             </div>
           </div>
@@ -2076,6 +2201,18 @@ function BattleView(props: {
               <strong>{battle.turnOwner === 'boss'
                 ? `${creatureName(wild, props.zh)} · ${props.t('bossTurn')}`
                 : `${creatureName(activeDefinition, props.zh)} · ${props.t('activeTurn')}`}</strong>
+              {amplificationSignal !== undefined && (
+                <span
+                  key={amplificationSignal.key}
+                  className={`${css.turnSignalEffect} ${css[`signalEffect_${amplificationSignal.kind}`]} ${amplificationSignal.actor === 'boss' ? css.turnSignalEffectBoss : ''}`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  <i>{TILE_SYMBOLS[amplificationSignal.ecology]}</i>
+                  <b>{props.t(SIGNAL_EFFECT_KEYS[amplificationSignal.kind])}</b>
+                  {amplificationSignal.amount > 0 && <em>+{amplificationSignal.amount.toLocaleString()}</em>}
+                </span>
+              )}
               {battle.turnOwner === 'player' && (
                 <button
                   type="button"
@@ -2102,18 +2239,6 @@ function BattleView(props: {
                   <i aria-hidden="true" />
                   <strong>{props.t('enemyActing')}</strong>
                   <span>ENEMY TURN</span>
-                </div>
-              )}
-              {signalReadout !== undefined && (
-                <div
-                  key={signalReadout.key}
-                  className={`${css.signalEffectHud} ${css[`signalEffect_${signalReadout.kind}`]} ${signalReadout.actor === 'boss' ? css.signalEffectBoss : ''}`}
-                  role="status"
-                  aria-live="polite"
-                >
-                  <span>{TILE_SYMBOLS[signalReadout.ecology]}</span>
-                  <strong>{props.t(SIGNAL_EFFECT_KEYS[signalReadout.kind])}</strong>
-                  <b>{signalReadout.amount > 0 ? `+${signalReadout.amount.toLocaleString()}` : 'MAX'}</b>
                 </div>
               )}
               <div

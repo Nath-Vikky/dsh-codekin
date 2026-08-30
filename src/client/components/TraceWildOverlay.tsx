@@ -1427,6 +1427,11 @@ const INTENT_KEYS: Record<EnemyIntent, TraceWildLocaleKey> = {
   corrupt: 'intentCorrupt', mark: 'intentMark', lock: 'intentLock', freeze: 'intentFreeze',
 }
 
+const INTENT_DETAIL_KEYS: Record<EnemyIntent, TraceWildLocaleKey> = {
+  strike: 'intentDetailStrike', guard: 'intentDetailGuard', disrupt: 'intentDetailDisrupt',
+  corrupt: 'intentDetailCorrupt', mark: 'intentDetailMark', lock: 'intentDetailLock', freeze: 'intentDetailFreeze',
+}
+
 const SIGNAL_EFFECT_KEYS: Record<MatchSignalEffect['kind'], TraceWildLocaleKey> = {
   repair: 'signalRepair', guard: 'signalGuard', sync: 'signalSync',
   overclock: 'signalOverclock', breach: 'signalBreach',
@@ -1435,6 +1440,16 @@ const SIGNAL_EFFECT_KEYS: Record<MatchSignalEffect['kind'], TraceWildLocaleKey> 
 const SIGNAL_RULE_KEYS: Record<TraceEcology, TraceWildLocaleKey> = {
   lumen: 'signalRuleLumen', forge: 'signalRuleForge', relay: 'signalRuleRelay',
   aegis: 'signalRuleAegis', glitch: 'signalRuleGlitch',
+}
+
+function BattleHoverDetail(props: { title: string; meta: string; body: string }) {
+  return (
+    <span className={css.battleHoverDetail} role="tooltip">
+      <b>{props.title}</b>
+      <small>{props.meta}</small>
+      <span>{props.body}</span>
+    </span>
+  )
 }
 
 function tileLabel(tile: MatchTile, index: number, t: TraceWildOverlayProps['t']): string {
@@ -1956,6 +1971,24 @@ function BattleView(props: {
           const definition = target === undefined ? undefined : creatureById(target.creatureId)
           return definition === undefined ? props.t('targetMember') : creatureName(definition, props.zh)
         })()
+  const bossHazardLimit = Math.min(6, 2 + battle.bossSkillTier)
+  const bossLockLimit = Math.min(5, Math.max(3, battle.bossSkillTier))
+  const bossSkillTitle = props.t('towerSkillTier', { tier: battle.bossSkillTier })
+  const bossSkillMeta = `${props.t('bossEnergy')} ${battle.bossEnergy}/24`
+  const bossSkillBody = `${props.t('bossSkillTierDetail', {
+    tier: battle.bossSkillTier,
+    hazards: bossHazardLimit,
+    locks: bossLockLimit,
+  })} ${battle.bossSkillArmed
+    ? props.t('bossSkillReadyDetail')
+    : props.t('bossSkillChargingDetail', { remaining: Math.max(0, 24 - battle.bossEnergy) })}`
+  const bossSkillLabel = `${bossSkillTitle}. ${bossSkillMeta}. ${bossSkillBody}`
+  const enemyIntentTitle = props.t(INTENT_KEYS[battle.enemyIntent])
+  const enemyIntentMeta = props.t('enemyIntentMeta', { target: enemyTarget })
+  const enemyIntentBody = props.t(INTENT_DETAIL_KEYS[battle.enemyIntent], {
+    count: battle.enemyIntent === 'corrupt' ? bossHazardLimit : bossLockLimit,
+  })
+  const enemyIntentLabel = `${enemyIntentTitle}. ${enemyIntentMeta}. ${enemyIntentBody}`
   const lastLog = battle.log.at(-1)
   const transitionTitle = props.transition === undefined
     ? undefined
@@ -2083,7 +2116,15 @@ function BattleView(props: {
           <div className={css.wildVitals}>
             <div className={css.fighterName}>
               <strong>{creatureName(wild, props.zh)}</strong>
-              <span>Lv.{battle.wildLevel} · {props.t(CORE_KEYS[battle.wildQuality])} · {props.t(ECOLOGY_KEYS[wild.ecology])}{battle.mode === 'tower' ? ` · ${props.t('towerSkillTier', { tier: battle.bossSkillTier })}` : ''}</span>
+              <span
+                className={battle.mode === 'tower' ? css.battleHoverTrigger : undefined}
+                {...(battle.mode === 'tower' ? { tabIndex: 0, title: bossSkillLabel, 'aria-label': bossSkillLabel } : {})}
+              >
+                Lv.{battle.wildLevel} · {props.t(CORE_KEYS[battle.wildQuality])} · {props.t(ECOLOGY_KEYS[wild.ecology])}
+                {battle.mode === 'tower' && (
+                  <> · {bossSkillTitle}<BattleHoverDetail title={bossSkillTitle} meta={bossSkillMeta} body={bossSkillBody} /></>
+                )}
+              </span>
             </div>
             <div className={`${css.hpBar} ${css.hpWild}`}>
               <em style={{ width: `${percent(predictedHp, battle.wildMaxHp)}%` }} />
@@ -2135,15 +2176,27 @@ function BattleView(props: {
               {battle.pendingTeamDamage > 0 ? ` · ${props.t('pendingDamage')} ${battle.pendingTeamDamage.toLocaleString()}` : ''}
             </small>
             <div className={css.energyBar}><i style={{ width: `${percent(battle.bossEnergy, 24)}%` }} /></div>
-            <small>
+            <small
+              className={css.battleHoverTrigger}
+              tabIndex={0}
+              title={bossSkillLabel}
+              aria-label={bossSkillLabel}
+            >
               {props.t('bossEnergy')} {battle.bossEnergy}/24 · {battle.bossSkillArmed ? props.t('skillReady') : props.t('skillCharging')}
               {battle.turnOwner === 'boss' ? ` · ${props.t('bossCharge')} ${battle.bossAttackCharge.toFixed(1)}` : ''}
+              <BattleHoverDetail title={bossSkillTitle} meta={bossSkillMeta} body={bossSkillBody} />
             </small>
           </div>
-          <div className={css.enemyIntent}>
+          <div
+            className={`${css.enemyIntent} ${css.battleHoverTrigger}`}
+            tabIndex={0}
+            title={enemyIntentLabel}
+            aria-label={enemyIntentLabel}
+          >
             <span>{props.t('enemyIntent')}</span>
-            <strong>{props.t(INTENT_KEYS[battle.enemyIntent])}</strong>
+            <strong>{enemyIntentTitle}</strong>
             <small>{enemyTarget}</small>
+            <BattleHoverDetail title={enemyIntentTitle} meta={enemyIntentMeta} body={enemyIntentBody} />
           </div>
           {damageReadout !== undefined && (
             <div
@@ -2431,7 +2484,15 @@ function BattleView(props: {
                 <strong>{props.t('towerNoCapture')}</strong>
                 <small>{props.t('towerBattleReward', { floor: battle.towerFloor ?? 1 })}</small>
               </div>
-              <b>{props.t('towerSkillTier', { tier: battle.bossSkillTier })}</b>
+              <b
+                className={css.battleHoverTrigger}
+                tabIndex={0}
+                title={bossSkillLabel}
+                aria-label={bossSkillLabel}
+              >
+                {bossSkillTitle}
+                <BattleHoverDetail title={bossSkillTitle} meta={bossSkillMeta} body={bossSkillBody} />
+              </b>
             </div>
           )}
 

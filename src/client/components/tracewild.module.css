@@ -1595,6 +1595,35 @@
 .modifierAttack { --modifier-color: #d45a43; }
 .modifierPierce { --modifier-color: #8a5bb0; }
 .modifierDefense { --modifier-color: #3a91c7; }
+.battleHoverTrigger { position: relative; outline: none; cursor: help; }
+.battleHoverTrigger:focus-visible { box-shadow: 0 0 0 2px #9b7fbf4f; }
+.battleHoverDetail {
+  position: absolute; z-index: 80; left: 50%; bottom: calc(100% + 7px); width: 218px;
+  display: grid; gap: 4px; padding: 8px 9px; border: 1px solid #ffffffdf; border-radius: 10px;
+  background: #263b3af2; color: #fff; box-shadow: 0 9px 24px #233a3661;
+  text-align: left; text-transform: none; letter-spacing: normal; white-space: normal; pointer-events: none;
+  opacity: 0; visibility: hidden; transform: translate(-50%, 4px) scale(.97); transform-origin: 50% 100%;
+  transition: opacity .14s ease, visibility .14s, transform .14s ease;
+}
+.battleHoverDetail > b { color: #fff; font: 900 9px/1.2 ui-sans-serif, system-ui, sans-serif; }
+.battleHoverDetail > small { color: #bfe2d8; font: 800 7px/1.35 ui-sans-serif, system-ui, sans-serif; }
+.battleHoverDetail > span { color: #e7f1ee; font: 650 7px/1.5 ui-sans-serif, system-ui, sans-serif; text-transform: none; letter-spacing: normal; }
+.battleHoverTrigger:hover > .battleHoverDetail,
+.battleHoverTrigger:focus > .battleHoverDetail {
+  opacity: 1; visibility: visible; transform: translate(-50%, 0) scale(1);
+}
+.enemyIntent { cursor: help; }
+.enemyIntent .battleHoverDetail {
+  left: auto; right: 0; top: calc(100% + 6px); bottom: auto; transform: translateY(-3px) scale(.97); transform-origin: 100% 0;
+}
+.enemyIntent:hover > .battleHoverDetail,
+.enemyIntent:focus > .battleHoverDetail { transform: translateY(0) scale(1); }
+.enemyIntent .battleHoverDetail > b { color: #fff; font-size: 9px; }
+.enemyIntent .battleHoverDetail > small { color: #f1bfd1; font: 800 7px/1.35 ui-sans-serif, system-ui, sans-serif; }
+.enemyIntent .battleHoverDetail > span { color: #f7e9ee; font: 650 7px/1.5 ui-sans-serif, system-ui, sans-serif; }
+.towerBattleStatus > b.battleHoverTrigger .battleHoverDetail { left: auto; right: 0; transform: translateY(4px) scale(.97); transform-origin: 100% 100%; }
+.towerBattleStatus > b.battleHoverTrigger:hover .battleHoverDetail,
+.towerBattleStatus > b.battleHoverTrigger:focus .battleHoverDetail { transform: translateY(0) scale(1); }
 .wildVitals small { font-size: 6.5px; line-height: 1.2; }
 .wildVitals .energyBar { height: 3px; }
 .enemyIntent { right: 8px; top: 8px; }

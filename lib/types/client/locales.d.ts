@@ -126,6 +126,17 @@ export declare const zh: {
     readonly intentMark: "主动协议封锁";
     readonly intentLock: "属性珠封锁";
     readonly intentFreeze: "行动冻结";
+    readonly enemyIntentMeta: "目标：{target} · 结算：Boss 本轮行动结束";
+    readonly intentDetailStrike: "本轮每次三消都会累计伤害，行动结束后一次扣除队伍共享运行值。";
+    readonly intentDetailGuard: "指令值就绪时消耗 24 点，为自身排入最大运行值 10% 的防护层，并在本轮结束统一获得。";
+    readonly intentDetailDisrupt: "指令值就绪时消耗 24 点，在本轮结束重新排列棋盘。";
+    readonly intentDetailCorrupt: "指令值就绪时消耗 24 点，注入最多 {count} 颗持续 3 次行动的危险色块；消除它会损失共享运行值。";
+    readonly intentDetailMark: "指令值就绪时消耗 24 点，使目标失去 2 点指令值，并封锁其主动协议 1 个行动阶段。";
+    readonly intentDetailLock: "指令值就绪时消耗 24 点，封锁目标属性最多 {count} 颗色珠 2 次行动。";
+    readonly intentDetailFreeze: "指令值就绪时消耗 24 点，使目标的下一个行动阶段直接跳过，并进入强控冷却。";
+    readonly bossSkillTierDetail: "技能阶 {tier}：危险色块上限 {hazards}，属性珠封锁上限 {locks}。高阶会提高强控概率和伤害上限；5 阶半血后进入第二阶段。";
+    readonly bossSkillReadyDetail: "本轮专属技能已就绪，将在 Boss 行动结束时消耗 24 点并执行上方敌方意图。";
+    readonly bossSkillChargingDetail: "本轮尚未武装专属技能，距离 24 点还差 {remaining} 点；即使本轮充满，也会在下一次 Boss 阶段检查。";
     readonly targetAll: "全体";
     readonly targetSelf: "自身";
     readonly targetSingle: "单体";

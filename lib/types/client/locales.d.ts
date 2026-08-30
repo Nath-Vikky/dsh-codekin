@@ -129,6 +129,9 @@ export declare const zh: {
     readonly specialOrigin: "核心指令";
     readonly squadHelp: "最多选择 3 只，按顺序轮流行动；每只拥有连续 3 次交换。";
     readonly saveSquad: "保存编队";
+    readonly rosterPage: "第 {page}/{pages} 页 · 共 {count} 只";
+    readonly previousPage: "上一页";
+    readonly nextPage: "下一页";
     readonly releaseCreature: "放生码灵";
     readonly releaseConfirmTitle: "确认放生";
     readonly releaseConfirmBody: "确定要放生“{name}”吗？此操作无法撤销，返还素材只取决于码灵品质。";

@@ -306,7 +306,7 @@
   position: relative; min-width: 0; min-height: 0; padding: 0; overflow: hidden; border: 1px solid #ffffff24; border-radius: 31%;
   color: #fff; cursor: grab; display: grid; place-items: center;
   box-shadow: inset 0 1px #ffffff24, 0 2px 5px #0005;
-  transform: translate3d(var(--drag-x), var(--drag-y), 0); will-change: transform, opacity;
+  transform: translate3d(var(--drag-x), var(--drag-y), 0); contain: layout style paint;
   transition: transform .13s cubic-bezier(.22,1,.36,1), filter .15s ease, border-color .15s ease, box-shadow .15s ease;
   animation: tileSettle .3s cubic-bezier(.34,1.56,.64,1) both;
   animation-delay: calc(var(--tile-row) * 12ms);
@@ -319,14 +319,14 @@
 .matchTile:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .matchTile:disabled { cursor: wait; opacity: .72; }
 .matchTileSelected { border-color: #edf8f5cc !important; box-shadow: 0 0 0 2px #edf8f538, 0 5px 12px #0005; filter: brightness(1.09); }
-.matchTileDragging { z-index: 12; cursor: grabbing; transform: translate3d(var(--drag-x), var(--drag-y), 0) scale(1.055); filter: brightness(1.1); box-shadow: 0 8px 16px #0007; transition: none; }
+.matchTileDragging { z-index: 12; cursor: grabbing; transform: translate3d(var(--drag-x), var(--drag-y), 0) scale(1.055); filter: brightness(1.1); box-shadow: 0 8px 16px #0007; transition: none; will-change: transform; }
 .matchTileSpecial { animation: tileSpecial 1.5s ease-in-out infinite alternate; }
 .matchTileLocked { cursor: not-allowed; filter: saturate(.3) brightness(.72); border-color: #a8bcdf70; box-shadow: inset 0 0 0 2px #1d294766, 0 2px 5px #0005; }
 .matchTileLocked::before { content: ''; position: absolute; z-index: 3; inset: 0; background: repeating-linear-gradient(135deg, #bcd1ff0c 0 5px, transparent 5px 10px); pointer-events: none; }
 @keyframes tileSettle { from { opacity: .15; transform: translateY(-18px) scale(.72); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes tileSpecial { to { filter: brightness(1.12); box-shadow: 0 0 0 2px currentColor, 0 3px 8px #0004; } }
-.matchTileClearing { pointer-events: none; animation: tileClear .19s cubic-bezier(.4,0,.2,1) forwards !important; }
-.matchTileFalling { pointer-events: none; animation: tileFall var(--fall-duration) cubic-bezier(.22,1,.36,1) var(--fall-delay) both !important; }
+.matchTileClearing { pointer-events: none; animation: tileClear .19s cubic-bezier(.4,0,.2,1) forwards !important; will-change: transform, opacity; }
+.matchTileFalling { pointer-events: none; animation: tileFall var(--fall-duration) cubic-bezier(.22,1,.36,1) var(--fall-delay) both !important; will-change: transform, opacity; }
 @keyframes tileClear {
   0% { opacity: 1; transform: scale(1); filter: brightness(1); }
   45% { opacity: 1; transform: scale(1.08); filter: brightness(1.22); }
@@ -338,10 +338,10 @@
   88% { transform: translateY(-2%) scale(.995,1.005); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-.tileSwapRight { z-index: 10; animation: swapRight .14s ease-in forwards !important; }
-.tileSwapLeft { z-index: 10; animation: swapLeft .14s ease-in forwards !important; }
-.tileSwapDown { z-index: 10; animation: swapDown .14s ease-in forwards !important; }
-.tileSwapUp { z-index: 10; animation: swapUp .14s ease-in forwards !important; }
+.tileSwapRight { z-index: 10; animation: swapRight .14s ease-in forwards !important; will-change: transform; }
+.tileSwapLeft { z-index: 10; animation: swapLeft .14s ease-in forwards !important; will-change: transform; }
+.tileSwapDown { z-index: 10; animation: swapDown .14s ease-in forwards !important; will-change: transform; }
+.tileSwapUp { z-index: 10; animation: swapUp .14s ease-in forwards !important; will-change: transform; }
 @keyframes swapRight { to { transform: translateX(calc(100% + 3px)) scale(.94); } }
 @keyframes swapLeft { to { transform: translateX(calc(-100% - 3px)) scale(.94); } }
 @keyframes swapDown { to { transform: translateY(calc(100% + 3px)) scale(.94); } }
@@ -1707,3 +1707,29 @@
   .battleTransition > span, .attackWave, .attackImpact, .wildWasHit .sprite_medium,
   .enemyActionAlert, .enemyActionAlert::after, .enemyActionAlert > i { animation: none; }
 }
+
+/* Runtime performance: keep the soft surface language without repeatedly
+ * repainting large blurred layers while the window or board is moving. */
+.spritePlaceholder {
+  display: inline-grid; place-items: center; border: 1px solid #78908a2b; border-radius: 50%;
+  background: linear-gradient(145deg, #eef3f0, #dce6e1); color: #82938f;
+  filter: none; font: 900 17px/1 ui-monospace, monospace;
+}
+.rosterPagination {
+  min-height: 32px; display: grid; grid-template-columns: 76px minmax(0, 1fr) 76px;
+  align-items: center; gap: 7px; margin-bottom: 8px;
+}
+.rosterPagination span { color: #708682; text-align: center; font-size: 8px; }
+.rosterPagination button {
+  min-height: 28px; border: 1px solid #6e9b8c2b; border-radius: 999px;
+  background: #f8fbf9d9; color: #46675f; cursor: pointer; font: 750 8px/1 ui-sans-serif, system-ui, sans-serif;
+}
+.rosterPagination button:disabled { opacity: .38; cursor: default; }
+.creatureCard, .dexCard { content-visibility: auto; contain-intrinsic-size: auto 180px; }
+.battlePanel, .boardStage { contain: layout style; }
+.header { backdrop-filter: blur(10px) saturate(110%); }
+.launcherOpen { backdrop-filter: blur(8px); }
+.modalBackdrop, .battleBackdrop { backdrop-filter: blur(8px) saturate(105%); }
+.wildVitals, .captureBoardOverlay, .battleTransition { backdrop-filter: none; }
+.overlayDragging .header { backdrop-filter: none; }
+.overlayDragging .content * { animation-play-state: paused !important; }

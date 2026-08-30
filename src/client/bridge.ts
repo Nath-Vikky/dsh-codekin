@@ -10,6 +10,31 @@ import { TRACE_ECOLOGIES } from '../core/catalog.ts'
 import { MATCH_BOARD_CELLS, MATCH_BOARD_SIZE, MAX_MATCH_CASCADES, areAdjacentTiles } from '../core/match3.ts'
 
 const API = '/api/tracewild'
+const TRACEWILD_SETTINGS_CHANGED_EVENT = 'dsh-codekin:settings-changed'
+const TRACEWILD_SETTINGS_CHANNEL = 'dsh-codekin-settings-v1'
+
+export function notifyTraceWildSettingsChanged(): void {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event(TRACEWILD_SETTINGS_CHANGED_EVENT))
+  if (typeof BroadcastChannel === 'undefined') return
+  const channel = new BroadcastChannel(TRACEWILD_SETTINGS_CHANNEL)
+  channel.postMessage(null)
+  channel.close()
+}
+
+export function subscribeTraceWildSettingsChanged(listener: () => void): () => void {
+  if (typeof window === 'undefined') return () => {}
+  window.addEventListener(TRACEWILD_SETTINGS_CHANGED_EVENT, listener)
+  const channel = typeof BroadcastChannel === 'undefined'
+    ? undefined
+    : new BroadcastChannel(TRACEWILD_SETTINGS_CHANNEL)
+  channel?.addEventListener('message', listener)
+  return () => {
+    window.removeEventListener(TRACEWILD_SETTINGS_CHANGED_EVENT, listener)
+    channel?.removeEventListener('message', listener)
+    channel?.close()
+  }
+}
 
 export class TraceWildConnectionError extends Error {
   constructor(readonly code: 'invalid-action' | 'conflict' | 'unavailable') {

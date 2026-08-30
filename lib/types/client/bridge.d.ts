@@ -1,4 +1,6 @@
 import type { TraceWildAction, TraceWildActionResponse, TraceWildSnapshot } from '../core/types.ts';
+export declare function notifyTraceWildSettingsChanged(): void;
+export declare function subscribeTraceWildSettingsChanged(listener: () => void): () => void;
 export declare class TraceWildConnectionError extends Error {
     readonly code: 'invalid-action' | 'conflict' | 'unavailable';
     constructor(code: 'invalid-action' | 'conflict' | 'unavailable');

@@ -5,7 +5,9 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.7.0",
-  "engines": { "node": "^22.19.0 || >=24.0.0" },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
   "scripts": {
     "build": "node --run clean && pnpm --filter @nath-vikky/codekin-engine build && tsc -p tsconfig.json && tsdown",
     "clean": "node --eval \"import('node:fs/promises').then(async ({rm}) => { await rm('lib', { recursive: true, force: true }); await rm('packages/engine/dist', { recursive: true, force: true }) })\"",
@@ -15,16 +17,37 @@
     "prepack": "node --run check"
   },
   "main": "lib/index.js",
-  "types": "lib/types/index.d.ts",
+  "types": "lib/types/src/index.d.ts",
   "exports": {
-    ".": { "types": "./lib/types/src/index.d.ts", "default": "./lib/index.js" },
-    "./client": { "types": "./lib/types/src/client/index.d.ts", "default": "./lib/client.js" },
-    "./engine": { "types": "./lib/types/packages/engine/src/index.d.ts", "default": "./lib/engine.js" },
+    ".": {
+      "types": "./lib/types/src/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/src/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./engine": {
+      "types": "./lib/types/packages/engine/src/index.d.ts",
+      "default": "./lib/engine.js"
+    },
+    "./content": {
+      "types": "./lib/types/packages/content-sdk/src/index.d.ts",
+      "default": "./lib/content.js"
+    },
+    "./content/core": {
+      "types": "./lib/types/content-packs/core/src/index.d.ts",
+      "default": "./lib/content-core.js"
+    },
     "./package.json": "./package.json"
   },
   "dsh": {
-    "engines": { "dsh": ">=0.1.2-alpha.1" },
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "engines": {
+      "dsh": ">=0.1.2-alpha.1"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "inject": [
         "@deepseek-ai/dsh-client-locale",
@@ -49,17 +72,39 @@
     "react-dom": "^18.2.0"
   },
   "peerDependenciesMeta": {
-    "@deepseek-ai/cordis": { "optional": true },
-    "@deepseek-ai/dsh-client-connection": { "optional": true },
-    "@deepseek-ai/dsh-client-locale": { "optional": true },
-    "@deepseek-ai/dsh-client-ui-layout": { "optional": true },
-    "@deepseek-ai/dsh-client-ui-renderer": { "optional": true },
-    "@deepseek-ai/dsh-client-ui-settings": { "optional": true },
-    "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
-    "@deepseek-ai/dsh-host-webserver": { "optional": true },
-    "@deepseek-ai/dsh-session": { "optional": true },
-    "react": { "optional": true },
-    "react-dom": { "optional": true }
+    "@deepseek-ai/cordis": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-connection": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-locale": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-layout": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-renderer": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-settings": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-slots": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-host-webserver": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-session": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.1",
@@ -81,15 +126,36 @@
     "typescript": "6.0.3",
     "vitest": "4.1.11"
   },
-  "repository": { "type": "git", "url": "git+https://github.com/Nath-Vikky/dsh-codekin.git" },
-  "publishConfig": { "access": "public", "tag": "next" },
-  "keywords": ["deepseek-harness", "dsh-plugin", "codekin", "creature-collector", "match-3", "game"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nath-Vikky/dsh-codekin.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh-plugin",
+    "codekin",
+    "creature-collector",
+    "match-3",
+    "game"
+  ],
   "license": "MIT",
   "files": [
-    "lib/index.js", "lib/index.js.map", "lib/client.js", "lib/client.js.map",
-    "lib/engine.js", "lib/engine.js.map",
-    "lib/types/**/*.d.ts", "lib/types/**/*.d.ts.map",
-    "assets/creatures/sprite-gallery-v1.png", "assets/creatures/sprites",
-    "cordis.patch.yml", "LICENSE", "README.md", "README.zh-CN.md"
-  ]
+    "lib/*.js",
+    "lib/*.js.map",
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "assets/creatures/sprite-gallery-v1.png",
+    "assets/creatures/sprites",
+    "cordis.patch.yml",
+    "LICENSE",
+    "README.md",
+    "README.zh-CN.md"
+  ],
+  "dependencies": {
+    "ajv": "8.20.0"
+  }
 }

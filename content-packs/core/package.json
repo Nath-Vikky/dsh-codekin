@@ -1,0 +1,12 @@
+{
+  "name": "@nath-vikky/codekin-content-core",
+  "description": "Official Codekin content aligned with dsh-codekin 0.3.2",
+  "version": "0.3.2",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit --pretty false"
+  },
+  "license": "MIT"
+}

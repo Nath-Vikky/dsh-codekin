@@ -10,5 +10,5 @@
     "tsBuildInfoFile": "lib/tsconfig.tsbuildinfo",
     "types": ["node"]
   },
-  "include": ["src", "packages/engine/src"]
+  "include": ["src", "packages/*/src", "content-packs/*/src"]
 }

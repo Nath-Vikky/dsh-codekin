@@ -41,6 +41,8 @@ const host: UserConfig = {
   entry: {
     index: 'lib/types/src/index.js',
     engine: 'lib/types/packages/engine/src/index.js',
+    content: 'lib/types/packages/content-sdk/src/index.js',
+    'content-core': 'lib/types/content-packs/core/src/index.js',
   },
   outDir: 'lib',
   format: ['esm'],

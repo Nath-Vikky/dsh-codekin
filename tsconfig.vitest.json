@@ -5,5 +5,5 @@
     "noEmit": true,
     "types": ["node", "vitest/globals"]
   },
-  "include": ["src", "packages/engine/src", "tests"]
+  "include": ["src", "packages/*/src", "content-packs/*/src", "tests"]
 }

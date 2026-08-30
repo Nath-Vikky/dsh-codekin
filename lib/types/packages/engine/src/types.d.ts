@@ -1,27 +1,5 @@
-export type TraceEcology = 'lumen' | 'forge' | 'relay' | 'aegis' | 'glitch';
-export type TraceRarity = 'common' | 'uncommon' | 'rare' | 'apex';
-export type CaptureCoreQuality = 'pebble' | 'pulse' | 'prism' | 'nova' | 'origin';
-export type IndividualQuality = CaptureCoreQuality;
-export type GrowthMaterialQuality = CaptureCoreQuality;
-export interface CreatureStats {
-    hp: number;
-    attack: number;
-    defense: number;
-    speed: number;
-}
-export interface CreatureDefinition {
-    number: number;
-    id: string;
-    nameZh: string;
-    nameEn: string;
-    ecology: TraceEcology;
-    rarity: TraceRarity;
-    combatRole: string;
-    baseCaptureRate: number;
-    signatureProtocol: string;
-    spriteIndex: number;
-    stats: CreatureStats;
-}
+import type { CaptureCoreQuality, GrowthMaterialQuality, IndividualQuality, TraceEcology } from '../../content-sdk/src/types.ts';
+export type { CaptureCoreQuality, CreatureDefinition, CreatureStats, GrowthMaterialQuality, IndividualQuality, TraceEcology, TraceRarity, } from '../../content-sdk/src/types.ts';
 export interface CapturedCreature {
     instanceId: string;
     creatureId: string;

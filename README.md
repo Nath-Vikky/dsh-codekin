@@ -79,7 +79,8 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
 - A persisted enable switch under DSH Settings → Codekin; disabling pauses event rewards and idle time without deleting progress.
 - A two-step release flow in Squad that returns one same-quality growth material regardless of the Codekin's level.
 - Three base actions per active Codekin; direct match-four refunds an action and match-five adds one.
-- A wild-battle turn may be ended early to preserve a low-runtime capture target.
+- Any battle lets the player end the active Codekin's remaining actions. In wild encounters this can
+  preserve a low-runtime capture target instead of defeating it accidentally.
 - The three Codekin share one squad runtime pool. Stage damage is queued and resolved through a prominent team-strike total at the end of the cycle.
 - Repair and guard are likewise queued across the whole squad or Boss phase, then settle together. Compute sync, Compile overclock, and Glitch breach persist as scoped two-round modifiers with compact hover details.
 - Wild Codekin use separate Boss scaling and can telegraph hazard panels, protocol seals, tile locks,
@@ -89,6 +90,22 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
 - Reward popups, item details, visible material experience values, and explicit confirmations for irreversible roster actions.
 - Host-validated game actions and atomic local persistence.
 
+## 0.3.2 battle update
+
+- The command board is now 8×8, keeps panels anchored during pointer gestures, and silently restores
+  invalid swaps without replacing the battle state with a technical error.
+- The active squad member has a visible focus glow, while one compact `SKIP` control works consistently
+  in wild encounters and the Endless Stack Tower.
+- Every player clear briefly contributes an effectiveness-colored damage value before the HUD settles
+  on the final `TOTAL DAMAGE`. Boss actions use the same readable `ENEMY DAMAGE` presentation and a
+  slightly slower cadence.
+- Player and Boss strikes travel as a visible attack wave before HP changes or defeat resolves. Enemy
+  phases also lock the board behind a red warning strip until all Boss actions finish.
+- Recovery, shielding, damage forecasts, and HP changes animate in the vital bar. Persistent attack,
+  defense, and scoped attribute effects use compact icons with custom hover details and remaining rounds.
+- Enemy intent and Boss-skill chips stay compact beside the Boss vitals, with in-game hover panels rather
+  than overlapping browser-native tooltips.
+
 ## Battle and encounter rules
 
 Swap adjacent tiles to queue compute damage and charge matching squad members. Matching Guard and
@@ -97,8 +114,9 @@ also establish persistent team, single-member, or opponent modifiers. Each squad
 normally contributes three actions; a direct match-four refunds an action and a match-five grants an
 extra action. The three squad stages are displayed separately, then resolve as one team strike. Wild
 Bosses have their own multi-action cycle, strike one shared squad runtime pool, and use hazard panels,
-protocol seals, locks, freezes, shields, board reroutes, and quality-dependent mechanics. A player may end the current stage early to avoid
-defeating a weakened capture target. Encounter duration, level, and quality respond to effective DSH
+protocol seals, locks, freezes, shields, board reroutes, and quality-dependent mechanics. A player may
+end the current stage early in any battle; in a wild encounter this can avoid defeating a weakened
+capture target. Encounter duration, level, and quality respond to effective DSH
 activity while map population and regional balancing prevent one activity type from occupying every
 spawn slot.
 

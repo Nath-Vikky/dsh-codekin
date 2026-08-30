@@ -2118,7 +2118,7 @@ function BattleView(props: {
               <strong>{creatureName(wild, props.zh)}</strong>
               <span
                 className={battle.mode === 'tower' ? css.battleHoverTrigger : undefined}
-                {...(battle.mode === 'tower' ? { tabIndex: 0, title: bossSkillLabel, 'aria-label': bossSkillLabel } : {})}
+                {...(battle.mode === 'tower' ? { tabIndex: 0, 'aria-label': bossSkillLabel } : {})}
               >
                 Lv.{battle.wildLevel} · {props.t(CORE_KEYS[battle.wildQuality])} · {props.t(ECOLOGY_KEYS[wild.ecology])}
                 {battle.mode === 'tower' && (
@@ -2179,7 +2179,6 @@ function BattleView(props: {
             <small
               className={css.battleHoverTrigger}
               tabIndex={0}
-              title={bossSkillLabel}
               aria-label={bossSkillLabel}
             >
               {props.t('bossEnergy')} {battle.bossEnergy}/24 · {battle.bossSkillArmed ? props.t('skillReady') : props.t('skillCharging')}
@@ -2190,7 +2189,6 @@ function BattleView(props: {
           <div
             className={`${css.enemyIntent} ${css.battleHoverTrigger}`}
             tabIndex={0}
-            title={enemyIntentLabel}
             aria-label={enemyIntentLabel}
           >
             <span>{props.t('enemyIntent')}</span>
@@ -2487,7 +2485,6 @@ function BattleView(props: {
               <b
                 className={css.battleHoverTrigger}
                 tabIndex={0}
-                title={bossSkillLabel}
                 aria-label={bossSkillLabel}
               >
                 {bossSkillTitle}

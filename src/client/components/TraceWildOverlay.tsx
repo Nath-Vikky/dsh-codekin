@@ -1513,6 +1513,7 @@ function BattleView(props: {
   const [displayedWildHp, setDisplayedWildHp] = useState(battle.wildHp)
   const [displayedPartyHp, setDisplayedPartyHp] = useState(battle.partyHp)
   const gestureRef = useRef<TileGesture>()
+  const draggedTileElement = useRef<HTMLButtonElement>()
   const bossActionInFlight = useRef(false)
   const bossActionTimer = useRef<number>()
   const swapTimer = useRef<number>()
@@ -1529,6 +1530,22 @@ function BattleView(props: {
   const activeDefinition = active === undefined ? undefined : creatureById(active.creatureId)
   const locked = props.busy || animating
   const boardLocked = locked || battle.turnOwner === 'boss' || battle.captureWindow || battle.actionsRemaining <= 0
+  const resetDraggedTile = useCallback((element = draggedTileElement.current): void => {
+    element?.style.setProperty('--drag-x', '0px')
+    element?.style.setProperty('--drag-y', '0px')
+  }, [])
+
+  useEffect(() => {
+    if (gesture !== undefined || draggedTileElement.current === undefined) return
+    const element = draggedTileElement.current
+    resetDraggedTile(element)
+    const frame = window.requestAnimationFrame(() => {
+      resetDraggedTile(element)
+      if (draggedTileElement.current === element) draggedTileElement.current = undefined
+    })
+    return () => { window.cancelAnimationFrame(frame) }
+  }, [gesture, resetDraggedTile])
+
   useEffect(() => {
     setSelectedTile(undefined)
     gestureRef.current = undefined
@@ -1812,6 +1829,7 @@ function BattleView(props: {
     swapTimer.current = window.setTimeout(() => {
       swapTimer.current = undefined
       void props.act({ type: 'battle-swap', from, to }, presentBattleResponse).finally(() => {
+        setSwapMotion(undefined)
         setClearingTiles(undefined)
         setFallRows(undefined)
         setActiveChain(undefined)
@@ -1868,6 +1886,7 @@ function BattleView(props: {
     if (Math.max(Math.abs(offsetX), Math.abs(offsetY)) < threshold) return
     const target = swipeTarget(index, offsetX, offsetY)
     if (target === undefined) return
+    resetDraggedTile(element)
     gestureRef.current = undefined
     suppressNextClick(350)
     swap(index, target)
@@ -2088,6 +2107,8 @@ function BattleView(props: {
                     onPointerDown={(event) => {
                       if (boardLocked || (tile.lockedActions ?? 0) > 0) return
                       event.currentTarget.setPointerCapture(event.pointerId)
+                      draggedTileElement.current = event.currentTarget
+                      resetDraggedTile(event.currentTarget)
                       const nextGesture = { index, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, offsetX: 0, offsetY: 0 }
                       gestureRef.current = nextGesture
                       setGesture(nextGesture)
@@ -2110,15 +2131,19 @@ function BattleView(props: {
                         suppressNextClick(250)
                       }
                       gestureRef.current = undefined
-                      event.currentTarget.style.removeProperty('--drag-x')
-                      event.currentTarget.style.removeProperty('--drag-y')
+                      resetDraggedTile(event.currentTarget)
                       setGesture(undefined)
                       if (target !== undefined) swap(index, target)
                     }}
                     onPointerCancel={(event) => {
                       gestureRef.current = undefined
-                      event.currentTarget.style.removeProperty('--drag-x')
-                      event.currentTarget.style.removeProperty('--drag-y')
+                      resetDraggedTile(event.currentTarget)
+                      setGesture(undefined)
+                    }}
+                    onLostPointerCapture={(event) => {
+                      if (gestureRef.current?.pointerId !== event.pointerId) return
+                      gestureRef.current = undefined
+                      resetDraggedTile(event.currentTarget)
                       setGesture(undefined)
                     }}
                   >

@@ -1,5 +1,5 @@
 import type { MatchCascadeFrame, MatchTile, RandomSource, TraceEcology } from './types.ts';
-export declare const MATCH_BOARD_SIZE = 7;
+export declare const MATCH_BOARD_SIZE = 8;
 export declare const MATCH_BOARD_CELLS: number;
 export declare const MAX_MATCH_CASCADES = 12;
 export interface MatchResolutionStep {

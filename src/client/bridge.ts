@@ -1,15 +1,41 @@
 import type {
   MatchTile,
   MatchDamageEffectiveness,
+  MatchSignalEffect,
   TraceWildAction,
   TraceWildActionResponse,
   TraceWildBattleAnimation,
   TraceWildSnapshot,
 } from '../core/types.ts'
 import { TRACE_ECOLOGIES } from '../core/catalog.ts'
-import { MATCH_BOARD_CELLS, MAX_MATCH_CASCADES, areAdjacentTiles } from '../core/match3.ts'
+import { MATCH_BOARD_CELLS, MATCH_BOARD_SIZE, MAX_MATCH_CASCADES, areAdjacentTiles } from '../core/match3.ts'
 
 const API = '/api/tracewild'
+const TRACEWILD_SETTINGS_CHANGED_EVENT = 'dsh-codekin:settings-changed'
+const TRACEWILD_SETTINGS_CHANNEL = 'dsh-codekin-settings-v1'
+
+export function notifyTraceWildSettingsChanged(): void {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event(TRACEWILD_SETTINGS_CHANGED_EVENT))
+  if (typeof BroadcastChannel === 'undefined') return
+  const channel = new BroadcastChannel(TRACEWILD_SETTINGS_CHANNEL)
+  channel.postMessage(null)
+  channel.close()
+}
+
+export function subscribeTraceWildSettingsChanged(listener: () => void): () => void {
+  if (typeof window === 'undefined') return () => {}
+  window.addEventListener(TRACEWILD_SETTINGS_CHANGED_EVENT, listener)
+  const channel = typeof BroadcastChannel === 'undefined'
+    ? undefined
+    : new BroadcastChannel(TRACEWILD_SETTINGS_CHANNEL)
+  channel?.addEventListener('message', listener)
+  return () => {
+    window.removeEventListener(TRACEWILD_SETTINGS_CHANGED_EVENT, listener)
+    channel?.removeEventListener('message', listener)
+    channel?.close()
+  }
+}
 
 export class TraceWildConnectionError extends Error {
   constructor(readonly code: 'invalid-action' | 'conflict' | 'unavailable') {
@@ -18,6 +44,7 @@ export class TraceWildConnectionError extends Error {
 }
 
 const TILE_SPECIALS = ['none', 'row', 'column', 'burst', 'origin'] as const
+const MATCH_SIGNAL_EFFECTS = ['repair', 'guard', 'sync', 'overclock', 'breach'] as const
 
 function plainRecord(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)
@@ -52,7 +79,8 @@ function matchBoard(value: unknown): MatchTile[] {
 function battleAnimation(value: unknown): TraceWildBattleAnimation {
   const row = plainRecord(value)
   if (row.kind !== 'match' || typeof row.battleId !== 'string' || row.battleId.length < 3 || row.battleId.length > 96
-    || !Array.isArray(row.frames) || row.frames.length < 1 || row.frames.length > MAX_MATCH_CASCADES) {
+    || !Array.isArray(row.frames) || row.frames.length > MAX_MATCH_CASCADES
+    || row.frames.length === 0 && row.strike === undefined && row.recovery === undefined) {
     throw new TypeError('invalid animation')
   }
   const frames = row.frames.map((value, frameIndex) => {
@@ -68,7 +96,7 @@ function battleAnimation(value: unknown): TraceWildBattleAnimation {
     })
     if (new Set(removed).size !== removed.length) throw new TypeError('invalid animation')
     const fallRows = frame.fallRows.map(distance => {
-      if (!Number.isSafeInteger(distance) || (distance as number) < 0 || (distance as number) > 7) {
+      if (!Number.isSafeInteger(distance) || (distance as number) < 0 || (distance as number) > MATCH_BOARD_SIZE) {
         throw new TypeError('invalid animation')
       }
       return distance as number
@@ -83,6 +111,22 @@ function battleAnimation(value: unknown): TraceWildBattleAnimation {
       || (frame.hazardDamage as number) < 1 || (frame.hazardDamage as number) > 9_999_999)) {
       throw new TypeError('invalid animation')
     }
+    let signalEffect: MatchSignalEffect | undefined
+    if (frame.signalEffect !== undefined) {
+      const rawEffect = plainRecord(frame.signalEffect)
+      const effectKeys = Object.keys(rawEffect)
+      if (effectKeys.length !== 3
+        || effectKeys.some(key => key !== 'kind' && key !== 'ecology' && key !== 'amount')
+        || !MATCH_SIGNAL_EFFECTS.includes(rawEffect.kind as never)
+        || !TRACE_ECOLOGIES.includes(rawEffect.ecology as never)
+        || !Number.isSafeInteger(rawEffect.amount) || (rawEffect.amount as number) < 0
+        || (rawEffect.amount as number) > 9_999_999) throw new TypeError('invalid animation')
+      signalEffect = {
+        kind: rawEffect.kind as MatchSignalEffect['kind'],
+        ecology: rawEffect.ecology as MatchSignalEffect['ecology'],
+        amount: rawEffect.amount as number,
+      }
+    }
     return {
       chain: frame.chain as number,
       before: matchBoard(frame.before),
@@ -94,10 +138,72 @@ function battleAnimation(value: unknown): TraceWildBattleAnimation {
         totalDamage: frame.totalDamage as number,
         effectiveness: frame.effectiveness as MatchDamageEffectiveness,
       } : {}),
+      ...(signalEffect === undefined ? {} : { signalEffect }),
       ...(frame.hazardDamage === undefined ? {} : { hazardDamage: frame.hazardDamage as number }),
     }
   })
   if (row.actor !== undefined && row.actor !== 'player' && row.actor !== 'boss') throw new TypeError('invalid animation')
+  let strike: TraceWildBattleAnimation['strike']
+  if (row.strike !== undefined) {
+    const rawStrike = plainRecord(row.strike)
+    const strikeKeys = Object.keys(rawStrike)
+    if (strikeKeys.length !== 5
+      || strikeKeys.some(key => key !== 'actor' && key !== 'damage' && key !== 'targetHpBefore'
+        && key !== 'targetHpAfter' && key !== 'targetMaxHp')
+      || rawStrike.actor !== 'player' && rawStrike.actor !== 'boss'
+      || row.actor !== undefined && rawStrike.actor !== row.actor
+      || !Number.isSafeInteger(rawStrike.damage) || (rawStrike.damage as number) < 1 || (rawStrike.damage as number) > 9_999_999
+      || !Number.isSafeInteger(rawStrike.targetMaxHp) || (rawStrike.targetMaxHp as number) < 1 || (rawStrike.targetMaxHp as number) > 9_999_999
+      || !Number.isSafeInteger(rawStrike.targetHpBefore) || (rawStrike.targetHpBefore as number) < 0
+      || (rawStrike.targetHpBefore as number) > (rawStrike.targetMaxHp as number)
+      || !Number.isSafeInteger(rawStrike.targetHpAfter) || (rawStrike.targetHpAfter as number) < 0
+      || (rawStrike.targetHpAfter as number) > (rawStrike.targetHpBefore as number)) {
+      throw new TypeError('invalid animation')
+    }
+    strike = {
+      actor: rawStrike.actor,
+      damage: rawStrike.damage as number,
+      targetHpBefore: rawStrike.targetHpBefore as number,
+      targetHpAfter: rawStrike.targetHpAfter as number,
+      targetMaxHp: rawStrike.targetMaxHp as number,
+    }
+  }
+  let recovery: TraceWildBattleAnimation['recovery']
+  if (row.recovery !== undefined) {
+    const rawRecovery = plainRecord(row.recovery)
+    const recoveryKeys = Object.keys(rawRecovery)
+    if (recoveryKeys.length !== 8
+      || recoveryKeys.some(key => key !== 'actor' && key !== 'healing' && key !== 'shielding'
+        && key !== 'targetHpBefore' && key !== 'targetHpAfter' && key !== 'targetMaxHp'
+        && key !== 'targetShieldBefore' && key !== 'targetShieldAfter')
+      || rawRecovery.actor !== 'player' && rawRecovery.actor !== 'boss'
+      || row.actor !== undefined && rawRecovery.actor !== row.actor
+      || !Number.isSafeInteger(rawRecovery.healing) || (rawRecovery.healing as number) < 0
+      || (rawRecovery.healing as number) > 9_999_999
+      || !Number.isSafeInteger(rawRecovery.shielding) || (rawRecovery.shielding as number) < 0
+      || (rawRecovery.shielding as number) > 9_999_999
+      || (rawRecovery.healing as number) === 0 && (rawRecovery.shielding as number) === 0
+      || !Number.isSafeInteger(rawRecovery.targetMaxHp) || (rawRecovery.targetMaxHp as number) < 1
+      || (rawRecovery.targetMaxHp as number) > 9_999_999
+      || !Number.isSafeInteger(rawRecovery.targetHpBefore) || (rawRecovery.targetHpBefore as number) < 0
+      || !Number.isSafeInteger(rawRecovery.targetHpAfter)
+      || (rawRecovery.targetHpAfter as number) < (rawRecovery.targetHpBefore as number)
+      || (rawRecovery.targetHpAfter as number) > (rawRecovery.targetMaxHp as number)
+      || !Number.isSafeInteger(rawRecovery.targetShieldBefore) || (rawRecovery.targetShieldBefore as number) < 0
+      || !Number.isSafeInteger(rawRecovery.targetShieldAfter)
+      || (rawRecovery.targetShieldAfter as number) < (rawRecovery.targetShieldBefore as number)
+      || (rawRecovery.targetShieldAfter as number) > 9_999_999) throw new TypeError('invalid animation')
+    recovery = {
+      actor: rawRecovery.actor,
+      healing: rawRecovery.healing as number,
+      shielding: rawRecovery.shielding as number,
+      targetHpBefore: rawRecovery.targetHpBefore as number,
+      targetHpAfter: rawRecovery.targetHpAfter as number,
+      targetMaxHp: rawRecovery.targetMaxHp as number,
+      targetShieldBefore: rawRecovery.targetShieldBefore as number,
+      targetShieldAfter: rawRecovery.targetShieldAfter as number,
+    }
+  }
   let swap: TraceWildBattleAnimation['swap']
   if (row.swap !== undefined) {
     const rawSwap = plainRecord(row.swap)
@@ -109,6 +215,8 @@ function battleAnimation(value: unknown): TraceWildBattleAnimation {
     kind: 'match', battleId: row.battleId, frames,
     ...(row.actor === undefined ? {} : { actor: row.actor }),
     ...(swap === undefined ? {} : { swap }),
+    ...(strike === undefined ? {} : { strike }),
+    ...(recovery === undefined ? {} : { recovery }),
   }
 }
 
@@ -122,6 +230,12 @@ function snapshot(value: unknown): TraceWildSnapshot {
     || !Array.isArray(row.state.dex) || !Array.isArray(row.state.squad)) {
     throw new TypeError('invalid snapshot')
   }
+  // Host and Client can briefly straddle different plugin builds during a
+  // linked-package refresh. Never let a new 8×8 Client reinterpret a persisted
+  // 7×7 battle: its coordinates would render incorrectly and actions would be
+  // sent against a different topology. A restarted current Host safely drops
+  // the incompatible in-progress battle while preserving the profile.
+  if (row.state.battle !== undefined) matchBoard(row.state.battle.board)
   return structuredClone(row as TraceWildSnapshot)
 }
 

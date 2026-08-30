@@ -59,21 +59,45 @@ describe('TraceWild Cordis lifecycle', () => {
     const snapshot = vi.fn()
     const act = vi.fn()
     const subscribe = vi.fn()
-    const reject = vi.fn(() => 401 as const)
     const service = { snapshot, act, subscribe } as unknown as TraceWildService
-    const group = createTraceWildRoutes(service, '.', reject)
+    const group = createTraceWildRoutes(service, '.')
 
     await Promise.all(group.routes.map(async (route) => {
       const res = response()
       await route.handler(request(route.path.endsWith('/action') ? 'POST' : 'GET'), res.response)
-      expect(res.statuses).toEqual([401])
-      expect(res.writes).toEqual(['unauthorized'])
+      expect(res.statuses).toEqual([403])
+      expect(res.writes).toEqual(['forbidden'])
     }))
 
-    expect(reject).toHaveBeenCalledTimes(5)
     expect(snapshot).not.toHaveBeenCalled()
     expect(act).not.toHaveBeenCalled()
     expect(subscribe).not.toHaveBeenCalled()
+  })
+
+  it('accepts the full loopback range but rejects non-loopback and foreign-origin requests', () => {
+    const snapshot = vi.fn(() => ({ ok: true }))
+    const service = { snapshot } as unknown as TraceWildService
+    const group = createTraceWildRoutes(service, '.')
+    const state = group.routes.find(route => route.path === `${TRACEWILD_API_PREFIX}/state`)!
+
+    const local = response()
+    state.handler(request('GET', {
+      host: '127.23.45.67:63214',
+      origin: 'http://127.23.45.67:63214',
+      'sec-fetch-site': 'same-origin',
+    }), local.response)
+    expect(local.statuses).toEqual([200])
+
+    for (const headers of [
+      { host: '128.0.0.1:63214' },
+      { host: '127.0.0.1:63214', origin: 'http://evil.example' },
+      { host: '127.0.0.1:63214', 'sec-fetch-site': 'cross-site' },
+    ]) {
+      const rejected = response()
+      state.handler(request('GET', headers), rejected.response)
+      expect(rejected.statuses).toEqual([403])
+    }
+    expect(snapshot).toHaveBeenCalledOnce()
   })
 
   it('ends active event streams and removes their subscriptions when unloaded', () => {
@@ -86,11 +110,11 @@ describe('TraceWild Cordis lifecycle', () => {
         return () => { unsubscribed += 1 }
       },
     } as unknown as TraceWildService
-    const group = createTraceWildRoutes(service, '.', () => undefined)
+    const group = createTraceWildRoutes(service, '.')
     const events = group.routes.find(route => route.path === `${TRACEWILD_API_PREFIX}/events`)!
     const res = response()
 
-    events.handler(request('GET'), res.response)
+    events.handler(request('GET', { host: '127.0.0.1:63214' }), res.response)
     expect(subscribed).toBe(1)
     expect(res.writes.some(value => value.startsWith('data: '))).toBe(true)
 
@@ -104,7 +128,7 @@ describe('TraceWild Cordis lifecycle', () => {
   it('requires the explicit cleanup phrase before deleting the local save', async () => {
     const clearLocalData = vi.fn(() => ({ ok: true, schemaVersion: 3, state: { schemaVersion: 3 }, serverTime: 1 }))
     const service = { clearLocalData } as unknown as TraceWildService
-    const group = createTraceWildRoutes(service, '.', () => undefined)
+    const group = createTraceWildRoutes(service, '.')
     const route = group.routes.find(candidate => candidate.path === `${TRACEWILD_API_PREFIX}/save`)!
     const req = request('DELETE', {
       host: '127.0.0.1:63214',
@@ -125,7 +149,7 @@ describe('TraceWild Cordis lifecycle', () => {
   it('fails closed without committing an action that was awaiting its body during unload', async () => {
     const act = vi.fn()
     const service = { act } as unknown as TraceWildService
-    const group = createTraceWildRoutes(service, '.', () => undefined)
+    const group = createTraceWildRoutes(service, '.')
     const action = group.routes.find(route => route.path === `${TRACEWILD_API_PREFIX}/action`)!
     const req = request('POST', {
       host: '127.0.0.1:63214',

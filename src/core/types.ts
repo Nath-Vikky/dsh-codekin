@@ -71,6 +71,34 @@ export interface MatchTile {
 
 export type MatchDamageEffectiveness = 'advantage' | 'neutral' | 'resisted'
 
+export type MatchSignalEffectKind = 'repair' | 'guard' | 'sync' | 'overclock' | 'breach'
+
+export interface MatchSignalEffect {
+  kind: MatchSignalEffectKind
+  ecology: TraceEcology
+  /** Queued healing/shielding, or the extra damage contributed by this signal role. */
+  amount: number
+}
+
+export type BattleAmplifierSignal = 'sync' | 'overclock' | 'breach'
+export type BattleAmplifierStat = 'attack' | 'penetration'
+export type BattleAmplifierScope = 'team' | 'member' | 'self' | 'opponent'
+
+/**
+ * A bounded combat modifier that survives individual swaps. Remaining rounds
+ * age only after both the squad and Boss have completed a full board phase.
+ */
+export interface BattleAmplifier {
+  signal: BattleAmplifierSignal
+  ecology: TraceEcology
+  stat: BattleAmplifierStat
+  scope: BattleAmplifierScope
+  /** 100 means +10%. */
+  valuePermille: number
+  remainingRounds: number
+  targetInstanceId?: string
+}
+
 export interface MatchCascadeFrame {
   chain: number
   before: MatchTile[]
@@ -82,6 +110,8 @@ export interface MatchCascadeFrame {
   /** Running damage total accumulated by the acting side. */
   totalDamage?: number
   effectiveness?: MatchDamageEffectiveness
+  /** Matching the acting Codekin's ecology turns that panel color into its signal role. */
+  signalEffect?: MatchSignalEffect
   /** Shared-party damage caused by dangerous panels in this step. */
   hazardDamage?: number
 }
@@ -92,6 +122,29 @@ export interface TraceWildBattleAnimation {
   frames: MatchCascadeFrame[]
   actor?: 'player' | 'boss'
   swap?: { from: number; to: number }
+  /** Final, authoritative hit applied after the board cascade has finished. */
+  strike?: TraceWildBattleStrike
+  /** Final phase-wide recovery applied after every action for this side. */
+  recovery?: TraceWildBattleRecovery
+}
+
+export interface TraceWildBattleStrike {
+  actor: 'player' | 'boss'
+  damage: number
+  targetHpBefore: number
+  targetHpAfter: number
+  targetMaxHp: number
+}
+
+export interface TraceWildBattleRecovery {
+  actor: 'player' | 'boss'
+  healing: number
+  shielding: number
+  targetHpBefore: number
+  targetHpAfter: number
+  targetMaxHp: number
+  targetShieldBefore: number
+  targetShieldAfter: number
 }
 
 export interface BattlePartyMember {
@@ -177,6 +230,9 @@ export interface BattleState {
   partyHp: number
   partyMaxHp: number
   partyShield: number
+  pendingPartyHealing: number
+  pendingPartyShielding: number
+  partyAmplifiers: BattleAmplifier[]
   turnOwner: 'player' | 'boss'
   activeIndex: number
   actionsRemaining: number
@@ -198,6 +254,9 @@ export interface BattleState {
   wildMaxHp: number
   wildArmor: number
   wildShield: number
+  pendingWildHealing: number
+  pendingWildShielding: number
+  bossAmplifiers: BattleAmplifier[]
   wildDefense: number
   wildAttack: number
   wildLevel: number

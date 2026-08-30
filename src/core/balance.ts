@@ -48,16 +48,16 @@ export const PLAYER_QUALITY_BASE_MULTIPLIERS: Readonly<Record<IndividualQuality,
   pebble: 0.82,
   pulse: 0.91,
   prism: 1,
-  nova: 1.1,
-  origin: 1.22,
+  nova: 1.11,
+  origin: 1.24,
 })
 
 export const PLAYER_QUALITY_GROWTH_BONUSES: Readonly<Record<IndividualQuality, number>> = Object.freeze({
-  pebble: 0.48,
-  pulse: 0.6,
-  prism: 0.74,
-  nova: 0.91,
-  origin: 1.1,
+  pebble: 0.72,
+  pulse: 0.86,
+  prism: 1.02,
+  nova: 1.2,
+  origin: 1.42,
 })
 
 /** @deprecated Use PLAYER_QUALITY_BASE_MULTIPLIERS for new balance work. */
@@ -130,18 +130,18 @@ const IDLE_QUALITY_WEIGHTS = Object.freeze([
 
 const WILD_HP_QUALITY: Readonly<Record<IndividualQuality, number>> = Object.freeze({
   pebble: 1,
-  pulse: 1.15,
-  prism: 1.35,
-  nova: 1.6,
-  origin: 1.95,
+  pulse: 1.12,
+  prism: 1.28,
+  nova: 1.48,
+  origin: 1.75,
 })
 
 const WILD_ATTACK_QUALITY: Readonly<Record<IndividualQuality, number>> = Object.freeze({
   pebble: 1,
-  pulse: 1.07,
-  prism: 1.16,
-  nova: 1.28,
-  origin: 1.42,
+  pulse: 1.04,
+  prism: 1.09,
+  nova: 1.15,
+  origin: 1.23,
 })
 
 const WILD_DEFENSE_QUALITY: Readonly<Record<IndividualQuality, number>> = Object.freeze({
@@ -149,14 +149,7 @@ const WILD_DEFENSE_QUALITY: Readonly<Record<IndividualQuality, number>> = Object
   pulse: 1.04,
   prism: 1.09,
   nova: 1.15,
-  origin: 1.22,
-})
-
-const WILD_BASE_HP: Readonly<Record<TraceRarity, number>> = Object.freeze({
-  common: 48,
-  uncommon: 52,
-  rare: 57,
-  apex: 63,
+  origin: 1.23,
 })
 
 const SPECIES_CAPTURE_CAP: Readonly<Record<TraceRarity, number>> = Object.freeze({
@@ -223,15 +216,15 @@ export function idleRewardTier(elapsedMinutesValue: number): {
 }
 
 const PLAYER_STAT_REFERENCES: Readonly<CreatureStats> = Object.freeze({
-  hp: 42,
-  attack: 9,
-  defense: 7,
-  speed: 12,
+  hp: 1_380,
+  attack: 192,
+  defense: 124,
+  speed: 112,
 })
 
 function playerLevelProgress(levelValue: number): number {
   const level = Math.min(MAX_PLAYER_LEVEL, Math.max(1, Math.round(levelValue)))
-  return Math.pow((level - 1) / (MAX_PLAYER_LEVEL - 1), 1.08)
+  return Math.pow((level - 1) / (MAX_PLAYER_LEVEL - 1), 0.86)
 }
 
 function playerStatAptitude(baseValue: number, referenceValue: number): number {
@@ -375,20 +368,26 @@ export function wildStats(
   const partySize = Math.min(3, Math.max(1, Math.round(partySizeValue)))
   const partyAverageLevel = Math.min(100, Math.max(1, Math.round(partyAverageLevelValue)))
   const levelGap = Math.max(0, level - partyAverageLevel)
-  const qualityThreat = qualityIndex(quality)
-  const partyBossFactor = 1 + 0.7 * (partySize - 1)
-  const hpLevelFactor = 1 + 0.018 * growth + 0.00006 * growth * growth
-  const attackLevelFactor = 1 + 0.012 * growth + 0.000035 * growth * growth
-  const defenseLevelFactor = 1 + 0.008 * growth + 0.000025 * growth * growth
-  const hpGapPressure = 1 + Math.min(0.55, levelGap * (0.009 + 0.00225 * qualityThreat))
-  const attackGapPressure = 1 + Math.min(0.4, levelGap * (0.006 + 0.00175 * qualityThreat))
-  const defenseGapPressure = 1 + Math.min(0.28, levelGap * (0.004 + 0.00125 * qualityThreat))
+  const progress = growth / (MAX_PLAYER_LEVEL - 1)
+  // V3 pacing is built from target rounds rather than stacked threat bonuses.
+  // A full squad contributes three action stages, so boss durability grows
+  // almost linearly with party size; solo encounters get a small mercy cut.
+  const partyBossFactor = 0.95 + 0.95 * (partySize - 1)
+  const hpLevelFactor = 1 + 1.45 * progress + 0.45 * progress * progress
+  const attackLevelFactor = 1 + 1.05 * progress + 0.25 * progress * progress
+  const defenseLevelFactor = 1 + 0.9 * progress + 0.2 * progress * progress
+  // The level itself already raises every stat. This small relative-pressure
+  // term makes deliberate over-level encounters threatening without applying
+  // the old level gap two or three times across the damage pipeline.
+  const hpGapPressure = 1 + Math.min(0.18, levelGap * 0.006)
+  const attackGapPressure = 1 + Math.min(0.1, levelGap * 0.003)
+  const defenseGapPressure = 1 + Math.min(0.1, levelGap * 0.003)
   return {
     hp: Math.max(1, Math.round(
-      WILD_BASE_HP[definition.rarity] * hpLevelFactor * WILD_HP_QUALITY[quality] * partyBossFactor * hpGapPressure,
+      definition.stats.hp * 1.55 * hpLevelFactor * WILD_HP_QUALITY[quality] * partyBossFactor * hpGapPressure,
     )),
     attack: Math.max(1, Math.round(
-      definition.stats.attack * attackLevelFactor * WILD_ATTACK_QUALITY[quality] * attackGapPressure,
+      definition.stats.attack * 0.45 * attackLevelFactor * WILD_ATTACK_QUALITY[quality] * attackGapPressure,
     )),
     defense: Math.max(1, Math.round(
       definition.stats.defense * defenseLevelFactor * WILD_DEFENSE_QUALITY[quality] * defenseGapPressure,

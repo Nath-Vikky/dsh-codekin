@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { TraceWildSnapshot } from '../../core/types.ts'
-import { createTraceWildConnection } from '../bridge.ts'
+import { createTraceWildConnection, notifyTraceWildSettingsChanged } from '../bridge.ts'
 import css from './tracewild.module.css'
 
 export type TraceWildSettingsProps = SettingsSectionOwnerProps & PropsLocale<'tracewild'>
@@ -17,9 +17,16 @@ export function TraceWildSettings({ t }: TraceWildSettingsProps) {
   const [deleteArmed, setDeleteArmed] = useState(false)
   const [deleted, setDeleted] = useState(false)
 
+  const adoptSnapshot = useCallback((value: TraceWildSnapshot): void => {
+    setSnapshot(current => current?.state.createdAt === value.state.createdAt
+      && current.state.revision === value.state.revision
+      ? current
+      : value)
+  }, [])
+
   const refresh = useCallback(async (signal?: AbortSignal): Promise<void> => {
     try {
-      setSnapshot(await connection.load(signal))
+      adoptSnapshot(await connection.load(signal))
       setOnline(true)
       setFailed(false)
     } catch {
@@ -28,17 +35,17 @@ export function TraceWildSettings({ t }: TraceWildSettingsProps) {
         setFailed(true)
       }
     }
-  }, [connection])
+  }, [adoptSnapshot, connection])
 
   useEffect(() => {
     const controller = new AbortController()
     void refresh(controller.signal)
-    const unsubscribe = connection.subscribe(setSnapshot, setOnline)
+    const unsubscribe = connection.subscribe(adoptSnapshot, setOnline)
     return () => {
       controller.abort()
       unsubscribe()
     }
-  }, [connection, refresh])
+  }, [adoptSnapshot, connection, refresh])
 
   const enabled = snapshot?.state.enabled ?? false
   const toggle = async (): Promise<void> => {
@@ -46,7 +53,8 @@ export function TraceWildSettings({ t }: TraceWildSettingsProps) {
     setBusy(true)
     setFailed(false)
     try {
-      setSnapshot(await connection.act({ type: 'set-enabled', enabled: !enabled }))
+      adoptSnapshot(await connection.act({ type: 'set-enabled', enabled: !enabled }))
+      notifyTraceWildSettingsChanged()
       setOnline(true)
       setDeleted(false)
     } catch {
@@ -62,7 +70,8 @@ export function TraceWildSettings({ t }: TraceWildSettingsProps) {
     setBusy(true)
     setFailed(false)
     try {
-      setSnapshot(await connection.clearLocalData())
+      adoptSnapshot(await connection.clearLocalData())
+      notifyTraceWildSettingsChanged()
       setOnline(true)
       setDeleted(true)
       setDeleteArmed(false)
@@ -77,7 +86,15 @@ export function TraceWildSettings({ t }: TraceWildSettingsProps) {
   return (
     <section className={css.settingsPage} aria-labelledby="codekin-settings-title">
       <header className={css.settingsHero}>
-        <img src="/api/tracewild/assets/sprites/codekin-launcher-v1.webp" alt="" draggable={false} />
+        <img
+          src="/api/tracewild/assets/sprites/codekin-launcher-v1.webp"
+          alt=""
+          width={384}
+          height={384}
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+        />
         <div>
           <p>CODEKIN</p>
           <h2 id="codekin-settings-title">{t('settingsTitle')}</h2>

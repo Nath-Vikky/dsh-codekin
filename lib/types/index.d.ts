@@ -1,5 +1,4 @@
 import type { Context } from '@deepseek-ai/cordis';
-import type { HostConnectionHandle } from '@deepseek-ai/dsh-client-connection';
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver';
 import type { Session, SessionEvent, SessionStore } from '@deepseek-ai/dsh-session';
 export * from './core/index.ts';
@@ -10,7 +9,6 @@ declare module '@deepseek-ai/cordis' {
     interface Context {
         webServer: WebServer;
         sessions: SessionStore;
-        connection: HostConnectionHandle;
     }
     interface Events {
         'session/event'(session: Session, event: SessionEvent): void;

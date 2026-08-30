@@ -10,9 +10,9 @@ requests, or agent behavior.
 
 ## Install and enable
 
-### DSH `0.1.2-alpha.1` preview
+### DSH `0.1.2` Alpha preview
 
-Codekin `0.3.2` targets the source-only DSH `0.1.2-alpha.1` preview. It is distributed only
+Codekin `0.3.2` supports the source-only DSH `0.1.2-alpha.1` and `0.1.2-alpha.2` previews. It is distributed only
 through GitHub and is intentionally blocked from npm publishing. The current `main` branch commits
 its reviewed runtime bundles, so the dsh-web Workshop-compatible repository install needs no Alpha
 SDK checkout:
@@ -130,7 +130,7 @@ or modify conversations.
 ## Compatibility and status
 
 - `0.2.0`: stable npm `latest`, for DeepSeek Harness Web `0.1.0-rc.5`.
-- `0.3.2`: GitHub-only prerelease, for the source tag `dsh-v0.1.2-alpha.1`.
+- `0.3.2`: GitHub-only prerelease, verified against source tags `dsh-v0.1.2-alpha.1` and `dsh-v0.1.2-alpha.2`.
 
 The Alpha build has been validated in an isolated official source profile for package installation,
 client composition, authenticated state/action/assets, client-bundle HMR, and live Cordis

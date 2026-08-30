@@ -9,9 +9,9 @@
 
 ## 安装与启用
 
-### DSH `0.1.2-alpha.1` 预览版
+### DSH `0.1.2` Alpha 预览版
 
-码灵 `0.3.2` 专门适配仅提供源码的 DSH `0.1.2-alpha.1` 预览版。本版本只通过
+码灵 `0.3.2` 支持仅提供源码的 DSH `0.1.2-alpha.1` 与 `0.1.2-alpha.2` 预览版。本版本只通过
 GitHub 分发，并通过包清单主动禁止 npm 发布。当前 `main` 分支会提交经过检查的运行时 Bundle，
 因此 dsh-web 创意工坊兼容的仓库安装不需要额外准备 Alpha SDK 源码：
 
@@ -108,7 +108,7 @@ dsh plugin --profile web add @nath-vikky/dsh-codekin@latest
 ## 兼容性与状态
 
 - `0.2.0`：npm `latest` 稳定版，适配 DeepSeek Harness Web `0.1.0-rc.5`。
-- `0.3.2`：仅 GitHub 提供的预发行版，适配源码标签 `dsh-v0.1.2-alpha.1`。
+- `0.3.2`：仅 GitHub 提供的预发行版，已验证源码标签 `dsh-v0.1.2-alpha.1` 与 `dsh-v0.1.2-alpha.2`。
 
 Alpha 版本已经在隔离的官方源码 Profile 中验证安装、Client 组合、带认证的状态/操作/资源访问、
 Client Bundle HMR，以及 Cordis 实时禁用和恢复时的资源清理。由于上游 Alpha API 在下一个稳定版

@@ -51,11 +51,11 @@ jobs:
 
       - name: Checkout pinned DSH Alpha source
         run: |
-          git clone --depth 1 --branch dsh-v0.1.2-alpha.1 \
+          git clone --depth 1 --branch dsh-v0.1.2-alpha.2 \
             https://github.com/deepseek-ai/deepseek-harness.git \
             "$GITHUB_WORKSPACE/../deepseek-harness"
           test "$(git -C "$GITHUB_WORKSPACE/../deepseek-harness" rev-parse HEAD)" = \
-            "cd5ef8148158c3a752a658978873241fdf8e2bbc"
+            "0a53fb55bea101816fa226bb964ae2bed71c343b"
 
       - name: Build official Alpha libraries
         run: |

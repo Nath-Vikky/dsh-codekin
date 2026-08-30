@@ -81,6 +81,7 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
 - Three base actions per active Codekin; direct match-four refunds an action and match-five adds one.
 - A wild-battle turn may be ended early to preserve a low-runtime capture target.
 - The three Codekin share one squad runtime pool. Stage damage is queued and resolved through a prominent team-strike total at the end of the cycle.
+- Repair and guard are likewise queued across the whole squad or Boss phase, then settle together. Compute sync, Compile overclock, and Glitch breach persist as scoped two-round modifiers with compact hover details.
 - Wild Codekin use separate Boss scaling and can telegraph hazard panels, protocol seals, tile locks,
   freezes, board reroutes, and phase shields according to their level and quality.
 - Matching a Codekin's attribute builds command points, and every Codekin has one passive plus one active ability.
@@ -91,8 +92,8 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
 ## Battle and encounter rules
 
 Swap adjacent tiles to queue compute damage and charge matching squad members. Matching Guard and
-Network panels trade their normal damage for recovery and shielding, while Compute, Compile, and Glitch
-panels specialize in synchronized, chain-scaled, and defense-piercing damage. Each squad member
+Network panels queue phase-wide recovery and shielding, while Compute, Compile, and Glitch panels
+also establish persistent team, single-member, or opponent modifiers. Each squad member
 normally contributes three actions; a direct match-four refunds an action and a match-five grants an
 extra action. The three squad stages are displayed separately, then resolve as one team strike. Wild
 Bosses have their own multi-action cycle, strike one shared squad runtime pool, and use hazard panels,

@@ -80,7 +80,7 @@ function battleAnimation(value: unknown): TraceWildBattleAnimation {
   const row = plainRecord(value)
   if (row.kind !== 'match' || typeof row.battleId !== 'string' || row.battleId.length < 3 || row.battleId.length > 96
     || !Array.isArray(row.frames) || row.frames.length > MAX_MATCH_CASCADES
-    || row.frames.length === 0 && row.strike === undefined) {
+    || row.frames.length === 0 && row.strike === undefined && row.recovery === undefined) {
     throw new TypeError('invalid animation')
   }
   const frames = row.frames.map((value, frameIndex) => {
@@ -168,6 +168,42 @@ function battleAnimation(value: unknown): TraceWildBattleAnimation {
       targetMaxHp: rawStrike.targetMaxHp as number,
     }
   }
+  let recovery: TraceWildBattleAnimation['recovery']
+  if (row.recovery !== undefined) {
+    const rawRecovery = plainRecord(row.recovery)
+    const recoveryKeys = Object.keys(rawRecovery)
+    if (recoveryKeys.length !== 8
+      || recoveryKeys.some(key => key !== 'actor' && key !== 'healing' && key !== 'shielding'
+        && key !== 'targetHpBefore' && key !== 'targetHpAfter' && key !== 'targetMaxHp'
+        && key !== 'targetShieldBefore' && key !== 'targetShieldAfter')
+      || rawRecovery.actor !== 'player' && rawRecovery.actor !== 'boss'
+      || row.actor !== undefined && rawRecovery.actor !== row.actor
+      || !Number.isSafeInteger(rawRecovery.healing) || (rawRecovery.healing as number) < 0
+      || (rawRecovery.healing as number) > 9_999_999
+      || !Number.isSafeInteger(rawRecovery.shielding) || (rawRecovery.shielding as number) < 0
+      || (rawRecovery.shielding as number) > 9_999_999
+      || (rawRecovery.healing as number) === 0 && (rawRecovery.shielding as number) === 0
+      || !Number.isSafeInteger(rawRecovery.targetMaxHp) || (rawRecovery.targetMaxHp as number) < 1
+      || (rawRecovery.targetMaxHp as number) > 9_999_999
+      || !Number.isSafeInteger(rawRecovery.targetHpBefore) || (rawRecovery.targetHpBefore as number) < 0
+      || !Number.isSafeInteger(rawRecovery.targetHpAfter)
+      || (rawRecovery.targetHpAfter as number) < (rawRecovery.targetHpBefore as number)
+      || (rawRecovery.targetHpAfter as number) > (rawRecovery.targetMaxHp as number)
+      || !Number.isSafeInteger(rawRecovery.targetShieldBefore) || (rawRecovery.targetShieldBefore as number) < 0
+      || !Number.isSafeInteger(rawRecovery.targetShieldAfter)
+      || (rawRecovery.targetShieldAfter as number) < (rawRecovery.targetShieldBefore as number)
+      || (rawRecovery.targetShieldAfter as number) > 9_999_999) throw new TypeError('invalid animation')
+    recovery = {
+      actor: rawRecovery.actor,
+      healing: rawRecovery.healing as number,
+      shielding: rawRecovery.shielding as number,
+      targetHpBefore: rawRecovery.targetHpBefore as number,
+      targetHpAfter: rawRecovery.targetHpAfter as number,
+      targetMaxHp: rawRecovery.targetMaxHp as number,
+      targetShieldBefore: rawRecovery.targetShieldBefore as number,
+      targetShieldAfter: rawRecovery.targetShieldAfter as number,
+    }
+  }
   let swap: TraceWildBattleAnimation['swap']
   if (row.swap !== undefined) {
     const rawSwap = plainRecord(row.swap)
@@ -180,6 +216,7 @@ function battleAnimation(value: unknown): TraceWildBattleAnimation {
     ...(row.actor === undefined ? {} : { actor: row.actor }),
     ...(swap === undefined ? {} : { swap }),
     ...(strike === undefined ? {} : { strike }),
+    ...(recovery === undefined ? {} : { recovery }),
   }
 }
 

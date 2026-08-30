@@ -66,8 +66,25 @@ export type MatchSignalEffectKind = 'repair' | 'guard' | 'sync' | 'overclock' | 
 export interface MatchSignalEffect {
     kind: MatchSignalEffectKind;
     ecology: TraceEcology;
-    /** Applied healing/shielding, or the extra damage contributed by this signal role. */
+    /** Queued healing/shielding, or the extra damage contributed by this signal role. */
     amount: number;
+}
+export type BattleAmplifierSignal = 'sync' | 'overclock' | 'breach';
+export type BattleAmplifierStat = 'attack' | 'penetration';
+export type BattleAmplifierScope = 'team' | 'member' | 'self' | 'opponent';
+/**
+ * A bounded combat modifier that survives individual swaps. Remaining rounds
+ * age only after both the squad and Boss have completed a full board phase.
+ */
+export interface BattleAmplifier {
+    signal: BattleAmplifierSignal;
+    ecology: TraceEcology;
+    stat: BattleAmplifierStat;
+    scope: BattleAmplifierScope;
+    /** 100 means +10%. */
+    valuePermille: number;
+    remainingRounds: number;
+    targetInstanceId?: string;
 }
 export interface MatchCascadeFrame {
     chain: number;
@@ -96,6 +113,8 @@ export interface TraceWildBattleAnimation {
     };
     /** Final, authoritative hit applied after the board cascade has finished. */
     strike?: TraceWildBattleStrike;
+    /** Final phase-wide recovery applied after every action for this side. */
+    recovery?: TraceWildBattleRecovery;
 }
 export interface TraceWildBattleStrike {
     actor: 'player' | 'boss';
@@ -103,6 +122,16 @@ export interface TraceWildBattleStrike {
     targetHpBefore: number;
     targetHpAfter: number;
     targetMaxHp: number;
+}
+export interface TraceWildBattleRecovery {
+    actor: 'player' | 'boss';
+    healing: number;
+    shielding: number;
+    targetHpBefore: number;
+    targetHpAfter: number;
+    targetMaxHp: number;
+    targetShieldBefore: number;
+    targetShieldAfter: number;
 }
 export interface BattlePartyMember {
     instanceId: string;
@@ -151,6 +180,9 @@ export interface BattleState {
     partyHp: number;
     partyMaxHp: number;
     partyShield: number;
+    pendingPartyHealing: number;
+    pendingPartyShielding: number;
+    partyAmplifiers: BattleAmplifier[];
     turnOwner: 'player' | 'boss';
     activeIndex: number;
     actionsRemaining: number;
@@ -172,6 +204,9 @@ export interface BattleState {
     wildMaxHp: number;
     wildArmor: number;
     wildShield: number;
+    pendingWildHealing: number;
+    pendingWildShielding: number;
+    bossAmplifiers: BattleAmplifier[];
     wildDefense: number;
     wildAttack: number;
     wildLevel: number;

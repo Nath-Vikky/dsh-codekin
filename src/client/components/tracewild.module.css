@@ -1471,7 +1471,7 @@
 .sharedHpHeader span { color: #4f7068; font: 900 7px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .09em; }
 .sharedHpHeader strong { color: #375d53; font: 900 9px/1 ui-monospace, monospace; }
 .sharedHpNumbers { display: flex; align-items: center; justify-content: flex-end; gap: 7px; min-width: 0; }
-.sharedHpNumbers small, .wildHpNumbers > span {
+.sharedHpNumbers small {
   border: 1px solid #7bb8d89c; border-radius: 999px; padding: 2px 5px;
   background: linear-gradient(135deg, #e7f7ff, #cde8f7); color: #347ba3;
   box-shadow: inset 0 1px #fff, 0 0 8px #62add33b;
@@ -1570,6 +1570,31 @@
 .wildVitals .fighterName span { font-size: 7px; }
 .wildHpNumbers { min-height: 15px; display: flex; align-items: center; justify-content: center; gap: 7px; }
 .wildHpNumbers > strong { color: #4b6963; font: 900 7px/1 ui-monospace, monospace; white-space: nowrap; }
+.enemyModifierStrip, .playerModifierStrip { display: flex; align-items: center; gap: 3px; }
+.enemyModifierStrip:empty { display: none; }
+.playerModifierStrip { margin-left: auto; flex: 0 0 auto; }
+.combatModifierIcon {
+  --modifier-color: #b47a22; position: relative; z-index: 12; width: 19px; height: 19px; flex: 0 0 19px;
+  display: grid; place-items: center; border: 1px solid color-mix(in srgb, var(--modifier-color) 64%, white);
+  border-radius: 50%; background: linear-gradient(145deg, #fff, color-mix(in srgb, var(--modifier-color) 18%, white));
+  color: var(--modifier-color); box-shadow: inset 0 1px #fff, 0 2px 7px color-mix(in srgb, var(--modifier-color) 24%, transparent);
+  cursor: help; font: 950 8px/1 ui-sans-serif, system-ui, sans-serif; outline: none;
+}
+.combatModifierIcon::after {
+  content: attr(data-tooltip); position: absolute; z-index: 60; left: 50%; bottom: calc(100% + 7px);
+  width: max-content; max-width: 210px; padding: 6px 8px; border: 1px solid #ffffffd9; border-radius: 8px;
+  background: #263b3aee; color: #fff; box-shadow: 0 7px 18px #233a364f;
+  font: 750 7px/1.45 ui-sans-serif, system-ui, sans-serif; text-align: left; white-space: normal;
+  opacity: 0; pointer-events: none; transform: translate(-50%, 3px) scale(.96); transform-origin: 50% 100%;
+  transition: opacity .14s ease, transform .14s ease;
+}
+.combatModifierIcon:hover::after, .combatModifierIcon:focus-visible::after { opacity: 1; transform: translate(-50%, 0) scale(1); }
+.playerModifierIcon { width: 22px; height: 22px; flex-basis: 22px; grid-template-columns: auto auto; align-content: center; column-gap: 0; }
+.playerModifierIcon > b { font: 1000 7px/1 ui-monospace, monospace; }
+.playerModifierIcon > small { margin-top: 1px; font: 900 4.5px/1 ui-monospace, monospace; }
+.modifierAttack { --modifier-color: #d45a43; }
+.modifierPierce { --modifier-color: #8a5bb0; }
+.modifierDefense { --modifier-color: #3a91c7; }
 .wildVitals small { font-size: 6.5px; line-height: 1.2; }
 .wildVitals .energyBar { height: 3px; }
 .enemyIntent { right: 8px; top: 8px; }
@@ -1677,27 +1702,6 @@
 @keyframes enemyActionAlertIn { from { opacity: 0; transform: translateY(-7px) scale(.97); } }
 @keyframes enemyActionAlertScan { 48%, 100% { transform: translateX(340%); } }
 @keyframes enemyActionAlertPulse { to { opacity: .55; transform: scale(.72); box-shadow: 0 0 0 2px #fff1, 0 0 4px #fff; } }
-.turnSignalEffect {
-  min-width: 0; max-width: 112px; min-height: 22px; margin-left: auto; padding: 3px 6px 3px 3px;
-  display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 4px;
-  border: 1px solid currentColor; border-radius: 999px; background: #ffffffda;
-  box-shadow: inset 0 1px #fff, 0 4px 10px color-mix(in srgb, currentColor 20%, transparent);
-  overflow: hidden; pointer-events: none; animation: turnSignalIn .5s cubic-bezier(.16,1,.3,1) both;
-}
-.turnSignalEffect > i {
-  width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%;
-  background: currentColor; color: #fff; font: 900 8px/1 ui-sans-serif, system-ui, sans-serif; font-style: normal;
-}
-.turnSignalEffect > b { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: currentColor; font: 900 6.5px/1 ui-sans-serif, system-ui, sans-serif; white-space: nowrap; }
-.turnSignalEffect > em { color: currentColor; font: 1000 8px/1 ui-monospace, monospace; font-style: normal; white-space: nowrap; }
-.turnSignalEffect + .turnSkipButton, .turnSignalEffect + .actionDots { margin-left: 0; }
-.signalEffect_repair { color: #3b9f72; }
-.signalEffect_guard { color: #3b84bd; }
-.signalEffect_sync { color: #c49124; }
-.signalEffect_overclock { color: #d94f55; }
-.signalEffect_breach { color: #8a5cb1; }
-.turnSignalEffectBoss { border-color: #e48da1; background: #fff3f6e8; }
-@keyframes turnSignalIn { from { opacity: 0; transform: translateX(7px) scale(.86); } }
 .signalRule {
   margin: 3px auto 0; width: fit-content; max-width: 96%; border: 1px solid currentColor;
   border-radius: 999px; padding: 3px 8px; background: #ffffff9e; text-align: center;
@@ -1775,7 +1779,7 @@
   .wildBanner .sprite_medium, .wildBanner .enemyAura, .captureBoardOverlay, .captureCoreGrid button,
   .captureBoardIntro > header strong, .battleTransition, .battleTransition::before, .battleTransition::after,
   .battleTransition > span, .attackWave, .attackImpact, .wildWasHit .sprite_medium,
-  .enemyActionAlert, .enemyActionAlert::after, .enemyActionAlert > i, .turnSignalEffect,
+  .enemyActionAlert, .enemyActionAlert::after, .enemyActionAlert > i,
   .hpHealingBudget, .hpShieldActive { animation: none; transition-duration: .01ms; }
 }
 

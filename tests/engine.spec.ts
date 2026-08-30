@@ -336,9 +336,26 @@ describe('TraceWild match battle', () => {
       }, seededRandom(0x9900), 250)
       const effect = result.animation?.frames.find(frame => frame.signalEffect?.ecology === ecology)?.signalEffect
       expect(effect).toMatchObject({ ecology, kind, amount: expect.any(Number) })
-      if (kind === 'repair') expect(result.state.battle!.partyHp).toBeGreaterThan(beforePartyHp)
-      if (kind === 'guard') expect(result.state.battle!.partyShield).toBeGreaterThan(0)
-      if (kind !== 'repair' && kind !== 'guard') expect(effect!.amount).toBeGreaterThan(0)
+      if (kind === 'repair') {
+        expect(result.state.battle!.partyHp).toBe(beforePartyHp)
+        expect(result.state.battle!.pendingPartyHealing).toBeGreaterThan(0)
+        const settled = applyTraceWildAction(result.state, { type: 'battle-skip-stage' }, low, 260)
+        expect(settled.animation?.recovery).toMatchObject({ actor: 'player', healing: expect.any(Number) })
+        expect(settled.state.battle!.partyHp).toBeGreaterThan(beforePartyHp)
+      }
+      if (kind === 'guard') {
+        expect(result.state.battle!.partyShield).toBe(0)
+        expect(result.state.battle!.pendingPartyShielding).toBeGreaterThan(0)
+        const settled = applyTraceWildAction(result.state, { type: 'battle-skip-stage' }, low, 261)
+        expect(settled.animation?.recovery).toMatchObject({ actor: 'player', shielding: expect.any(Number) })
+        expect(settled.state.battle!.partyShield).toBeGreaterThan(0)
+      }
+      if (kind !== 'repair' && kind !== 'guard') {
+        expect(effect!.amount).toBeGreaterThan(0)
+        expect(result.state.battle!.partyAmplifiers).toContainEqual(expect.objectContaining({
+          signal: kind, remainingRounds: 2,
+        }))
+      }
     }
 
     const state = battleState()

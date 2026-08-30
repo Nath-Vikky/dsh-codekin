@@ -56,6 +56,7 @@ import {
   towerFloorProfile,
 } from './tower.ts'
 import type {
+  BattleAmplifier,
   BattleLogEntry,
   BattlePartyMember,
   BattleState,
@@ -75,6 +76,7 @@ import type {
   WildEncounter,
   TraceWildAction,
   TraceWildBattleAnimation,
+  TraceWildBattleRecovery,
   TraceWildBattleStrike,
   TraceWildIdleReward,
   TraceWildState,
@@ -86,6 +88,8 @@ const MAX_LOG_ENTRIES = 40
 const MAX_BATTLE_LOG_ENTRIES = 14
 const ENERGY_LIMIT = 12
 const MAX_IDLE_ELAPSED_MS = 12 * 60 * 60 * 1000
+const AMPLIFIER_DURATION_ROUNDS = 2
+const MAX_AMPLIFIERS_PER_SIDE = 8
 
 export const ECOLOGY_ADVANTAGE: Readonly<Record<TraceEcology, TraceEcology>> = Object.freeze({
   lumen: 'glitch',
@@ -459,6 +463,174 @@ function shieldParty(battle: BattleState, amount: number): number {
   return battle.partyShield - before
 }
 
+function queuePartyHealing(battle: BattleState, amount: number): number {
+  const available = Math.max(0, battle.partyMaxHp - battle.partyHp - battle.pendingPartyHealing)
+  const queued = Math.min(available, Math.max(0, Math.round(amount)))
+  battle.pendingPartyHealing += queued
+  return queued
+}
+
+function queuePartyShielding(battle: BattleState, amount: number): number {
+  const limit = Math.round(battle.partyMaxHp * 0.6)
+  const available = Math.max(0, limit - battle.partyShield - battle.pendingPartyShielding)
+  const queued = Math.min(available, Math.max(0, Math.round(amount)))
+  battle.pendingPartyShielding += queued
+  return queued
+}
+
+function healWild(battle: BattleState, amount: number): number {
+  const before = battle.wildHp
+  battle.wildHp = Math.min(battle.wildMaxHp, battle.wildHp + Math.max(0, Math.round(amount)))
+  return battle.wildHp - before
+}
+
+function shieldWild(battle: BattleState, amount: number): number {
+  const limit = Math.round(battle.wildMaxHp * 0.4)
+  const before = battle.wildShield
+  battle.wildShield = Math.min(limit, battle.wildShield + Math.max(0, Math.round(amount)))
+  return battle.wildShield - before
+}
+
+function queueWildHealing(battle: BattleState, amount: number): number {
+  const available = Math.max(0, battle.wildMaxHp - battle.wildHp - battle.pendingWildHealing)
+  const queued = Math.min(available, Math.max(0, Math.round(amount)))
+  battle.pendingWildHealing += queued
+  return queued
+}
+
+function queueWildShielding(battle: BattleState, amount: number): number {
+  const limit = Math.round(battle.wildMaxHp * 0.4)
+  const available = Math.max(0, limit - battle.wildShield - battle.pendingWildShielding)
+  const queued = Math.min(available, Math.max(0, Math.round(amount)))
+  battle.pendingWildShielding += queued
+  return queued
+}
+
+function settlePartyRecovery(battle: BattleState): TraceWildBattleRecovery | undefined {
+  const targetHpBefore = battle.partyHp
+  const targetShieldBefore = battle.partyShield
+  const healing = healParty(battle, battle.pendingPartyHealing)
+  const shielding = shieldParty(battle, battle.pendingPartyShielding)
+  battle.pendingPartyHealing = 0
+  battle.pendingPartyShielding = 0
+  if (healing > 0) appendBattleLog(battle, { turn: battle.turn, kind: 'heal', amount: healing })
+  if (shielding > 0) appendBattleLog(battle, { turn: battle.turn, kind: 'shield', amount: shielding })
+  if (healing <= 0 && shielding <= 0) return undefined
+  return {
+    actor: 'player', healing, shielding,
+    targetHpBefore, targetHpAfter: battle.partyHp, targetMaxHp: battle.partyMaxHp,
+    targetShieldBefore, targetShieldAfter: battle.partyShield,
+  }
+}
+
+function settleWildRecovery(battle: BattleState): TraceWildBattleRecovery | undefined {
+  const targetHpBefore = battle.wildHp
+  const targetShieldBefore = battle.wildShield
+  const healing = healWild(battle, battle.pendingWildHealing)
+  const shielding = shieldWild(battle, battle.pendingWildShielding)
+  battle.pendingWildHealing = 0
+  battle.pendingWildShielding = 0
+  if (shielding > 0) appendBattleLog(battle, { turn: battle.turn, kind: 'enemy-shield', amount: battle.wildShield })
+  if (healing <= 0 && shielding <= 0) return undefined
+  return {
+    actor: 'boss', healing, shielding,
+    targetHpBefore, targetHpAfter: battle.wildHp, targetMaxHp: battle.wildMaxHp,
+    targetShieldBefore, targetShieldAfter: battle.wildShield,
+  }
+}
+
+function sameAmplifier(left: BattleAmplifier, right: BattleAmplifier): boolean {
+  return left.signal === right.signal && left.stat === right.stat && left.scope === right.scope
+    && left.targetInstanceId === right.targetInstanceId
+}
+
+function upsertAmplifier(target: BattleAmplifier[], next: BattleAmplifier): void {
+  const current = target.find(value => sameAmplifier(value, next))
+  if (current !== undefined) {
+    current.valuePermille = Math.max(current.valuePermille, next.valuePermille)
+    current.remainingRounds = Math.max(current.remainingRounds, next.remainingRounds)
+    current.ecology = next.ecology
+    return
+  }
+  if (target.length >= MAX_AMPLIFIERS_PER_SIDE) target.shift()
+  target.push(next)
+}
+
+function activatePlayerAmplifier(battle: BattleState, effect: MatchSignalEffect): void {
+  const member = activeMember(battle)
+  if (effect.kind === 'sync') {
+    upsertAmplifier(battle.partyAmplifiers, {
+      signal: 'sync', ecology: effect.ecology, stat: 'attack', scope: 'team',
+      valuePermille: 30, remainingRounds: AMPLIFIER_DURATION_ROUNDS,
+    })
+  } else if (effect.kind === 'overclock') {
+    upsertAmplifier(battle.partyAmplifiers, {
+      signal: 'overclock', ecology: effect.ecology, stat: 'attack', scope: 'member',
+      valuePermille: 50, remainingRounds: AMPLIFIER_DURATION_ROUNDS,
+      targetInstanceId: member.instanceId,
+    })
+  } else if (effect.kind === 'breach') {
+    upsertAmplifier(battle.partyAmplifiers, {
+      signal: 'breach', ecology: effect.ecology, stat: 'penetration', scope: 'opponent',
+      valuePermille: 40, remainingRounds: AMPLIFIER_DURATION_ROUNDS,
+    })
+  }
+}
+
+function activateBossAmplifier(battle: BattleState, effect: MatchSignalEffect): void {
+  if (effect.kind === 'sync') {
+    upsertAmplifier(battle.bossAmplifiers, {
+      signal: 'sync', ecology: effect.ecology, stat: 'attack', scope: 'self',
+      valuePermille: 80, remainingRounds: AMPLIFIER_DURATION_ROUNDS,
+    })
+  } else if (effect.kind === 'overclock') {
+    upsertAmplifier(battle.bossAmplifiers, {
+      signal: 'overclock', ecology: effect.ecology, stat: 'attack', scope: 'self',
+      valuePermille: 110, remainingRounds: AMPLIFIER_DURATION_ROUNDS,
+    })
+  } else if (effect.kind === 'breach') {
+    upsertAmplifier(battle.bossAmplifiers, {
+      signal: 'breach', ecology: effect.ecology, stat: 'penetration', scope: 'opponent',
+      valuePermille: 90, remainingRounds: AMPLIFIER_DURATION_ROUNDS,
+    })
+  }
+}
+
+function playerAttackAmplifier(battle: BattleState, member: BattlePartyMember): number {
+  return battle.partyAmplifiers.reduce((sum, value) => (
+    value.stat === 'attack' && (value.scope === 'team'
+      || value.scope === 'member' && value.targetInstanceId === member.instanceId)
+      ? sum + value.valuePermille
+      : sum
+  ), 0)
+}
+
+function playerPenetrationAmplifier(battle: BattleState): number {
+  return battle.partyAmplifiers.reduce((sum, value) => (
+    value.stat === 'penetration' && value.scope === 'opponent' ? sum + value.valuePermille : sum
+  ), 0)
+}
+
+function bossAttackAmplifier(battle: BattleState): number {
+  return battle.bossAmplifiers.reduce((sum, value) => (
+    value.stat === 'attack' && value.scope === 'self' ? sum + value.valuePermille : sum
+  ), 0)
+}
+
+function bossPenetrationAmplifier(battle: BattleState): number {
+  return battle.bossAmplifiers.reduce((sum, value) => (
+    value.stat === 'penetration' && value.scope === 'opponent' ? sum + value.valuePermille : sum
+  ), 0)
+}
+
+function ageAmplifiers(battle: BattleState): void {
+  const age = (values: BattleAmplifier[]): BattleAmplifier[] => values
+    .map(value => ({ ...value, remainingRounds: value.remainingRounds - 1 }))
+    .filter(value => value.remainingRounds > 0)
+  battle.partyAmplifiers = age(battle.partyAmplifiers)
+  battle.bossAmplifiers = age(battle.bossAmplifiers)
+}
+
 function damageParty(battle: BattleState, amountValue: number): number {
   let amount = Math.max(1, Math.round(amountValue))
   const absorbed = Math.min(battle.partyShield, amount)
@@ -550,6 +722,9 @@ function damageForStep(
   if (activeEcology === undefined) throw new TraceWildRuleError('conflict')
   const hasForktail = livingMembers(battle).some(row => row.creatureId === 'relay-forktail')
   const hasAtlas = livingMembers(battle).some(row => row.creatureId === 'lumen-atlashart')
+  const attackMultiplier = 1 + Math.min(500, playerAttackAmplifier(battle, member)) / 1_000
+  const penetratedDefense = battle.wildDefense
+    * (1 - Math.min(500, playerPenetrationAmplifier(battle)) / 1_000)
   let combo = Math.min(2.25, 1 + 0.25 * (chain - 1) + (hasForktail ? 0.04 * (chain - 1) : 0))
   if (hasAtlas && chain === 1 && battle.party.some(row => row.creatureId === 'lumen-atlashart' && row.passiveRound !== battle.round)) {
     combo = Math.max(combo, 1.15)
@@ -561,8 +736,8 @@ function damageForStep(
     const count = counts[ecology]
     if (count <= 0) continue
     const element = battle.affinityFloorActions > 0 ? Math.max(1.2, affinity(ecology, wild.ecology)) : affinity(ecology, wild.ecology)
-    const baseContribution = stats.attack * (count / 3) * combo * element
-      * playerOffenseLevelFactor(member, battle) * playerDefenseFactor(battle.wildDefense)
+    const baseContribution = stats.attack * (count / 3) * combo * element * attackMultiplier
+      * playerOffenseLevelFactor(member, battle) * playerDefenseFactor(penetratedDefense)
     let contribution = baseContribution
     if (ecology === activeEcology) {
       if (ecology === 'aegis') {
@@ -590,8 +765,8 @@ function damageForStep(
         contribution *= Math.min(1.32, 1.12 + Math.max(0, count - 3) * 0.035 + Math.max(0, chain - 1) * 0.025)
         signalEffect = { kind: 'overclock', ecology, amount: Math.max(1, Math.round(contribution - baseContribution)) }
       } else {
-        contribution = stats.attack * (count / 3) * combo * element
-          * playerOffenseLevelFactor(member, battle) * playerDefenseFactor(battle.wildDefense * 0.4) * 1.03
+        contribution = stats.attack * (count / 3) * combo * element * attackMultiplier
+          * playerOffenseLevelFactor(member, battle) * playerDefenseFactor(penetratedDefense * 0.4) * 1.03
         signalEffect = { kind: 'breach', ecology, amount: Math.max(1, Math.round(contribution - baseContribution)) }
       }
     }
@@ -616,15 +791,12 @@ function damageForStep(
 
 function applyPlayerSignalEffect(battle: BattleState, effect: MatchSignalEffect): MatchSignalEffect {
   if (effect.kind === 'repair') {
-    const amount = healParty(battle, effect.amount)
-    if (amount > 0) appendBattleLog(battle, { turn: battle.turn, kind: 'heal', amount })
-    return { ...effect, amount }
+    return { ...effect, amount: queuePartyHealing(battle, effect.amount) }
   }
   if (effect.kind === 'guard') {
-    const amount = shieldParty(battle, effect.amount)
-    if (amount > 0) appendBattleLog(battle, { turn: battle.turn, kind: 'shield', amount })
-    return { ...effect, amount }
+    return { ...effect, amount: queuePartyShielding(battle, effect.amount) }
   }
+  activatePlayerAmplifier(battle, effect)
   return effect
 }
 
@@ -688,7 +860,7 @@ function applyMatchPassives(
         break
       case 'lumen-foliomoth':
         if (counts.lumen >= 4) {
-          healParty(battle, member.maxHp * 0.03 * scale)
+          queuePartyHealing(battle, member.maxHp * 0.03 * scale)
         }
         break
       case 'lumen-lensel':
@@ -735,17 +907,17 @@ function applyMatchPassives(
         break
       case 'aegis-veribud':
         if (counts.aegis > 0 && member.passiveStage !== battle.stage) {
-          healParty(battle, active.maxHp * 0.02 * scale)
+          queuePartyHealing(battle, active.maxHp * 0.02 * scale)
           member.passiveStage = battle.stage
         }
         break
       case 'aegis-anchorbee':
-        if (specialCount > 0) shieldParty(battle, active.maxHp * 0.04 * scale)
+        if (specialCount > 0) queuePartyShielding(battle, active.maxHp * 0.04 * scale)
         break
       case 'aegis-steady-ram': {
         const wild = creatureById(battleEncounterCreatureId(battle))!
         const resisted = ECOLOGY_ADVANTAGE[wild.ecology]
-        if (counts[resisted] > 0) shieldParty(battle, stepDamage * 0.2 * scale)
+        if (counts[resisted] > 0) queuePartyShielding(battle, stepDamage * 0.2 * scale)
         break
       }
       case 'glitch-null-nibbler':
@@ -860,7 +1032,7 @@ function applyStageEntryPassives(battle: BattleState): void {
   member.skillUsedStage = false
   const scale = qualityMultiplier(member)
   if (member.creatureId === 'relay-pingfly') grantEnergy(member, 2)
-  if (member.creatureId === 'aegis-loop-tortoise') shieldParty(battle, member.maxHp * 0.08 * scale)
+  if (member.creatureId === 'aegis-loop-tortoise') queuePartyShielding(battle, member.maxHp * 0.08 * scale)
   appendBattleLog(battle, { turn: battle.turn, kind: 'switch', creatureId: member.creatureId })
 }
 
@@ -969,8 +1141,9 @@ function bossPhaseDamageCap(battle: BattleState): number {
   const levelPressure = Math.min(0.08, Math.max(0, battle.wildLevel - partyAverageLevel) * 0.004)
   const qualityPressure = qualityIndex(battle.wildQuality) * 0.035
   const skillPressure = (battle.bossSkillTier - 1) * 0.01
+  const amplifier = 1 + Math.min(500, bossAttackAmplifier(battle)) / 1_000
   return Math.max(1, Math.round(
-    battle.partyMaxHp * Math.min(0.6, 0.34 + qualityPressure + skillPressure + levelPressure),
+    battle.partyMaxHp * Math.min(0.68, (0.34 + qualityPressure + skillPressure + levelPressure) * amplifier),
   ))
 }
 
@@ -986,7 +1159,8 @@ function enemyDamageForStep(
   // This pressure term rises with party size, but much slower than shared HP,
   // preserving the value of building a team without making solo starts free.
   const partyPressure = 0.42 + 0.42 * Math.max(0, battle.party.length - 1)
-  const defense = partyDefense(battle)
+  const defense = partyDefense(battle) * (1 - Math.min(500, bossPenetrationAmplifier(battle)) / 1_000)
+  const attackMultiplier = 1 + Math.min(500, bossAttackAmplifier(battle)) / 1_000
   let total = 0
   let signalEffect: MatchSignalEffect | undefined
   const effectivenessDamage: Record<MatchDamageEffectiveness, number> = { advantage: 0, neutral: 0, resisted: 0 }
@@ -995,7 +1169,7 @@ function enemyDamageForStep(
     if (count <= 0) continue
     const element = partyAffinity(battle, ecology)
     const tilePower = Math.pow(count / 3, 0.9)
-    const baseContribution = battle.wildAttack * tilePower * combo * (battle.bossDamageScale / 1000)
+    const baseContribution = battle.wildAttack * tilePower * combo * (battle.bossDamageScale / 1000) * attackMultiplier
       * partyPressure * element * (1_400 / (1_400 + Math.max(0, defense) * 2.2))
     let contribution = baseContribution
     if (ecology === wildEcology) {
@@ -1021,7 +1195,7 @@ function enemyDamageForStep(
         contribution *= Math.min(1.4, 1.16 + Math.max(0, count - 3) * 0.04 + Math.max(0, chain - 1) * 0.03)
         signalEffect = { kind: 'overclock', ecology, amount: Math.max(1, Math.round(contribution - baseContribution)) }
       } else {
-        contribution = battle.wildAttack * tilePower * combo * (battle.bossDamageScale / 1000)
+        contribution = battle.wildAttack * tilePower * combo * (battle.bossDamageScale / 1000) * attackMultiplier
           * partyPressure * element * (1_400 / (1_400 + Math.max(0, defense * 0.35) * 2.2)) * 1.05
         signalEffect = { kind: 'breach', ecology, amount: Math.max(1, Math.round(contribution - baseContribution)) }
       }
@@ -1045,15 +1219,12 @@ function enemyDamageForStep(
 
 function applyBossSignalEffect(battle: BattleState, effect: MatchSignalEffect): MatchSignalEffect {
   if (effect.kind === 'repair') {
-    const before = battle.wildHp
-    battle.wildHp = Math.min(battle.wildMaxHp, battle.wildHp + effect.amount)
-    return { ...effect, amount: battle.wildHp - before }
+    return { ...effect, amount: queueWildHealing(battle, effect.amount) }
   }
   if (effect.kind === 'guard') {
-    const before = battle.wildShield
-    battle.wildShield = Math.min(Math.round(battle.wildMaxHp * 0.4), battle.wildShield + effect.amount)
-    return { ...effect, amount: battle.wildShield - before }
+    return { ...effect, amount: queueWildShielding(battle, effect.amount) }
   }
+  activateBossAmplifier(battle, effect)
   return effect
 }
 
@@ -1163,11 +1334,7 @@ function performBossSettlement(battle: BattleState, random: RandomSource): boole
     appendBattleLog(battle, { turn: battle.turn, kind: 'boss-skill', creatureId: wild.id })
     switch (battle.enemyIntent) {
       case 'guard':
-        battle.wildShield = Math.min(
-          Math.round(battle.wildMaxHp * 0.4),
-          battle.wildShield + Math.round(battle.wildMaxHp * 0.1),
-        )
-        appendBattleLog(battle, { turn: battle.turn, kind: 'enemy-shield', amount: battle.wildShield })
+        queueWildShielding(battle, battle.wildMaxHp * 0.1)
         break
       case 'freeze':
         if (target !== undefined) {
@@ -1214,7 +1381,10 @@ function advanceBattleStage(battle: BattleState): boolean {
   const next = nextLivingIndex(battle)
   if (next === undefined) return true
   battle.activeIndex = next.index
-  if (next.wrapped) battle.round += 1
+  if (next.wrapped) {
+    battle.round += 1
+    ageAmplifiers(battle)
+  }
   battle.stage += 1
   battle.actionsRemaining = battle.party[next.index]!.frozenStages > 0 ? 0 : BASE_ACTIONS_PER_CREATURE
   battle.bonusActionsGranted = 0
@@ -1286,6 +1456,9 @@ function installBattle(
     partyHp: partyMaxHp,
     partyMaxHp,
     partyShield: 0,
+    pendingPartyHealing: 0,
+    pendingPartyShielding: 0,
+    partyAmplifiers: [],
     turnOwner: 'player',
     activeIndex: 0,
     actionsRemaining: BASE_ACTIONS_PER_CREATURE,
@@ -1305,6 +1478,9 @@ function installBattle(
     wildMaxHp,
     wildArmor: input.armor,
     wildShield: 0,
+    pendingWildHealing: 0,
+    pendingWildShielding: 0,
+    bossAmplifiers: [],
     wildDefense: input.stats.defense,
     wildAttack: input.stats.attack,
     wildLevel: input.level,
@@ -1433,11 +1609,13 @@ function beginBossPhase(battle: BattleState, random: RandomSource): BattleOutcom
 interface BattleStageCompletion {
   outcome: BattleOutcome
   strike?: TraceWildBattleStrike
+  recovery?: TraceWildBattleRecovery
 }
 
 function finishBossPhase(battle: BattleState, random: RandomSource): BattleStageCompletion {
   const targetHpBefore = battle.partyHp
   const defeated = performBossSettlement(battle, random)
+  const recovery = settleWildRecovery(battle)
   const strike = battle.lastBossAttack > 0
     ? {
         actor: 'boss' as const,
@@ -1447,7 +1625,11 @@ function finishBossPhase(battle: BattleState, random: RandomSource): BattleStage
         targetMaxHp: battle.partyMaxHp,
       }
     : undefined
-  if (defeated) return { outcome: 'battle-lost', ...(strike === undefined ? {} : { strike }) }
+  if (defeated) return {
+    outcome: 'battle-lost',
+    ...(strike === undefined ? {} : { strike }),
+    ...(recovery === undefined ? {} : { recovery }),
+  }
   battle.turnOwner = 'player'
   battle.bossActionsRemaining = 0
   battle.bossActionsTaken = 0
@@ -1455,9 +1637,17 @@ function finishBossPhase(battle: BattleState, random: RandomSource): BattleStage
   battle.pendingBossDamage = 0
   battle.bossDamageScale = 1000
   battle.bossBonusActionsGranted = 0
-  if (advanceBattleStage(battle)) return { outcome: 'battle-lost', ...(strike === undefined ? {} : { strike }) }
+  if (advanceBattleStage(battle)) return {
+    outcome: 'battle-lost',
+    ...(strike === undefined ? {} : { strike }),
+    ...(recovery === undefined ? {} : { recovery }),
+  }
   prepareBossIntent(battle, random)
-  return { outcome: 'none', ...(strike === undefined ? {} : { strike }) }
+  return {
+    outcome: 'none',
+    ...(strike === undefined ? {} : { strike }),
+    ...(recovery === undefined ? {} : { recovery }),
+  }
 }
 
 function completeBattleStage(
@@ -1467,6 +1657,7 @@ function completeBattleStage(
   const next = nextLivingIndex(battle)
   const wrapped = next?.wrapped === true
   if (wrapped) {
+    const recovery = settlePartyRecovery(battle)
     const targetHpBefore = battle.wildHp
     const defeated = settleTeamStrike(battle)
     const strike = battle.lastTeamStrike > 0
@@ -1478,13 +1669,25 @@ function completeBattleStage(
           targetMaxHp: battle.wildMaxHp,
         }
       : undefined
-    if (defeated) return { outcome: 'wild-defeated', ...(strike === undefined ? {} : { strike }) }
+    if (defeated) return {
+      outcome: 'wild-defeated',
+      ...(strike === undefined ? {} : { strike }),
+      ...(recovery === undefined ? {} : { recovery }),
+    }
     if (isCaptureWindowAvailable(battle)) {
       battle.captureWindow = true
-      return { outcome: 'none', ...(strike === undefined ? {} : { strike }) }
+      return {
+        outcome: 'none',
+        ...(strike === undefined ? {} : { strike }),
+        ...(recovery === undefined ? {} : { recovery }),
+      }
     }
     const outcome = beginBossPhase(battle, random)
-    return { outcome, ...(strike === undefined ? {} : { strike }) }
+    return {
+      outcome,
+      ...(strike === undefined ? {} : { strike }),
+      ...(recovery === undefined ? {} : { recovery }),
+    }
   }
   return { outcome: advanceBattleStage(battle) ? 'battle-lost' : 'none' }
 }
@@ -1524,6 +1727,7 @@ function performBattleSwap(
     ? { outcome: 'battle-lost' as const }
     : battle.actionsRemaining === 0 ? completeBattleStage(battle, random) : { outcome: 'none' as const }
   if (completion.strike !== undefined) animation.strike = completion.strike
+  if (completion.recovery !== undefined) animation.recovery = completion.recovery
   return { outcome: completion.outcome, animation }
 }
 
@@ -1611,6 +1815,7 @@ function performBossBoardAction(
     animation: {
       kind: 'match', battleId: battle.id, actor: 'boss', swap: { from: swap.from, to: swap.to }, frames: resolution.frames,
       ...(completion.strike === undefined ? {} : { strike: completion.strike }),
+      ...(completion.recovery === undefined ? {} : { recovery: completion.recovery }),
     },
   }
 }
@@ -1633,9 +1838,15 @@ function continueBattle(
   const completion = completeBattleStage(battle, random)
   return {
     outcome: completion.outcome,
-    ...(completion.strike === undefined
+    ...(completion.strike === undefined && completion.recovery === undefined
       ? {}
-      : { animation: { kind: 'match', battleId: battle.id, actor: 'player', frames: [], strike: completion.strike } }),
+      : {
+          animation: {
+            kind: 'match', battleId: battle.id, actor: 'player', frames: [],
+            ...(completion.strike === undefined ? {} : { strike: completion.strike }),
+            ...(completion.recovery === undefined ? {} : { recovery: completion.recovery }),
+          },
+        }),
   }
 }
 
@@ -1689,8 +1900,8 @@ function castActiveSkill(state: TraceWildState, creatureInstanceId: string, rand
       animationFrames.push(...resolveConvertedBoard(battle, random))
       break
     case 'lumen-foliomoth':
-      healParty(battle, battle.partyMaxHp * 0.08 * scale)
-      shieldParty(battle, member.maxHp * 0.1 * scale)
+      queuePartyHealing(battle, battle.partyMaxHp * 0.08 * scale)
+      queuePartyShielding(battle, member.maxHp * 0.1 * scale)
       break
     case 'lumen-lensel': {
       const wild = creatureById(battleEncounterCreatureId(battle))!
@@ -1708,7 +1919,7 @@ function castActiveSkill(state: TraceWildState, creatureInstanceId: string, rand
       for (let hit = 0; hit < 3; hit += 1) damage += applyRawHit(battle, member, 0.55 * scale)
       break
     case 'forge-rivetclaw':
-      shieldParty(battle, member.maxHp * 0.18 * scale)
+      queuePartyShielding(battle, member.maxHp * 0.18 * scale)
       member.counterPower = 0.8 * scale
       break
     case 'forge-solderling':
@@ -1746,22 +1957,22 @@ function castActiveSkill(state: TraceWildState, creatureInstanceId: string, rand
       animationFrames.push(...resolveConvertedBoard(battle, random))
       break
     case 'aegis-veribud':
-      healParty(battle, battle.partyMaxHp * 0.1 * scale)
+      queuePartyHealing(battle, battle.partyMaxHp * 0.1 * scale)
       break
     case 'aegis-loop-tortoise':
-      shieldParty(battle, battle.partyMaxHp * 0.2 * scale)
+      queuePartyShielding(battle, battle.partyMaxHp * 0.2 * scale)
       break
     case 'aegis-anchorbee':
       battle.enemyDelayed = Math.max(1, battle.enemyDelayed)
       battle.boardLockActions = Math.max(3, battle.boardLockActions)
       break
     case 'aegis-steady-ram':
-      shieldParty(battle, member.maxHp * 0.1 * scale)
+      queuePartyShielding(battle, member.maxHp * 0.1 * scale)
       damage += applyRawHit(battle, member, 1.4 * scale)
       break
     case 'aegis-dawnguard':
-      healParty(battle, battle.partyMaxHp * 0.16 * scale)
-      shieldParty(battle, battle.partyMaxHp * 0.08 * scale)
+      queuePartyHealing(battle, battle.partyMaxHp * 0.16 * scale)
+      queuePartyShielding(battle, battle.partyMaxHp * 0.08 * scale)
       break
     case 'glitch-null-nibbler':
       battle.wildShield = 0
@@ -2065,8 +2276,12 @@ export function applyTraceWildAction(
       if (next.battle === undefined) throw new TraceWildRuleError('conflict')
       const battleId = next.battle.id
       const result = skipPlayerStage(next.battle, random)
-      if (result.strike !== undefined) {
-        animation = { kind: 'match', battleId, actor: 'player', frames: [], strike: result.strike }
+      if (result.strike !== undefined || result.recovery !== undefined) {
+        animation = {
+          kind: 'match', battleId, actor: 'player', frames: [],
+          ...(result.strike === undefined ? {} : { strike: result.strike }),
+          ...(result.recovery === undefined ? {} : { recovery: result.recovery }),
+        }
       }
       if (result.outcome === 'battle-lost') {
         logBattleDefeat(next, now, random)
@@ -2248,6 +2463,40 @@ function restoreBoard(value: unknown): MatchTile[] | undefined {
   return findFirstLegalBattleSwap(board) === undefined ? undefined : board
 }
 
+function restoreAmplifiers(
+  value: unknown,
+  side: 'player' | 'boss',
+  party: readonly BattlePartyMember[],
+): BattleAmplifier[] {
+  if (!Array.isArray(value)) return []
+  const restored: BattleAmplifier[] = []
+  for (const raw of value.slice(0, MAX_AMPLIFIERS_PER_SIDE)) {
+    const row = record(raw)
+    if (row === undefined
+      || row.signal !== 'sync' && row.signal !== 'overclock' && row.signal !== 'breach'
+      || !isEcology(row.ecology)
+      || row.stat !== 'attack' && row.stat !== 'penetration'
+      || row.scope !== 'team' && row.scope !== 'member' && row.scope !== 'self' && row.scope !== 'opponent') continue
+    if (side === 'player' && row.scope !== 'team' && row.scope !== 'member' && row.scope !== 'opponent') continue
+    if (side === 'boss' && row.scope !== 'self' && row.scope !== 'opponent') continue
+    const targetInstanceId = typeof row.targetInstanceId === 'string' ? row.targetInstanceId : undefined
+    if (row.scope === 'member' && (targetInstanceId === undefined
+      || !party.some(member => member.instanceId === targetInstanceId))) continue
+    if (row.scope !== 'member' && targetInstanceId !== undefined) continue
+    const amplifier: BattleAmplifier = {
+      signal: row.signal,
+      ecology: row.ecology,
+      stat: row.stat,
+      scope: row.scope,
+      valuePermille: Math.max(10, safeInt(row.valuePermille, 10, 500)),
+      remainingRounds: Math.max(1, safeInt(row.remainingRounds, 1, 3)),
+      ...(targetInstanceId === undefined ? {} : { targetInstanceId }),
+    }
+    if (!restored.some(value => sameAmplifier(value, amplifier))) restored.push(amplifier)
+  }
+  return restored
+}
+
 function restoreBattle(root: Record<string, unknown>, state: TraceWildState): BattleState | undefined {
   const raw = record(root.battle)
   if (raw === undefined) return undefined
@@ -2347,6 +2596,13 @@ function restoreBattle(root: Record<string, unknown>, state: TraceWildState): Ba
       party.reduce((sum, member) => sum + member.shield, 0),
       partyMaxHp,
     ),
+    pendingPartyHealing: turnOwner === 'player'
+      ? safeInt(raw.pendingPartyHealing, 0, partyMaxHp - partyHp)
+      : 0,
+    pendingPartyShielding: turnOwner === 'player'
+      ? safeInt(raw.pendingPartyShielding, 0, partyMaxHp)
+      : 0,
+    partyAmplifiers: restoreAmplifiers(raw.partyAmplifiers, 'player', party),
     turnOwner,
     activeIndex,
     actionsRemaining,
@@ -2370,6 +2626,13 @@ function restoreBattle(root: Record<string, unknown>, state: TraceWildState): Ba
     wildMaxHp,
     wildArmor: safeInt(raw.wildArmor, encounter?.armor ?? towerProfile!.armor, 12),
     wildShield: safeInt(raw.wildShield, 0, wildMaxHp),
+    pendingWildHealing: turnOwner === 'boss'
+      ? safeInt(raw.pendingWildHealing, 0, wildMaxHp)
+      : 0,
+    pendingWildShielding: turnOwner === 'boss'
+      ? safeInt(raw.pendingWildShielding, 0, wildMaxHp)
+      : 0,
+    bossAmplifiers: restoreAmplifiers(raw.bossAmplifiers, 'boss', party),
     wildDefense: towerProfile === undefined
       ? safeInt(raw.wildDefense, fallbackWildStats.defense, 999_999)
       : fallbackWildStats.defense,
@@ -2403,6 +2666,22 @@ function restoreBattle(root: Record<string, unknown>, state: TraceWildState): Ba
   restored.pendingBossDamage = turnOwner === 'boss'
     ? safeInt(raw.pendingBossDamage, 0, partyHp + restored.partyShield)
     : 0
+  restored.pendingPartyHealing = Math.min(
+    restored.pendingPartyHealing,
+    Math.max(0, restored.partyMaxHp - restored.partyHp),
+  )
+  restored.pendingPartyShielding = Math.min(
+    restored.pendingPartyShielding,
+    Math.max(0, Math.round(restored.partyMaxHp * 0.6) - restored.partyShield),
+  )
+  restored.pendingWildHealing = Math.min(
+    restored.pendingWildHealing,
+    Math.max(0, restored.wildMaxHp - restored.wildHp),
+  )
+  restored.pendingWildShielding = Math.min(
+    restored.pendingWildShielding,
+    Math.max(0, Math.round(restored.wildMaxHp * 0.4) - restored.wildShield),
+  )
   syncLegacyPartyHealth(restored)
   return restored
 }

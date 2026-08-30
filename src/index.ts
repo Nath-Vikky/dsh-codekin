@@ -6,7 +6,7 @@ import type { Session, SessionEvent, SessionStore } from '@deepseek-ai/dsh-sessi
 import { createTraceWildRoutes } from './host/routes.ts'
 import { TraceWildService } from './host/service.ts'
 
-export * from './core/index.ts'
+export * from '../packages/engine/src/index.ts'
 export { TraceWildService } from './host/service.ts'
 
 export const name = 'dsh-codekin'

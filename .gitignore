@@ -11,6 +11,8 @@ coverage/
 lib/types/**/*.js
 lib/types/**/*.js.map
 lib/tsconfig.tsbuildinfo
+lib/types/*.tsbuildinfo
+packages/*/tsconfig.tsbuildinfo
 
 # Tool caches and reports
 .cache/

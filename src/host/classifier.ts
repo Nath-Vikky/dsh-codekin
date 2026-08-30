@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
-import type { TraceEcology, TraceSignal } from '../core/types.ts'
+import type { TraceEcology, TraceSignal } from '../../packages/engine/src/types.ts'
 
 interface TurnTrace {
   turn: number

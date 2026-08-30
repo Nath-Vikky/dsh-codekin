@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createInitialTraceWildState } from '../src/core/engine.ts'
+import { createInitialTraceWildState } from '../packages/engine/src/engine.ts'
 import { TraceWildPersistence } from '../src/host/persistence.ts'
 
 const roots: string[] = []

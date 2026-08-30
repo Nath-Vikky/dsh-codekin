@@ -7,14 +7,14 @@ import {
   createInitialTraceWildState,
   expireTraceWildEncounters,
   settleTraceWildIdleRewards,
-} from '../core/engine.ts'
+} from '../../packages/engine/src/engine.ts'
 import type {
   RandomSource,
   TraceWildAction,
   TraceWildActionResponse,
   TraceWildSnapshot,
   TraceWildState,
-} from '../core/types.ts'
+} from '../../packages/engine/src/types.ts'
 import { TraceWildEventClassifier } from './classifier.ts'
 import { TraceWildPersistence } from './persistence.ts'
 

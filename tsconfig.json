@@ -1,31 +1,14 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2024",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true,
-    "jsx": "react-jsx",
-    "lib": ["ES2024", "DOM", "DOM.Iterable"],
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "noImplicitOverride": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "skipLibCheck": true,
-    "isolatedModules": true,
-    "verbatimModuleSyntax": true,
-    "forceConsistentCasingInFileNames": true,
-    "preserveSymlinks": true,
     "composite": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "rootDir": "src",
+    "rootDir": ".",
     "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.tsbuildinfo",
     "types": ["node"]
   },
-  "include": ["src"]
+  "include": ["src", "packages/engine/src"]
 }

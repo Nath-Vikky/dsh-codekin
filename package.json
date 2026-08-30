@@ -7,18 +7,19 @@
   "packageManager": "pnpm@11.7.0",
   "engines": { "node": "^22.19.0 || >=24.0.0" },
   "scripts": {
-    "build": "node --run clean && tsc -p tsconfig.json && tsdown",
-    "clean": "node --eval \"import('node:fs/promises').then(({rm}) => rm('lib', { recursive: true, force: true }))\"",
+    "build": "node --run clean && pnpm --filter @nath-vikky/codekin-engine build && tsc -p tsconfig.json && tsdown",
+    "clean": "node --eval \"import('node:fs/promises').then(async ({rm}) => { await rm('lib', { recursive: true, force: true }); await rm('packages/engine/dist', { recursive: true, force: true }) })\"",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit --pretty false && tsc -p tsconfig.vitest.json --noEmit --pretty false",
+    "typecheck": "pnpm --filter @nath-vikky/codekin-engine typecheck && tsc -p tsconfig.json --noEmit --pretty false && tsc -p tsconfig.vitest.json --noEmit --pretty false",
     "check": "node --run typecheck && node --run test && node --run build",
     "prepack": "node --run check"
   },
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
   "exports": {
-    ".": { "types": "./lib/types/index.d.ts", "default": "./lib/index.js" },
-    "./client": { "types": "./lib/types/client/index.d.ts", "default": "./lib/client.js" },
+    ".": { "types": "./lib/types/src/index.d.ts", "default": "./lib/index.js" },
+    "./client": { "types": "./lib/types/src/client/index.d.ts", "default": "./lib/client.js" },
+    "./engine": { "types": "./lib/types/packages/engine/src/index.d.ts", "default": "./lib/engine.js" },
     "./package.json": "./package.json"
   },
   "dsh": {
@@ -62,14 +63,14 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.1",
-    "@deepseek-ai/dsh-client-connection": "link:../deepseek-harness/packages/client/connection",
-    "@deepseek-ai/dsh-client-locale": "link:../deepseek-harness/packages/client/locale",
-    "@deepseek-ai/dsh-client-ui-layout": "link:../deepseek-harness/packages/client/ui-layout",
-    "@deepseek-ai/dsh-client-ui-renderer": "link:../deepseek-harness/packages/client/ui-renderer",
-    "@deepseek-ai/dsh-client-ui-settings": "link:../deepseek-harness/packages/client/ui-settings",
-    "@deepseek-ai/dsh-client-ui-slots": "link:../deepseek-harness/packages/client/ui-slots",
-    "@deepseek-ai/dsh-host-webserver": "link:../deepseek-harness/packages/host/webserver",
-    "@deepseek-ai/dsh-session": "link:../deepseek-harness/packages/core/session",
+    "@deepseek-ai/dsh-client-connection": "link:../deepseek-harness-alpha/packages/client/connection",
+    "@deepseek-ai/dsh-client-locale": "link:../deepseek-harness-alpha/packages/client/locale",
+    "@deepseek-ai/dsh-client-ui-layout": "link:../deepseek-harness-alpha/packages/client/ui-layout",
+    "@deepseek-ai/dsh-client-ui-renderer": "link:../deepseek-harness-alpha/packages/client/ui-renderer",
+    "@deepseek-ai/dsh-client-ui-settings": "link:../deepseek-harness-alpha/packages/client/ui-settings",
+    "@deepseek-ai/dsh-client-ui-slots": "link:../deepseek-harness-alpha/packages/client/ui-slots",
+    "@deepseek-ai/dsh-host-webserver": "link:../deepseek-harness-alpha/packages/host/webserver",
+    "@deepseek-ai/dsh-session": "link:../deepseek-harness-alpha/packages/core/session",
     "@types/node": "22.20.0",
     "@types/react": "18.3.26",
     "@types/react-dom": "18.3.7",
@@ -86,6 +87,7 @@
   "license": "MIT",
   "files": [
     "lib/index.js", "lib/index.js.map", "lib/client.js", "lib/client.js.map",
+    "lib/engine.js", "lib/engine.js.map",
     "lib/types/**/*.d.ts", "lib/types/**/*.d.ts.map",
     "assets/creatures/sprite-gallery-v1.png", "assets/creatures/sprites",
     "cordis.patch.yml", "LICENSE", "README.md", "README.zh-CN.md"

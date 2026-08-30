@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CREATURE_CATALOG } from '../src/core/catalog.ts'
+import { CREATURE_CATALOG } from '../packages/engine/src/catalog.ts'
 import {
   MAX_MAP_ENCOUNTERS,
   encounterLifetimeMs,
@@ -8,7 +8,7 @@ import {
   wildLevelForRoster,
   wildStats,
   xpToNextLevel,
-} from '../src/core/balance.ts'
+} from '../packages/engine/src/balance.ts'
 import {
   applyTraceSignal,
   applyTraceWildAction,
@@ -16,7 +16,7 @@ import {
   expireTraceWildEncounters,
   restoreTraceWildState,
   settleTraceWildIdleRewards,
-} from '../src/core/engine.ts'
+} from '../packages/engine/src/engine.ts'
 import {
   MATCH_BOARD_CELLS,
   MATCH_BOARD_SIZE,
@@ -24,10 +24,10 @@ import {
   createMatchBoard,
   findFirstLegalBattleSwap,
   resolveBattleSwap,
-} from '../src/core/match3.ts'
-import { CREATURE_SKILLS } from '../src/core/skills.ts'
-import { towerFloorProfile } from '../src/core/tower.ts'
-import type { TraceWildState } from '../src/core/types.ts'
+} from '../packages/engine/src/match3.ts'
+import { CREATURE_SKILLS } from '../packages/engine/src/skills.ts'
+import { towerFloorProfile } from '../packages/engine/src/tower.ts'
+import type { TraceWildState } from '../packages/engine/src/types.ts'
 
 const low = (): number => 0
 

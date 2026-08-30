@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { TraceWildSnapshot } from '../../core/types.ts'
+import type { TraceWildSnapshot } from '../../../packages/engine/src/types.ts'
 import { createTraceWildConnection, notifyTraceWildSettingsChanged } from '../bridge.ts'
 import css from './tracewild.module.css'
 

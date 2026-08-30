@@ -32,12 +32,16 @@ function sourceAssetPath(source: string, importer: string): string {
   const marker = `${sep}lib${sep}types${sep}`
   const boundary = emitted.indexOf(marker)
   if (boundary < 0) return emitted
-  return resolve(emitted.slice(0, boundary), 'src', emitted.slice(boundary + marker.length))
+  const sourceRelative = emitted.slice(boundary + marker.length)
+  return resolve(emitted.slice(0, boundary), sourceRelative)
 }
 
 const host: UserConfig = {
   name: PACKAGE_ID,
-  entry: ['lib/types/index.js'],
+  entry: {
+    index: 'lib/types/src/index.js',
+    engine: 'lib/types/packages/engine/src/index.js',
+  },
   outDir: 'lib',
   format: ['esm'],
   platform: 'node',
@@ -53,7 +57,7 @@ const host: UserConfig = {
 
 const client: UserConfig = {
   name: `${PACKAGE_ID}/client`,
-  entry: { client: 'lib/types/client/index.js' },
+  entry: { client: 'lib/types/src/client/index.js' },
   outDir: 'lib',
   format: 'cjs',
   platform: 'browser',

@@ -1,8 +1,8 @@
 import { mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
-import { createInitialTraceWildState, restoreTraceWildState } from '../core/engine.ts'
-import type { TraceWildState } from '../core/types.ts'
+import { createInitialTraceWildState, restoreTraceWildState } from '../../packages/engine/src/engine.ts'
+import type { TraceWildState } from '../../packages/engine/src/types.ts'
 
 const MAX_STATE_BYTES = 2 * 1024 * 1024
 

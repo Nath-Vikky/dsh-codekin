@@ -6,9 +6,9 @@ import type {
   TraceWildActionResponse,
   TraceWildBattleAnimation,
   TraceWildSnapshot,
-} from '../core/types.ts'
-import { TRACE_ECOLOGIES } from '../core/catalog.ts'
-import { MATCH_BOARD_CELLS, MATCH_BOARD_SIZE, MAX_MATCH_CASCADES, areAdjacentTiles } from '../core/match3.ts'
+} from '../../packages/engine/src/types.ts'
+import { TRACE_ECOLOGIES } from '../../packages/engine/src/catalog.ts'
+import { MATCH_BOARD_CELLS, MATCH_BOARD_SIZE, MAX_MATCH_CASCADES, areAdjacentTiles } from '../../packages/engine/src/match3.ts'
 
 const API = '/api/tracewild'
 const TRACEWILD_SETTINGS_CHANGED_EVENT = 'dsh-codekin:settings-changed'

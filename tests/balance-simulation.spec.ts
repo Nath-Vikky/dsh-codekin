@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { totalXpForLevel } from '../src/core/balance.ts'
-import { applyTraceWildAction, createInitialTraceWildState } from '../src/core/engine.ts'
-import { findFirstLegalBattleSwap } from '../src/core/match3.ts'
-import type { CaptureCoreQuality, TraceWildState } from '../src/core/types.ts'
+import { totalXpForLevel } from '../packages/engine/src/balance.ts'
+import { applyTraceWildAction, createInitialTraceWildState } from '../packages/engine/src/engine.ts'
+import { findFirstLegalBattleSwap } from '../packages/engine/src/match3.ts'
+import type { CaptureCoreQuality, TraceWildState } from '../packages/engine/src/types.ts'
 
 function seededRandom(seedValue: number): () => number {
   let seed = seedValue >>> 0

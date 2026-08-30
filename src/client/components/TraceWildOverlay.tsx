@@ -7,7 +7,7 @@ import {
   CREATURE_CATALOG,
   STARTER_CREATURE_IDS,
   creatureById,
-} from '../../core/catalog.ts'
+} from '../../../packages/engine/src/catalog.ts'
 import {
   CORE_CAPTURE_POWER,
   MATERIAL_XP,
@@ -17,10 +17,10 @@ import {
   playerStats,
   totalXpForLevel,
   xpToNextLevel,
-} from '../../core/balance.ts'
-import { MATCH_BOARD_SIZE, areAdjacentTiles } from '../../core/match3.ts'
-import { skillByCreatureId } from '../../core/skills.ts'
-import { MAX_TOWER_FLOOR, towerFloorProfile } from '../../core/tower.ts'
+} from '../../../packages/engine/src/balance.ts'
+import { MATCH_BOARD_SIZE, areAdjacentTiles } from '../../../packages/engine/src/match3.ts'
+import { skillByCreatureId } from '../../../packages/engine/src/skills.ts'
+import { MAX_TOWER_FLOOR, towerFloorProfile } from '../../../packages/engine/src/tower.ts'
 import type {
   BattleAmplifier,
   CaptureCoreQuality,
@@ -36,7 +36,7 @@ import type {
   TraceWildBattleRecovery,
   TraceWildBattleStrike,
   TraceWildSnapshot,
-} from '../../core/types.ts'
+} from '../../../packages/engine/src/types.ts'
 import {
   TraceWildConnectionError,
   createTraceWildConnection,

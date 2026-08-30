@@ -12,7 +12,7 @@ requests, or agent behavior.
 
 ### DSH `0.1.2-alpha.1` preview
 
-Codekin `0.3.1-alpha.1` targets the source-only DSH `0.1.2-alpha.1` preview. It is distributed only
+Codekin `0.3.2` targets the source-only DSH `0.1.2-alpha.1` preview. It is distributed only
 through GitHub and is intentionally blocked from npm publishing. The current `main` branch commits
 its reviewed runtime bundles, so the dsh-web Workshop-compatible repository install needs no Alpha
 SDK checkout:
@@ -24,7 +24,7 @@ dsh plugin --profile web add https://github.com/Nath-Vikky/dsh-codekin
 For a reproducible version-pinned install, use the release asset instead:
 
 ```sh
-dsh plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.1-alpha.1/nath-vikky-dsh-codekin-0.3.1-alpha.1.tgz
+dsh plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.2/nath-vikky-dsh-codekin-0.3.2.tgz
 ```
 
 Restart DSH Web after installation, then open **DSH Settings → Codekin** and enable the plugin.
@@ -112,7 +112,7 @@ or modify conversations.
 ## Compatibility and status
 
 - `0.2.0`: stable npm `latest`, for DeepSeek Harness Web `0.1.0-rc.5`.
-- `0.3.1-alpha.1`: GitHub-only prerelease, for the source tag `dsh-v0.1.2-alpha.1`.
+- `0.3.2`: GitHub-only prerelease, for the source tag `dsh-v0.1.2-alpha.1`.
 
 The Alpha build has been validated in an isolated official source profile for package installation,
 client composition, authenticated state/action/assets, client-bundle HMR, and live Cordis

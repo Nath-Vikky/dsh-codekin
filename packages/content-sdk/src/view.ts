@@ -5,13 +5,11 @@ import type {
   ContentQualityDefinition,
   ContentRegistry,
   ContentSkillDefinition,
+  ContentPackIdentity,
 } from './types.ts'
 import { CONTENT_API_VERSION } from './types.ts'
 
-export interface ContentViewPack {
-  id: string
-  version: string
-}
+export type ContentViewPack = ContentPackIdentity
 
 /** Client-safe content data. Mechanics, aliases, and dependency internals are intentionally omitted. */
 export interface CodekinContentView {

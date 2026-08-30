@@ -1,7 +1,9 @@
 export * from '../packages/engine/src/index.ts';
+export * from './composition.ts';
 export * from '../content-packs/core/src/catalog.ts';
 export { CREATURE_SKILLS, skillByCreatureId, } from '../content-packs/core/src/skills.ts';
 export * from '../content-packs/core/src/mechanics.ts';
+export declare const CORE_CODEKIN_COMPOSITION: import("./composition.ts").CodekinComposition;
 export declare const CORE_CONTENT_REGISTRY: import("../packages/content-sdk/src/types.ts").ContentRegistry;
 export declare const CORE_CONTENT_VIEW: import("../packages/content-sdk/src/view.ts").CodekinContentView;
 export declare const CORE_ENGINE_CONTENT: import("./core-runtime.ts").CodekinEngineContent;

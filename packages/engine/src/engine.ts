@@ -3122,7 +3122,9 @@ export function restoreTraceWildState(value: unknown, now = Date.now()): TraceWi
     .filter((creature): creature is CapturedCreature => creature !== undefined)
   const migratedPartyLevel = effectivePartyLevel(migratedParty)
 
-  const rawDex = Array.isArray(root.dex) ? root.dex.slice(0, 25) : []
+  const rawDex = Array.isArray(root.dex)
+    ? root.dex.slice(0, currentEngineContent().creatures.length)
+    : []
   for (const raw of rawDex) {
     const row = record(raw)
     if (row === undefined) continue

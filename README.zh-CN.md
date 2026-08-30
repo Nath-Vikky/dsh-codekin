@@ -2,6 +2,8 @@
 
 [English](README.md) · [稳定版 npm 包](https://www.npmjs.com/package/@nath-vikky/dsh-codekin) · [GitHub 版本发布](https://github.com/Nath-Vikky/dsh-codekin/releases)
 
+[游戏引擎与内容包架构](docs/architecture.zh-CN.md)
+
 码灵是一款面向 DeepSeek Harness Web 的精灵收集与三消对战插件。它会将 DSH
 运行过程中的高层结果转化为本地游戏事件，不修改提示词、工具、模型请求或 Agent 行为。
 
@@ -103,7 +105,7 @@ dsh plugin --profile web add @nath-vikky/dsh-codekin@latest
 
 游戏进度保存在本地的 `$DSH_HOME/codekinsave/state.json`。码灵只记录有界的游戏事件与聚合后的
 运行结果，不保存提示词正文、助手回复、工具参数、命令、工作区路径或原始错误内容。它不会提交提示词、调用工具、修改模型请求
-或改变会话内容。
+或改变会话内容。磁盘存档封装会记录自身格式、引擎版本和有序内容包身份，并继续自动迁移此前的裸状态存档。
 
 ## 兼容性与状态
 

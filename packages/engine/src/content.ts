@@ -4,6 +4,7 @@ import {
 } from '../../content-sdk/src/types.ts'
 import type {
   CaptureCoreQuality,
+  ContentPackIdentity,
   ContentCreatureMechanicsDefinition,
   ContentRegistry,
   CreatureDefinition,
@@ -14,6 +15,7 @@ import { assertMechanicsContract } from './mechanics-contract.ts'
 
 export interface CodekinEngineContent {
   readonly id: string
+  readonly packs: readonly ContentPackIdentity[]
   readonly creatures: readonly CreatureDefinition[]
   readonly skills: readonly CreatureSkillDefinition[]
   readonly mechanics: readonly ContentCreatureMechanicsDefinition[]
@@ -113,10 +115,15 @@ export function createEngineContent(registry: ContentRegistry): CodekinEngineCon
   const towerRotation = Object.freeze(registry.packs.flatMap(pack => pack.tower.rotation))
   if (starterCreatureIds.length === 0) throw new EngineContentError(['at least one starter is required'])
   if (towerRotation.length === 0) throw new EngineContentError(['at least one tower creature is required'])
-  const id = registry.packs.map(pack => `${pack.manifest.id}@${pack.manifest.version}`).join('+')
+  const packs = Object.freeze(registry.packs.map(pack => Object.freeze({
+    id: pack.manifest.id,
+    version: pack.manifest.version,
+  })))
+  const id = packs.map(pack => `${pack.id}@${pack.version}`).join('+')
 
   return Object.freeze({
     id,
+    packs,
     creatures,
     skills,
     mechanics: Object.freeze([...registry.mechanics]),

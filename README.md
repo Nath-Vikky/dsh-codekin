@@ -2,6 +2,8 @@
 
 [简体中文](README.zh-CN.md) · [Stable npm package](https://www.npmjs.com/package/@nath-vikky/dsh-codekin) · [GitHub Releases](https://github.com/Nath-Vikky/dsh-codekin/releases)
 
+[Engine and content-pack architecture](docs/architecture.md)
+
 Codekin is a creature-collection and match-three battle plugin for DeepSeek Harness Web. It turns
 high-level DSH runtime outcomes into local game events without changing prompts, tools, model
 requests, or agent behavior.
@@ -125,7 +127,8 @@ spawn slot.
 Game progress is stored locally at `$DSH_HOME/codekinsave/state.json`. Codekin records bounded game
 events and aggregate runtime outcomes; it does not store prompt text, assistant responses, tool arguments, commands,
 workspace paths, or raw error bodies. It does not submit prompts, invoke tools, alter model requests,
-or modify conversations.
+or modify conversations. The on-disk save envelope records its format, engine version, and ordered content-pack
+identity while retaining automatic migration from the previous raw state format.
 
 ## Compatibility and status
 

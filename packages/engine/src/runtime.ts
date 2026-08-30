@@ -1,5 +1,5 @@
 import type { CodekinEngineContent } from './content.ts'
-import { withEngineContent } from './content.ts'
+import { CODEKIN_ENGINE_VERSION, withEngineContent } from './content.ts'
 import {
   applyTraceSignal,
   applyTraceWildAction,
@@ -12,6 +12,7 @@ import {
 import { towerFloorProfile } from './tower.ts'
 
 export interface CodekinRuntime {
+  readonly engineVersion: typeof CODEKIN_ENGINE_VERSION
   readonly content: CodekinEngineContent
   readonly createInitialTraceWildState: typeof createInitialTraceWildState
   readonly settleTraceWildIdleRewards: typeof settleTraceWildIdleRewards
@@ -26,6 +27,7 @@ export interface CodekinRuntime {
 export function createCodekinRuntime(content: CodekinEngineContent): CodekinRuntime {
   const run = <Result>(operation: () => Result): Result => withEngineContent(content, operation)
   return Object.freeze({
+    engineVersion: CODEKIN_ENGINE_VERSION,
     content,
     createInitialTraceWildState: (...args: Parameters<typeof createInitialTraceWildState>) => run(() => createInitialTraceWildState(...args)),
     settleTraceWildIdleRewards: (...args: Parameters<typeof settleTraceWildIdleRewards>) => run(() => settleTraceWildIdleRewards(...args)),

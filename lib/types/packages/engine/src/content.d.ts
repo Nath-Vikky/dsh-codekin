@@ -1,6 +1,7 @@
-import type { CaptureCoreQuality, ContentCreatureMechanicsDefinition, ContentRegistry, CreatureDefinition, CreatureSkillDefinition, TraceEcology } from '../../content-sdk/src/types.ts';
+import type { CaptureCoreQuality, ContentPackIdentity, ContentCreatureMechanicsDefinition, ContentRegistry, CreatureDefinition, CreatureSkillDefinition, TraceEcology } from '../../content-sdk/src/types.ts';
 export interface CodekinEngineContent {
     readonly id: string;
+    readonly packs: readonly ContentPackIdentity[];
     readonly creatures: readonly CreatureDefinition[];
     readonly skills: readonly CreatureSkillDefinition[];
     readonly mechanics: readonly ContentCreatureMechanicsDefinition[];

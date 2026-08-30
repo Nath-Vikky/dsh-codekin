@@ -62,6 +62,11 @@ export interface ContentPackManifest {
   priority?: number
 }
 
+export interface ContentPackIdentity {
+  id: string
+  version: string
+}
+
 export interface ContentEcologyDefinition {
   id: string
   order: number

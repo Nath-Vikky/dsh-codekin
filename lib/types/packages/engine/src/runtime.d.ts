@@ -1,7 +1,9 @@
 import type { CodekinEngineContent } from './content.ts';
+import { CODEKIN_ENGINE_VERSION } from './content.ts';
 import { applyTraceSignal, applyTraceWildAction, captureChanceForBattle, createInitialTraceWildState, expireTraceWildEncounters, restoreTraceWildState, settleTraceWildIdleRewards } from './engine.ts';
 import { towerFloorProfile } from './tower.ts';
 export interface CodekinRuntime {
+    readonly engineVersion: typeof CODEKIN_ENGINE_VERSION;
     readonly content: CodekinEngineContent;
     readonly createInitialTraceWildState: typeof createInitialTraceWildState;
     readonly settleTraceWildIdleRewards: typeof settleTraceWildIdleRewards;

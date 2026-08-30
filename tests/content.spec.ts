@@ -1,14 +1,14 @@
+import { existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { CORE_CONTENT_PACK } from '../content-packs/core/src/index.ts'
 import {
   ContentPackValidationError,
   contentPackIssues,
   createContentRegistry,
-  createContentView,
   defineContentPack,
 } from '../packages/content-sdk/src/index.ts'
-import { CODEKIN_ENGINE_VERSION, createEngineContent } from '../packages/engine/src/content.ts'
-import { createCodekinRuntime } from '../packages/engine/src/runtime.ts'
+import { createCodekinComposition } from '../src/composition.ts'
 
 const ADDON_CONTENT_PACK = defineContentPack({
   manifest: {
@@ -107,6 +107,10 @@ describe('Codekin content packs', () => {
     expect(registry.asset('creature:forge-rivetclaw:sprite')?.path).toBe(
       'sprites/forge-rivetclaw.webp',
     )
+    const assetRoot = new URL('../assets/creatures/', import.meta.url)
+    expect(registry.assets.filter(asset => (
+      !existsSync(fileURLToPath(new URL(asset.path, assetRoot)))
+    ))).toEqual([])
   })
 
   it('rejects malformed manifests before registry construction', () => {
@@ -152,22 +156,20 @@ describe('Codekin content packs', () => {
   })
 
   it('composes a dependency-ordered extension pack into the engine and client view', () => {
-    const registry = createContentRegistry(
-      [ADDON_CONTENT_PACK, CORE_CONTENT_PACK],
-      { engineVersion: CODEKIN_ENGINE_VERSION },
-    )
+    const composition = createCodekinComposition([ADDON_CONTENT_PACK, CORE_CONTENT_PACK])
+    const { registry } = composition
     expect(registry.packs.map(pack => pack.manifest.id)).toEqual([
       '@nath-vikky/codekin-core',
       '@example/codekin-addon',
     ])
     expect(registry.creatures).toHaveLength(26)
 
-    const view = createContentView(registry)
+    const { view } = composition
     expect(view.creatures.at(-1)?.id).toBe('addon-pulsebeetle')
     expect(view.towerRotation.at(-1)).toBe('addon-pulsebeetle')
     expect(JSON.stringify(view)).not.toContain('mechanics')
 
-    const runtime = createCodekinRuntime(createEngineContent(registry))
+    const { runtime } = composition
     const initial = runtime.createInitialTraceWildState(1_000)
     const result = runtime.applyTraceWildAction(
       initial,

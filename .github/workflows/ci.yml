@@ -6,6 +6,7 @@ on:
       - main
       - 'feat/**'
       - 'compat/**'
+      - 'next/**'
   pull_request:
 
 permissions:
@@ -17,7 +18,7 @@ concurrency:
 
 jobs:
   alpha:
-    name: DSH Alpha (${{ matrix.os }}, Node ${{ matrix.node }})
+    name: DSH Alpha.2 (${{ matrix.os }}, Node ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
@@ -48,19 +49,6 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: pnpm
-
-      - name: Checkout pinned DSH Alpha source
-        run: |
-          git clone --depth 1 --branch dsh-v0.1.2-alpha.2 \
-            https://github.com/deepseek-ai/deepseek-harness.git \
-            "$GITHUB_WORKSPACE/../deepseek-harness"
-          test "$(git -C "$GITHUB_WORKSPACE/../deepseek-harness" rev-parse HEAD)" = \
-            "0a53fb55bea101816fa226bb964ae2bed71c343b"
-
-      - name: Build official Alpha libraries
-        run: |
-          pnpm --dir "$GITHUB_WORKSPACE/../deepseek-harness" install --frozen-lockfile --ignore-scripts
-          pnpm --dir "$GITHUB_WORKSPACE/../deepseek-harness" run build:lib
 
       - name: Install Codekin dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts

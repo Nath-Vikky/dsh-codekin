@@ -12,21 +12,21 @@ requests, or agent behavior.
 
 ## Install and enable
 
-### DSH `0.1.2` Alpha preview
+### DSH `0.1.2-alpha.2` preview
 
-Codekin `0.3.2` supports the source-only DSH `0.1.2-alpha.1` and `0.1.2-alpha.2` previews. It is distributed only
-through GitHub and is intentionally blocked from npm publishing. The current `main` branch commits
-its reviewed runtime bundles, so the dsh-web Workshop-compatible repository install needs no Alpha
-SDK checkout:
+Codekin `0.3.2` uses the npm-published DSH `0.1.2-alpha.2` as its current development and validation
+baseline. The Codekin preview itself remains GitHub-only and is intentionally blocked from npm
+publishing. The current `main` branch commits its reviewed runtime bundles. Because npm's `latest`
+tag still points to the RC release line, install and launch Alpha DSH with an explicit version:
 
 ```sh
-dsh plugin --profile web add https://github.com/Nath-Vikky/dsh-codekin
+pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add https://github.com/Nath-Vikky/dsh-codekin
 ```
 
 For a reproducible version-pinned install, use the release asset instead:
 
 ```sh
-dsh plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.2/nath-vikky-dsh-codekin-0.3.2.tgz
+pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.2/nath-vikky-dsh-codekin-0.3.2.tgz
 ```
 
 Restart DSH Web after installation, then open **DSH Settings → Codekin** and enable the plugin.
@@ -133,9 +133,9 @@ identity while retaining automatic migration from the previous raw state format.
 ## Compatibility and status
 
 - `0.2.0`: stable npm `latest`, for DeepSeek Harness Web `0.1.0-rc.5`.
-- `0.3.2`: GitHub-only prerelease, verified against source tags `dsh-v0.1.2-alpha.1` and `dsh-v0.1.2-alpha.2`.
+- `0.3.2`: GitHub-only prerelease, validated against the npm package `@deepseek-ai/dsh@0.1.2-alpha.2`.
 
-The Alpha build has been validated in an isolated official source profile for package installation,
+The Alpha build has been validated in an isolated official npm profile for package installation,
 client composition, authenticated state/action/assets, client-bundle HMR, and live Cordis
 disable/re-enable cleanup. It is still a compatibility preview because upstream Alpha APIs may
 change again before the next stable DSH release.

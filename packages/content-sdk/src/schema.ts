@@ -16,7 +16,10 @@ export const CONTENT_PACK_SCHEMA = {
   $id: 'https://codekin.dev/schema/content-pack-v1.json',
   type: 'object',
   additionalProperties: false,
-  required: ['manifest', 'ecologies', 'qualities', 'creatures', 'skills', 'starters', 'tower', 'assets'],
+  required: [
+    'manifest', 'ecologies', 'qualities', 'creatures', 'skills', 'mechanics',
+    'encounters', 'starters', 'tower', 'assets',
+  ],
   properties: {
     manifest: {
       type: 'object',
@@ -114,6 +117,55 @@ export const CONTENT_PACK_SCHEMA = {
             required: ['name', 'description'],
             properties: { name: localizedText, description: localizedText },
           },
+        },
+      },
+    },
+    mechanics: {
+      type: 'array', maxItems: 2048,
+      items: {
+        type: 'object', additionalProperties: false,
+        required: ['creatureId', 'bindings'],
+        properties: {
+          creatureId: { type: 'string', pattern: ID_PATTERN },
+          bindings: {
+            type: 'array', minItems: 1, maxItems: 64,
+            items: {
+              type: 'object', additionalProperties: false,
+              required: ['trigger', 'opcode'],
+              properties: {
+                trigger: {
+                  enum: [
+                    'energy:overflow', 'damage:modify', 'match:after',
+                    'energy:after-distribute', 'stage:enter', 'defeat:before',
+                    'runtime:threshold', 'damage:taken', 'skill:before', 'skill:cast',
+                  ],
+                },
+                opcode: { type: 'string', pattern: ID_PATTERN },
+                priority: { type: 'integer', minimum: -1000, maximum: 1000 },
+                params: {
+                  type: 'object', maxProperties: 24,
+                  propertyNames: { pattern: '^[A-Za-z][A-Za-z0-9_-]{0,63}$' },
+                  additionalProperties: {
+                    anyOf: [
+                      { type: 'string', minLength: 1, maxLength: 128 },
+                      { type: 'number', minimum: -1000000, maximum: 1000000 },
+                      { type: 'boolean' },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    encounters: {
+      type: 'object', additionalProperties: false, required: ['variants'],
+      properties: {
+        variants: {
+          type: 'object', maxProperties: 128,
+          propertyNames: { pattern: '^[a-z][a-z0-9-]{0,63}$' },
+          additionalProperties: { type: 'string', pattern: ID_PATTERN },
         },
       },
     },

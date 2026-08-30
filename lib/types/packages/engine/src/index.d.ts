@@ -2,6 +2,8 @@ export * from './catalog.ts';
 export * from './balance.ts';
 export * from './engine.ts';
 export * from './match3.ts';
+export * from './mechanics.ts';
+export * from './mechanics-contract.ts';
 export * from './protocol.ts';
 export * from './skills.ts';
 export * from './tower.ts';

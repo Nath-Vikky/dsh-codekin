@@ -3,12 +3,15 @@ import {
   CAPTURE_CORE_QUALITIES,
   CREATURE_CATALOG,
   STARTER_CREATURE_IDS,
+  SIGNAL_VARIANT_CREATURE_IDS,
   TRACE_ECOLOGIES,
 } from './catalog.ts'
 import { CREATURE_SKILLS } from './skills.ts'
+import { CORE_CREATURE_MECHANICS } from './mechanics.ts'
 
 export * from './catalog.ts'
 export * from './skills.ts'
+export * from './mechanics.ts'
 
 const ECOLOGY_NAMES = {
   lumen: { zhCN: '智算', en: 'Compute' },
@@ -72,6 +75,8 @@ export const CORE_CONTENT_PACK = defineContentPack({
       description: { zhCN: skill.activeDescriptionZh, en: skill.activeDescriptionEn },
     },
   })),
+  mechanics: CORE_CREATURE_MECHANICS,
+  encounters: { variants: SIGNAL_VARIANT_CREATURE_IDS },
   starters: [...STARTER_CREATURE_IDS],
   tower: { rotation: CREATURE_CATALOG.map(creature => creature.id) },
   assets: [

@@ -101,11 +101,45 @@ export interface ContentSkillDefinition {
   }
 }
 
+export type ContentMechanicTrigger =
+  | 'energy:overflow'
+  | 'damage:modify'
+  | 'match:after'
+  | 'energy:after-distribute'
+  | 'stage:enter'
+  | 'defeat:before'
+  | 'runtime:threshold'
+  | 'damage:taken'
+  | 'skill:before'
+  | 'skill:cast'
+
+export type ContentMechanicParameter = string | number | boolean
+
+/**
+ * A bounded data instruction. The engine owns and validates each opcode;
+ * content packs never provide executable JavaScript.
+ */
+export interface ContentMechanicBinding {
+  trigger: ContentMechanicTrigger
+  opcode: string
+  priority?: number
+  params?: Readonly<Record<string, ContentMechanicParameter>>
+}
+
+export interface ContentCreatureMechanicsDefinition {
+  creatureId: string
+  bindings: readonly ContentMechanicBinding[]
+}
+
 export interface ContentAssetDefinition {
   key: string
   path: string
   mime: 'image/png' | 'image/webp'
   kind: 'launcher' | 'creature'
+}
+
+export interface ContentEncounterDefinition {
+  variants: Readonly<Record<string, string>>
 }
 
 export interface CodekinContentPack {
@@ -114,6 +148,8 @@ export interface CodekinContentPack {
   qualities: readonly ContentQualityDefinition[]
   creatures: readonly ContentCreatureDefinition[]
   skills: readonly ContentSkillDefinition[]
+  mechanics: readonly ContentCreatureMechanicsDefinition[]
+  encounters: ContentEncounterDefinition
   starters: readonly string[]
   tower: {
     rotation: readonly string[]
@@ -128,10 +164,14 @@ export interface ContentRegistry {
   readonly qualities: readonly ContentQualityDefinition[]
   readonly creatures: readonly ContentCreatureDefinition[]
   readonly skills: readonly ContentSkillDefinition[]
+  readonly mechanics: readonly ContentCreatureMechanicsDefinition[]
+  readonly encounterVariants: Readonly<Record<string, string>>
   readonly assets: readonly ContentAssetDefinition[]
   resolveId(id: string): string
   creature(id: string): ContentCreatureDefinition | undefined
   skill(creatureId: string): ContentSkillDefinition | undefined
+  creatureMechanics(creatureId: string): ContentCreatureMechanicsDefinition | undefined
+  encounterCreature(variant: string): ContentCreatureDefinition | undefined
   asset(key: string): ContentAssetDefinition | undefined
 }
 

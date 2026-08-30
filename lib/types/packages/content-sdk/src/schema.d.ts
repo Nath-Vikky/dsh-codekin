@@ -2,7 +2,7 @@ export declare const CONTENT_PACK_SCHEMA: {
     readonly $id: "https://codekin.dev/schema/content-pack-v1.json";
     readonly type: "object";
     readonly additionalProperties: false;
-    readonly required: readonly ["manifest", "ecologies", "qualities", "creatures", "skills", "starters", "tower", "assets"];
+    readonly required: readonly ["manifest", "ecologies", "qualities", "creatures", "skills", "mechanics", "encounters", "starters", "tower", "assets"];
     readonly properties: {
         readonly manifest: {
             readonly type: "object";
@@ -319,6 +319,83 @@ export declare const CONTENT_PACK_SCHEMA: {
                                 };
                             };
                         };
+                    };
+                };
+            };
+        };
+        readonly mechanics: {
+            readonly type: "array";
+            readonly maxItems: 2048;
+            readonly items: {
+                readonly type: "object";
+                readonly additionalProperties: false;
+                readonly required: readonly ["creatureId", "bindings"];
+                readonly properties: {
+                    readonly creatureId: {
+                        readonly type: "string";
+                        readonly pattern: "^[A-Za-z0-9@][A-Za-z0-9._:@/-]{1,127}$";
+                    };
+                    readonly bindings: {
+                        readonly type: "array";
+                        readonly minItems: 1;
+                        readonly maxItems: 64;
+                        readonly items: {
+                            readonly type: "object";
+                            readonly additionalProperties: false;
+                            readonly required: readonly ["trigger", "opcode"];
+                            readonly properties: {
+                                readonly trigger: {
+                                    readonly enum: readonly ["energy:overflow", "damage:modify", "match:after", "energy:after-distribute", "stage:enter", "defeat:before", "runtime:threshold", "damage:taken", "skill:before", "skill:cast"];
+                                };
+                                readonly opcode: {
+                                    readonly type: "string";
+                                    readonly pattern: "^[A-Za-z0-9@][A-Za-z0-9._:@/-]{1,127}$";
+                                };
+                                readonly priority: {
+                                    readonly type: "integer";
+                                    readonly minimum: -1000;
+                                    readonly maximum: 1000;
+                                };
+                                readonly params: {
+                                    readonly type: "object";
+                                    readonly maxProperties: 24;
+                                    readonly propertyNames: {
+                                        readonly pattern: "^[A-Za-z][A-Za-z0-9_-]{0,63}$";
+                                    };
+                                    readonly additionalProperties: {
+                                        readonly anyOf: readonly [{
+                                            readonly type: "string";
+                                            readonly minLength: 1;
+                                            readonly maxLength: 128;
+                                        }, {
+                                            readonly type: "number";
+                                            readonly minimum: -1000000;
+                                            readonly maximum: 1000000;
+                                        }, {
+                                            readonly type: "boolean";
+                                        }];
+                                    };
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        readonly encounters: {
+            readonly type: "object";
+            readonly additionalProperties: false;
+            readonly required: readonly ["variants"];
+            readonly properties: {
+                readonly variants: {
+                    readonly type: "object";
+                    readonly maxProperties: 128;
+                    readonly propertyNames: {
+                        readonly pattern: "^[a-z][a-z0-9-]{0,63}$";
+                    };
+                    readonly additionalProperties: {
+                        readonly type: "string";
+                        readonly pattern: "^[A-Za-z0-9@][A-Za-z0-9._:@/-]{1,127}$";
                     };
                 };
             };

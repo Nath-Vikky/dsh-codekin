@@ -3,6 +3,7 @@ import type {
   CodekinContentPack,
   ContentAssetDefinition,
   ContentCreatureDefinition,
+  ContentCreatureMechanicsDefinition,
   ContentEcologyDefinition,
   ContentQualityDefinition,
   ContentRegistry,
@@ -51,6 +52,9 @@ export function createContentRegistry(values: readonly unknown[]): ContentRegist
   const qualities = packs.flatMap(pack => pack.qualities)
   const creatures = packs.flatMap(pack => pack.creatures)
   const skills = packs.flatMap(pack => pack.skills)
+  const mechanics = packs.flatMap(pack => pack.mechanics)
+  const encounterVariantRows = packs.flatMap(pack => Object.entries(pack.encounters.variants)
+    .map(([variant, creatureId]) => ({ variant, creatureId })))
   const assets = packs.flatMap(pack => pack.assets)
   const issues: ContentValidationIssue[] = [
     ...duplicateIssues(packs, 'packs', row => row.manifest.id),
@@ -59,6 +63,8 @@ export function createContentRegistry(values: readonly unknown[]): ContentRegist
     ...duplicateIssues(creatures, 'creatures', row => row.id),
     ...duplicateIssues(creatures, 'creature-numbers', row => String(row.number)),
     ...duplicateIssues(skills, 'skills', row => row.creatureId),
+    ...duplicateIssues(mechanics, 'mechanics', row => row.creatureId),
+    ...duplicateIssues(encounterVariantRows, 'encounter-variants', row => row.variant),
     ...duplicateIssues(assets, 'assets', row => row.key),
   ]
 
@@ -66,6 +72,7 @@ export function createContentRegistry(values: readonly unknown[]): ContentRegist
   const creatureIds = new Set(creatures.map(row => row.id))
   const assetKeys = new Set(assets.map(row => row.key))
   const skillIds = new Set(skills.map(row => row.creatureId))
+  const mechanicIds = new Set(mechanics.map(row => row.creatureId))
   for (const creature of creatures) {
     if (!ecologyIds.has(creature.ecology)) issues.push({
       path: `/creatures/${creature.id}/ecology`, message: `unknown ecology ${creature.ecology}`,
@@ -76,10 +83,23 @@ export function createContentRegistry(values: readonly unknown[]): ContentRegist
     if (!skillIds.has(creature.id)) issues.push({
       path: `/creatures/${creature.id}`, message: 'missing skill definition',
     })
+    if (!mechanicIds.has(creature.id)) issues.push({
+      path: `/creatures/${creature.id}`, message: 'missing mechanics definition',
+    })
   }
   for (const skill of skills) {
     if (!creatureIds.has(skill.creatureId)) issues.push({
       path: `/skills/${skill.creatureId}`, message: 'unknown creature',
+    })
+  }
+  for (const definition of mechanics) {
+    if (!creatureIds.has(definition.creatureId)) issues.push({
+      path: `/mechanics/${definition.creatureId}`, message: 'unknown creature',
+    })
+  }
+  for (const row of encounterVariantRows) {
+    if (!creatureIds.has(row.creatureId)) issues.push({
+      path: `/encounters/variants/${row.variant}`, message: `unknown creature ${row.creatureId}`,
     })
   }
   for (const pack of packs) {
@@ -118,6 +138,8 @@ export function createContentRegistry(values: readonly unknown[]): ContentRegist
 
   const creatureMap = new Map(creatures.map(row => [row.id, row]))
   const skillMap = new Map(skills.map(row => [row.creatureId, row]))
+  const mechanicsMap = new Map(mechanics.map(row => [row.creatureId, row]))
+  const encounterVariantMap = new Map(encounterVariantRows.map(row => [row.variant, row.creatureId]))
   const assetMap = new Map(assets.map(row => [row.key, row]))
   const registry: ContentRegistry = {
     packs: Object.freeze([...packs]),
@@ -125,10 +147,17 @@ export function createContentRegistry(values: readonly unknown[]): ContentRegist
     qualities: Object.freeze([...qualities]),
     creatures: Object.freeze([...creatures]),
     skills: Object.freeze([...skills]),
+    mechanics: Object.freeze([...mechanics]),
+    encounterVariants: Object.freeze(Object.fromEntries(encounterVariantMap)),
     assets: Object.freeze([...assets]),
     resolveId: id => resolveAlias(aliases, id),
     creature: id => creatureMap.get(resolveAlias(aliases, id)),
     skill: id => skillMap.get(resolveAlias(aliases, id)),
+    creatureMechanics: id => mechanicsMap.get(resolveAlias(aliases, id)),
+    encounterCreature: variant => {
+      const id = encounterVariantMap.get(variant)
+      return id === undefined ? undefined : creatureMap.get(resolveAlias(aliases, id))
+    },
     asset: key => assetMap.get(key),
   }
   return Object.freeze(registry)
@@ -137,6 +166,7 @@ export function createContentRegistry(values: readonly unknown[]): ContentRegist
 export type {
   ContentAssetDefinition,
   ContentCreatureDefinition,
+  ContentCreatureMechanicsDefinition,
   ContentEcologyDefinition,
   ContentQualityDefinition,
   ContentSkillDefinition,

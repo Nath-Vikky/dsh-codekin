@@ -3,6 +3,7 @@ import {
   STARTER_CREATURE_IDS,
   TRACE_ECOLOGIES,
   creatureById,
+  creatureIdForSignalVariant,
   creaturesInEcology,
 } from './catalog.ts'
 import {
@@ -49,6 +50,8 @@ import {
   resolveForcedTiles,
 } from './match3.ts'
 import { QUALITY_SKILL_MULTIPLIERS, skillByCreatureId } from './skills.ts'
+import { CORE_CREATURE_MECHANICS, mechanicsByCreatureId } from './mechanics.ts'
+import { assertMechanicsContract } from './mechanics-contract.ts'
 import {
   MAX_TOWER_FLOOR,
   emptyTowerMaterialReward,
@@ -81,6 +84,10 @@ import type {
   TraceWildIdleReward,
   TraceWildState,
 } from './types.ts'
+import type {
+  ContentMechanicBinding,
+  ContentMechanicTrigger,
+} from '../../content-sdk/src/types.ts'
 
 const MAX_CREATURES = 240
 const MAX_PROCESSED_SIGNALS = 256
@@ -90,6 +97,8 @@ const ENERGY_LIMIT = 12
 const MAX_IDLE_ELAPSED_MS = 12 * 60 * 60 * 1000
 const AMPLIFIER_DURATION_ROUNDS = 2
 const MAX_AMPLIFIERS_PER_SIDE = 8
+
+assertMechanicsContract(CORE_CREATURE_MECHANICS)
 
 export const ECOLOGY_ADVANTAGE: Readonly<Record<TraceEcology, TraceEcology>> = Object.freeze({
   lumen: 'glitch',
@@ -103,6 +112,54 @@ export class TraceWildRuleError extends Error {
   constructor(readonly code: 'invalid-action' | 'conflict') {
     super(code)
   }
+}
+
+type MechanicHandler<Context> = (binding: ContentMechanicBinding, context: Context) => void
+
+function mechanicBindings(creatureId: string, trigger: ContentMechanicTrigger): readonly ContentMechanicBinding[] {
+  return (mechanicsByCreatureId(creatureId)?.bindings ?? [])
+    .map((binding, index) => ({ binding, index }))
+    .filter(row => row.binding.trigger === trigger)
+    .sort((left, right) => (left.binding.priority ?? 0) - (right.binding.priority ?? 0) || left.index - right.index)
+    .map(row => row.binding)
+}
+
+function runMechanics<Context>(
+  creatureId: string,
+  trigger: ContentMechanicTrigger,
+  handlers: Readonly<Record<string, MechanicHandler<Context>>>,
+  context: Context,
+): void {
+  for (const binding of mechanicBindings(creatureId, trigger)) {
+    const handler = handlers[binding.opcode]
+    if (handler === undefined) throw new TraceWildRuleError('conflict')
+    handler(binding, context)
+  }
+}
+
+function mechanicNumber(binding: ContentMechanicBinding, key: string): number {
+  const value = binding.params?.[key]
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new TraceWildRuleError('conflict')
+  return value
+}
+
+function mechanicString(binding: ContentMechanicBinding, key: string): string {
+  const value = binding.params?.[key]
+  if (typeof value !== 'string') throw new TraceWildRuleError('conflict')
+  return value
+}
+
+function mechanicBoolean(binding: ContentMechanicBinding, key: string, fallback = false): boolean {
+  const value = binding.params?.[key]
+  if (value === undefined) return fallback
+  if (typeof value !== 'boolean') throw new TraceWildRuleError('conflict')
+  return value
+}
+
+function mechanicEcology(binding: ContentMechanicBinding, key = 'ecology'): TraceEcology {
+  const value = mechanicString(binding, key)
+  if (!TRACE_ECOLOGIES.includes(value as TraceEcology)) throw new TraceWildRuleError('conflict')
+  return value as TraceEcology
 }
 
 function emptyCores(): Record<CaptureCoreQuality, number> {
@@ -275,10 +332,8 @@ function mapPoint(ecology: TraceEcology, random: RandomSource): { mapX: number; 
 
 function pickCreature(signal: TraceSignal, ecology: TraceEcology, random: RandomSource): string {
   if (ecology === 'glitch' && signal.variant !== undefined && boundedRandom(random) < 0.78) {
-    return ({
-      missing: 'glitch-null-nibbler', stack: 'glitch-stack-weaver', timeout: 'glitch-lagtoad',
-      crash: 'glitch-crashfox', overflow: 'glitch-overflow-maw',
-    } as const)[signal.variant]
+    const variantCreatureId = creatureIdForSignalVariant(signal.variant)
+    if (variantCreatureId !== undefined) return variantCreatureId
   }
   const intensity = Math.min(5, Math.max(0, signal.intensity))
   const candidates = creaturesInEcology(ecology)
@@ -642,14 +697,28 @@ function damageParty(battle: BattleState, amountValue: number): number {
   return absorbed + before - battle.partyHp
 }
 
+interface EnergyOverflowMechanicContext {
+  member: BattlePartyMember
+  overflow: number
+}
+
+const ENERGY_OVERFLOW_HANDLERS: Readonly<Record<string, MechanicHandler<EnergyOverflowMechanicContext>>> = {
+  'energy.store-overflow': (binding, { member, overflow }) => {
+    member.overcharge = Math.min(mechanicNumber(binding, 'maximum'), member.overcharge + overflow)
+  },
+}
+
 function grantEnergy(member: BattlePartyMember, amount: number): void {
   const whole = Math.max(0, Math.floor(amount))
   const available = Math.max(0, ENERGY_LIMIT - member.energy)
   member.energy += Math.min(available, whole)
   const overflow = whole - available
-  if (overflow > 0 && member.creatureId === 'glitch-overflow-maw') {
-    member.overcharge = Math.min(5, member.overcharge + overflow)
-  }
+  if (overflow > 0) runMechanics(
+    member.creatureId,
+    'energy:overflow',
+    ENERGY_OVERFLOW_HANDLERS,
+    { member, overflow },
+  )
 }
 
 function applyWildDamage(battle: BattleState, rawAmount: number, contributor?: BattlePartyMember): number {
@@ -709,6 +778,42 @@ interface MatchStepDamage {
   signalEffect?: MatchSignalEffect
 }
 
+interface DamageModifierMechanicContext {
+  battle: BattleState
+  owner: BattlePartyMember
+  acting: BattlePartyMember
+  chain: number
+  combo: number
+  multiplier: number
+  appliedAuras: Set<string>
+}
+
+const DAMAGE_MODIFIER_HANDLERS: Readonly<Record<string, MechanicHandler<DamageModifierMechanicContext>>> = {
+  'damage.combo-per-cascade': (binding, context) => {
+    if (context.appliedAuras.has(binding.opcode)) return
+    context.appliedAuras.add(binding.opcode)
+    context.combo += mechanicNumber(binding, 'amount') * Math.max(0, context.chain - 1)
+  },
+  'damage.first-match-floor': (binding, context) => {
+    if (context.appliedAuras.has(binding.opcode)) return
+    if (context.chain !== mechanicNumber(binding, 'chain') || context.owner.passiveRound === context.battle.round) return
+    context.appliedAuras.add(binding.opcode)
+    context.combo = Math.max(context.combo, mechanicNumber(binding, 'minimum'))
+  },
+  'damage.low-runtime-multiplier': (binding, context) => {
+    if (context.owner.instanceId !== context.acting.instanceId) return
+    if (context.battle.partyHp < context.battle.partyMaxHp * mechanicNumber(binding, 'belowRatio')) {
+      context.multiplier *= mechanicNumber(binding, 'multiplier')
+    }
+  },
+  'damage.round-parity-multiplier': (binding, context) => {
+    if (context.owner.instanceId !== context.acting.instanceId) return
+    const parity = mechanicString(binding, 'parity')
+    const matches = parity === 'odd' ? context.battle.round % 2 === 1 : context.battle.round % 2 === 0
+    if (matches) context.multiplier *= mechanicNumber(binding, 'multiplier')
+  },
+}
+
 function damageForStep(
   battle: BattleState,
   member: BattlePartyMember,
@@ -720,15 +825,23 @@ function damageForStep(
   const stats = memberStats(member)
   const activeEcology = creatureById(member.creatureId)?.ecology
   if (activeEcology === undefined) throw new TraceWildRuleError('conflict')
-  const hasForktail = livingMembers(battle).some(row => row.creatureId === 'relay-forktail')
-  const hasAtlas = livingMembers(battle).some(row => row.creatureId === 'lumen-atlashart')
   const attackMultiplier = 1 + Math.min(500, playerAttackAmplifier(battle, member)) / 1_000
   const penetratedDefense = battle.wildDefense
     * (1 - Math.min(500, playerPenetrationAmplifier(battle)) / 1_000)
-  let combo = Math.min(2.25, 1 + 0.25 * (chain - 1) + (hasForktail ? 0.04 * (chain - 1) : 0))
-  if (hasAtlas && chain === 1 && battle.party.some(row => row.creatureId === 'lumen-atlashart' && row.passiveRound !== battle.round)) {
-    combo = Math.max(combo, 1.15)
+  const modifierContext: DamageModifierMechanicContext = {
+    battle,
+    owner: member,
+    acting: member,
+    chain,
+    combo: 1 + 0.25 * (chain - 1),
+    multiplier: 1,
+    appliedAuras: new Set(),
   }
+  for (const owner of livingMembers(battle)) {
+    modifierContext.owner = owner
+    runMechanics(owner.creatureId, 'damage:modify', DAMAGE_MODIFIER_HANDLERS, modifierContext)
+  }
+  const combo = Math.min(2.25, modifierContext.combo)
   let total = 0
   let signalEffect: MatchSignalEffect | undefined
   const effectivenessDamage: Record<MatchDamageEffectiveness, number> = { advantage: 0, neutral: 0, resisted: 0 }
@@ -775,8 +888,7 @@ function damageForStep(
     const effectiveness: MatchDamageEffectiveness = element > 1 ? 'advantage' : element < 1 ? 'resisted' : 'neutral'
     effectivenessDamage[effectiveness] += contribution
   }
-  if (member.creatureId === 'glitch-crashfox' && battle.partyHp * 2 < battle.partyMaxHp) total *= 1.25
-  if (member.creatureId === 'relay-duplex-hare' && battle.round % 2 === 1) total *= 1.1
+  total *= modifierContext.multiplier
   const effectiveness = total <= 0
     ? 'neutral'
     : (Object.entries(effectivenessDamage) as [MatchDamageEffectiveness, number][])
@@ -837,6 +949,169 @@ function createGuaranteedMatch(boardValue: readonly MatchTile[], ecology: TraceE
   return board
 }
 
+interface MatchMechanicContext {
+  battle: BattleState
+  member: BattlePartyMember
+  active: BattlePartyMember
+  counts: Readonly<Record<TraceEcology, number>>
+  chain: number
+  specialCount: number
+  stepDamage: number
+  colors: number
+  scale: number
+  random: RandomSource
+  bonusDamage: number
+}
+
+function mechanicScopeUsed(
+  binding: ContentMechanicBinding,
+  member: BattlePartyMember,
+  battle: BattleState,
+): boolean {
+  const scope = binding.params?.once
+  if (scope === undefined) return false
+  if (scope === 'round') return member.passiveRound === battle.round
+  if (scope === 'stage') return member.passiveStage === battle.stage
+  throw new TraceWildRuleError('conflict')
+}
+
+function consumeMechanicScope(
+  binding: ContentMechanicBinding,
+  member: BattlePartyMember,
+  battle: BattleState,
+): void {
+  const scope = binding.params?.once
+  if (scope === undefined) return
+  if (scope === 'round') member.passiveRound = battle.round
+  else if (scope === 'stage') member.passiveStage = battle.stage
+  else throw new TraceWildRuleError('conflict')
+}
+
+function mechanicHpBasis(binding: ContentMechanicBinding, context: MatchMechanicContext): number {
+  switch (mechanicString(binding, 'basis')) {
+    case 'member-max-hp': return context.member.maxHp
+    case 'active-max-hp': return context.active.maxHp
+    case 'party-max-hp': return context.battle.partyMaxHp
+    default: throw new TraceWildRuleError('conflict')
+  }
+}
+
+const MATCH_MECHANIC_HANDLERS: Readonly<Record<string, MechanicHandler<MatchMechanicContext>>> = {
+  'match.add-mark': (binding, context) => {
+    const ecology = mechanicEcology(binding)
+    if (context.counts[ecology] < mechanicNumber(binding, 'minCount')
+      || mechanicScopeUsed(binding, context.member, context.battle)) return
+    context.battle.enemyMarks = Math.min(
+      mechanicNumber(binding, 'maximum'),
+      context.battle.enemyMarks + mechanicNumber(binding, 'amount'),
+    )
+    consumeMechanicScope(binding, context.member, context.battle)
+  },
+  'match.heal': (binding, context) => {
+    const ecology = mechanicEcology(binding)
+    if (context.counts[ecology] < mechanicNumber(binding, 'minCount')
+      || mechanicScopeUsed(binding, context.member, context.battle)) return
+    queuePartyHealing(context.battle, mechanicHpBasis(binding, context) * mechanicNumber(binding, 'ratio') * context.scale)
+    consumeMechanicScope(binding, context.member, context.battle)
+  },
+  'match.grant-energy-on-cascade': (binding, context) => {
+    if (context.chain < mechanicNumber(binding, 'minChain')
+      || mechanicScopeUsed(binding, context.member, context.battle)) return
+    grantEnergy(context.member, mechanicNumber(binding, 'amount'))
+    consumeMechanicScope(binding, context.member, context.battle)
+  },
+  'match.echo-damage': (binding, context) => {
+    if (context.chain < mechanicNumber(binding, 'minChain')
+      || mechanicScopeUsed(binding, context.member, context.battle)) return
+    context.bonusDamage += applyWildDamage(
+      context.battle,
+      context.stepDamage * mechanicNumber(binding, 'factor') * context.scale,
+    )
+    consumeMechanicScope(binding, context.member, context.battle)
+  },
+  'match.consume-first-match': (binding, context) => {
+    if (context.chain !== mechanicNumber(binding, 'chain')) return
+    consumeMechanicScope(binding, context.member, context.battle)
+  },
+  'match.raw-hit': (binding, context) => {
+    const ecology = mechanicEcology(binding)
+    if (context.counts[ecology] < mechanicNumber(binding, 'minCount')) return
+    context.bonusDamage += applyRawHit(
+      context.battle,
+      context.member,
+      mechanicNumber(binding, 'power') * context.scale,
+    )
+  },
+  'match.consume-counter': (binding, context) => {
+    const ecology = mechanicEcology(binding)
+    if (context.counts[ecology] <= 0 || context.member.counterPower <= 0) return
+    context.bonusDamage += applyRawHit(context.battle, context.member, context.member.counterPower)
+    context.member.counterPower = 0
+  },
+  'match.add-burn-mixed': (binding, context) => {
+    const ecology = mechanicEcology(binding)
+    if (context.counts[ecology] <= 0 || context.colors <= 1) return
+    context.battle.enemyBurn = Math.min(
+      mechanicNumber(binding, 'maximum'),
+      context.battle.enemyBurn + context.scale,
+    )
+  },
+  'match.break-armor': (binding, context) => {
+    const ecology = mechanicEcology(binding)
+    if (context.counts[ecology] >= mechanicNumber(binding, 'minCount') && context.battle.wildArmor > 0) {
+      context.battle.wildArmor = Math.max(0, context.battle.wildArmor - mechanicNumber(binding, 'amount'))
+    }
+  },
+  'match.add-burn-cascade': (binding, context) => {
+    const ecology = mechanicEcology(binding)
+    if (context.counts[ecology] <= 0 || context.chain < mechanicNumber(binding, 'minChain')) return
+    context.battle.enemyBurn = Math.min(
+      mechanicNumber(binding, 'maximum'),
+      context.battle.enemyBurn + mechanicNumber(binding, 'amount') * context.scale,
+    )
+  },
+  'match.grant-energy-round-parity': (binding, context) => {
+    const ecology = mechanicEcology(binding)
+    const parity = mechanicString(binding, 'parity')
+    const matches = parity === 'odd' ? context.battle.round % 2 === 1 : context.battle.round % 2 === 0
+    if (context.counts[ecology] > 0 && matches) grantEnergy(context.member, mechanicNumber(binding, 'amount'))
+  },
+  'match.convert-one': (binding, context) => {
+    const ecology = mechanicEcology(binding)
+    const minimumCount = binding.params?.minCount
+    const minimumChain = binding.params?.minChain
+    if (minimumCount !== undefined && (typeof minimumCount !== 'number' || context.counts[ecology] < minimumCount)) return
+    if (minimumChain !== undefined && (typeof minimumChain !== 'number' || context.chain < minimumChain)) return
+    if (minimumCount === undefined && minimumChain === undefined) throw new TraceWildRuleError('conflict')
+    if (mechanicScopeUsed(binding, context.member, context.battle)) return
+    context.battle.board = convertOnePassiveTile(context.battle.board, ecology, context.random)
+    consumeMechanicScope(binding, context.member, context.battle)
+  },
+  'match.shield-on-special': (binding, context) => {
+    if (context.specialCount <= 0) return
+    queuePartyShielding(context.battle, mechanicHpBasis(binding, context) * mechanicNumber(binding, 'ratio') * context.scale)
+  },
+  'match.shield-on-resisted': (binding, context) => {
+    const wild = creatureById(battleEncounterCreatureId(context.battle))
+    if (wild === undefined || context.counts[ECOLOGY_ADVANTAGE[wild.ecology]] <= 0) return
+    queuePartyShielding(context.battle, context.stepDamage * mechanicNumber(binding, 'ratio') * context.scale)
+  },
+  'match.erode-protection': (binding, context) => {
+    const ecology = mechanicEcology(binding)
+    if (context.counts[ecology] <= 0) return
+    if (context.battle.wildArmor > 0) {
+      context.battle.wildArmor = Math.max(0, context.battle.wildArmor - mechanicNumber(binding, 'armor'))
+    } else {
+      context.battle.wildShield = Math.max(
+        0,
+        context.battle.wildShield - Math.round(
+          memberStats(context.member).attack * mechanicNumber(binding, 'shieldAttackRatio') * context.scale,
+        ),
+      )
+    }
+  },
+}
+
 function applyMatchPassives(
   battle: BattleState,
   counts: Readonly<Record<TraceEcology, number>>,
@@ -846,93 +1121,51 @@ function applyMatchPassives(
   stepDamage: number,
   random: RandomSource,
 ): number {
-  let bonusDamage = 0
   const active = activeMember(battle)
-  const colors = TRACE_ECOLOGIES.filter(ecology => counts[ecology] > 0).length
+  const context: MatchMechanicContext = {
+    battle,
+    member: active,
+    active,
+    counts,
+    chain,
+    specialCount,
+    stepDamage,
+    colors: TRACE_ECOLOGIES.filter(ecology => counts[ecology] > 0).length,
+    scale: 1,
+    random,
+    bonusDamage: 0,
+  }
   for (const member of livingMembers(battle)) {
-    const scale = qualityMultiplier(member)
-    switch (member.creatureId) {
-      case 'lumen-indeximp':
-        if (counts.lumen > 0 && member.passiveRound !== battle.round) {
-          battle.enemyMarks = Math.min(3, battle.enemyMarks + 1)
-          member.passiveRound = battle.round
-        }
-        break
-      case 'lumen-foliomoth':
-        if (counts.lumen >= 4) {
-          queuePartyHealing(battle, member.maxHp * 0.03 * scale)
-        }
-        break
-      case 'lumen-lensel':
-        if (chain >= 2 && member.passiveStage !== battle.stage) {
-          grantEnergy(member, 2)
-          member.passiveStage = battle.stage
-        }
-        break
-      case 'lumen-echocoil':
-        if (chain >= 2 && member.passiveRound !== battle.round) {
-          bonusDamage += applyWildDamage(battle, stepDamage * 0.3 * scale)
-          member.passiveRound = battle.round
-        }
-        break
-      case 'lumen-atlashart':
-        if (chain === 1) member.passiveRound = battle.round
-        break
-      case 'forge-sparkmite':
-        if (counts.forge >= 4) bonusDamage += applyRawHit(battle, member, 0.25 * scale)
-        break
-      case 'forge-rivetclaw':
-        if (counts.forge > 0 && member.counterPower > 0) {
-          bonusDamage += applyRawHit(battle, member, member.counterPower)
-          member.counterPower = 0
-        }
-        break
-      case 'forge-solderling':
-        if (counts.forge > 0 && colors > 1) battle.enemyBurn = Math.min(4.2, battle.enemyBurn + scale)
-        break
-      case 'forge-anvilback':
-        if (counts.forge >= 5 && battle.wildArmor > 0) battle.wildArmor -= 1
-        break
-      case 'forge-kiln-colossus':
-        if (counts.forge > 0 && chain >= 2) battle.enemyBurn = Math.min(4.2, battle.enemyBurn + 0.25 * scale)
-        break
-      case 'relay-duplex-hare':
-        if (counts.relay > 0 && battle.round % 2 === 0) grantEnergy(member, 1)
-        break
-      case 'relay-routeray':
-        if (counts.relay > 0 && member.passiveStage !== battle.stage) {
-          battle.board = convertOnePassiveTile(battle.board, 'relay', random)
-          member.passiveStage = battle.stage
-        }
-        break
-      case 'aegis-veribud':
-        if (counts.aegis > 0 && member.passiveStage !== battle.stage) {
-          queuePartyHealing(battle, active.maxHp * 0.02 * scale)
-          member.passiveStage = battle.stage
-        }
-        break
-      case 'aegis-anchorbee':
-        if (specialCount > 0) queuePartyShielding(battle, active.maxHp * 0.04 * scale)
-        break
-      case 'aegis-steady-ram': {
-        const wild = creatureById(battleEncounterCreatureId(battle))!
-        const resisted = ECOLOGY_ADVANTAGE[wild.ecology]
-        if (counts[resisted] > 0) queuePartyShielding(battle, stepDamage * 0.2 * scale)
-        break
-      }
-      case 'glitch-null-nibbler':
-        if (counts.glitch > 0) {
-          if (battle.wildArmor > 0) battle.wildArmor -= 1
-          else battle.wildShield = Math.max(0, battle.wildShield - Math.round(memberStats(member).attack * scale))
-        }
-        break
-      case 'glitch-stack-weaver':
-        if (chain >= 2) battle.board = convertOnePassiveTile(battle.board, 'glitch', random)
-        break
-    }
+    context.member = member
+    context.scale = qualityMultiplier(member)
+    runMechanics(member.creatureId, 'match:after', MATCH_MECHANIC_HANDLERS, context)
   }
   if (maxGroup >= 5 && battle.wildArmor > 0) appendBattleLog(battle, { turn: battle.turn, kind: 'armor-break' })
-  return bonusDamage
+  return context.bonusDamage
+}
+
+interface EnergyDistributionMechanicContext {
+  battle: BattleState
+  totals: Readonly<Record<TraceEcology, number>>
+  appliedAuras: Set<string>
+}
+
+const ENERGY_DISTRIBUTION_HANDLERS: Readonly<Record<string, MechanicHandler<EnergyDistributionMechanicContext>>> = {
+  'energy.share': (binding, context) => {
+    if (context.appliedAuras.has(binding.opcode)) return
+    const ecology = mechanicEcology(binding)
+    if (context.totals[ecology] <= 0) return
+    context.appliedAuras.add(binding.opcode)
+    const shared = Math.floor(
+      Math.min(mechanicNumber(binding, 'maximumSource'), context.totals[ecology])
+      * mechanicNumber(binding, 'ratio'),
+    )
+    if (shared <= 0) return
+    for (const member of livingMembers(context.battle)) {
+      const memberEcology = creatureById(member.creatureId)?.ecology
+      if (!mechanicBoolean(binding, 'excludeEcology') || memberEcology !== ecology) grantEnergy(member, shared)
+    }
+  },
 }
 
 function distributeEnergy(battle: BattleState, totals: Readonly<Record<TraceEcology, number>>): void {
@@ -941,13 +1174,14 @@ function distributeEnergy(battle: BattleState, totals: Readonly<Record<TraceEcol
     if (ecology === undefined) continue
     grantEnergy(member, Math.min(8, totals[ecology]))
   }
-  if (totals.relay > 0 && livingMembers(battle).some(member => member.creatureId === 'relay-mesh-jelly')) {
-    const shared = Math.floor(Math.min(8, totals.relay) * 0.25)
-    if (shared > 0) {
-      for (const member of livingMembers(battle)) {
-        if (creatureById(member.creatureId)?.ecology !== 'relay') grantEnergy(member, shared)
-      }
-    }
+  const context: EnergyDistributionMechanicContext = { battle, totals, appliedAuras: new Set() }
+  for (const member of livingMembers(battle)) {
+    runMechanics(
+      member.creatureId,
+      'energy:after-distribute',
+      ENERGY_DISTRIBUTION_HANDLERS,
+      context,
+    )
   }
 }
 
@@ -1027,12 +1261,33 @@ function applyResolution(
   return totalDamage
 }
 
+interface StageEntryMechanicContext {
+  battle: BattleState
+  member: BattlePartyMember
+  scale: number
+}
+
+const STAGE_ENTRY_HANDLERS: Readonly<Record<string, MechanicHandler<StageEntryMechanicContext>>> = {
+  'stage.grant-energy': (binding, context) => {
+    grantEnergy(context.member, mechanicNumber(binding, 'amount'))
+  },
+  'stage.shield': (binding, context) => {
+    const basis = mechanicString(binding, 'basis')
+    const amount = basis === 'member-max-hp'
+      ? context.member.maxHp
+      : basis === 'party-max-hp'
+        ? context.battle.partyMaxHp
+        : undefined
+    if (amount === undefined) throw new TraceWildRuleError('conflict')
+    queuePartyShielding(context.battle, amount * mechanicNumber(binding, 'ratio') * context.scale)
+  },
+}
+
 function applyStageEntryPassives(battle: BattleState): void {
   const member = activeMember(battle)
   member.skillUsedStage = false
   const scale = qualityMultiplier(member)
-  if (member.creatureId === 'relay-pingfly') grantEnergy(member, 2)
-  if (member.creatureId === 'aegis-loop-tortoise') queuePartyShielding(battle, member.maxHp * 0.08 * scale)
+  runMechanics(member.creatureId, 'stage:enter', STAGE_ENTRY_HANDLERS, { battle, member, scale })
   appendBattleLog(battle, { turn: battle.turn, kind: 'switch', creatureId: member.creatureId })
 }
 
@@ -1045,22 +1300,63 @@ function nextLivingIndex(battle: BattleState): { index: number; wrapped: boolean
   return undefined
 }
 
-function maybePreventDefeat(battle: BattleState): boolean {
-  if (battle.partyHp > 0) return true
-  const guardian = battle.party.find(member => member.creatureId === 'aegis-dawnguard' && !member.reviveUsed)
-  if (guardian === undefined) return false
-  guardian.reviveUsed = true
-  battle.partyHp = 1
-  syncLegacyPartyHealth(battle)
-  shieldParty(battle, battle.partyMaxHp * 0.1 * qualityMultiplier(guardian))
-  return true
+interface DefeatMechanicContext {
+  battle: BattleState
+  member: BattlePartyMember
+  prevented: boolean
 }
 
-function maybeDelayForLagtoad(battle: BattleState): void {
-  const lagtoad = battle.party.find(member => member.creatureId === 'glitch-lagtoad' && !member.passiveBattleUsed)
-  if (lagtoad !== undefined && battle.partyHp * 2 < battle.partyMaxHp) {
-    lagtoad.passiveBattleUsed = true
-    battle.enemyDelayed = Math.max(1, battle.enemyDelayed)
+const DEFEAT_HANDLERS: Readonly<Record<string, MechanicHandler<DefeatMechanicContext>>> = {
+  'defeat.prevent': (binding, context) => {
+    if (context.prevented || context.member.reviveUsed) return
+    context.member.reviveUsed = true
+    context.battle.partyHp = mechanicNumber(binding, 'hp')
+    syncLegacyPartyHealth(context.battle)
+    shieldParty(
+      context.battle,
+      context.battle.partyMaxHp * mechanicNumber(binding, 'shieldRatio') * qualityMultiplier(context.member),
+    )
+    context.prevented = true
+  },
+}
+
+function maybePreventDefeat(battle: BattleState): boolean {
+  if (battle.partyHp > 0) return true
+  const context: DefeatMechanicContext = { battle, member: battle.party[0]!, prevented: false }
+  for (const member of battle.party) {
+    context.member = member
+    runMechanics(member.creatureId, 'defeat:before', DEFEAT_HANDLERS, context)
+    if (context.prevented) break
+  }
+  return context.prevented
+}
+
+interface RuntimeThresholdMechanicContext {
+  battle: BattleState
+  member: BattlePartyMember
+  applied: boolean
+}
+
+const RUNTIME_THRESHOLD_HANDLERS: Readonly<Record<string, MechanicHandler<RuntimeThresholdMechanicContext>>> = {
+  'runtime.delay-enemy': (binding, context) => {
+    if (context.applied || context.member.passiveBattleUsed) return
+    if (context.battle.partyHp < context.battle.partyMaxHp * mechanicNumber(binding, 'belowRatio')) {
+      context.member.passiveBattleUsed = true
+      context.battle.enemyDelayed = Math.max(
+        context.battle.enemyDelayed,
+        mechanicNumber(binding, 'actions'),
+      )
+      context.applied = true
+    }
+  },
+}
+
+function maybeApplyRuntimeThresholdMechanics(battle: BattleState): void {
+  const context: RuntimeThresholdMechanicContext = { battle, member: battle.party[0]!, applied: false }
+  for (const member of battle.party) {
+    context.member = member
+    runMechanics(member.creatureId, 'runtime:threshold', RUNTIME_THRESHOLD_HANDLERS, context)
+    if (context.applied) break
   }
 }
 
@@ -1268,12 +1564,25 @@ function allocateBossStepDamage(rawValues: readonly number[], budgetValue: numbe
   })
 }
 
+interface DamageTakenMechanicContext {
+  battle: BattleState
+  member: BattlePartyMember
+  damage: number
+}
+
+const DAMAGE_TAKEN_HANDLERS: Readonly<Record<string, MechanicHandler<DamageTakenMechanicContext>>> = {
+  'damage.arm-counter': (binding, context) => {
+    if (context.damage <= 0) return
+    context.member.counterPower = mechanicNumber(binding, 'power') * qualityMultiplier(context.member)
+  },
+}
+
 function applyEnemyTeamHit(battle: BattleState, amount: number): number {
   if (amount <= 0) return 0
   const damage = damageParty(battle, amount)
   if (damage > 0) {
     for (const member of battle.party) {
-      if (member.creatureId === 'forge-rivetclaw') member.counterPower = 0.8 * qualityMultiplier(member)
+      runMechanics(member.creatureId, 'damage:taken', DAMAGE_TAKEN_HANDLERS, { battle, member, damage })
     }
   }
   maybePreventDefeat(battle)
@@ -1586,7 +1895,7 @@ function ageTileLocks(battle: BattleState): void {
 }
 
 function beginBossPhase(battle: BattleState, random: RandomSource): BattleOutcome {
-  maybeDelayForLagtoad(battle)
+  maybeApplyRuntimeThresholdMechanics(battle)
   if (battle.enemyDelayed > 0) {
     battle.enemyDelayed -= 1
     appendBattleLog(battle, { turn: battle.turn, kind: 'enemy-delay' })
@@ -1872,6 +2181,182 @@ function resolveConvertedBoard(battle: BattleState, random: RandomSource): Match
   return resolution.frames
 }
 
+interface SkillMechanicContext {
+  state: TraceWildState
+  battle: BattleState
+  member: BattlePartyMember
+  random: RandomSource
+  scale: number
+  damage: number
+  animationFrames: MatchCascadeFrame[]
+}
+
+function optionalMechanicNumber(binding: ContentMechanicBinding, key: string, fallback: number): number {
+  const value = binding.params?.[key]
+  if (value === undefined) return fallback
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new TraceWildRuleError('conflict')
+  return value
+}
+
+function skillHpBasis(binding: ContentMechanicBinding, context: SkillMechanicContext): number {
+  switch (mechanicString(binding, 'basis')) {
+    case 'party-max-hp': return context.battle.partyMaxHp
+    case 'member-max-hp': return context.member.maxHp
+    case 'member-hp': return context.member.hp
+    default: throw new TraceWildRuleError('conflict')
+  }
+}
+
+function skillTargetEcology(binding: ContentMechanicBinding, context: SkillMechanicContext): TraceEcology {
+  const target = mechanicString(binding, 'ecology')
+  if (target !== 'counter') return mechanicEcology(binding)
+  const wild = creatureById(battleEncounterCreatureId(context.battle))
+  if (wild === undefined) throw new TraceWildRuleError('conflict')
+  return ecologyThatCounters(wild.ecology)
+}
+
+function resolveSkillBoard(context: SkillMechanicContext): void {
+  context.animationFrames.push(...resolveConvertedBoard(context.battle, context.random))
+}
+
+const SKILL_BEFORE_HANDLERS: Readonly<Record<string, MechanicHandler<SkillMechanicContext>>> = {
+  'skill.consume-overflow': (binding, context) => {
+    context.scale *= 1 + context.member.overcharge * mechanicNumber(binding, 'multiplierPerPoint')
+    context.member.overcharge = 0
+  },
+}
+
+const SKILL_CAST_HANDLERS: Readonly<Record<string, MechanicHandler<SkillMechanicContext>>> = {
+  'damage.raw-hit': (binding, context) => {
+    const hits = Math.max(1, Math.floor(optionalMechanicNumber(binding, 'hits', 1)))
+    for (let hit = 0; hit < hits; hit += 1) {
+      context.damage += applyRawHit(
+        context.battle,
+        context.member,
+        mechanicNumber(binding, 'power') * context.scale,
+      )
+    }
+  },
+  'damage.replay': (binding, context) => {
+    const minimum = mechanicString(binding, 'minimum')
+    if (minimum !== 'member-attack') throw new TraceWildRuleError('conflict')
+    context.damage += applyWildDamage(
+      context.battle,
+      Math.max(memberStats(context.member).attack, context.battle.lastPlayerDamage)
+        * mechanicNumber(binding, 'factor') * context.scale,
+    )
+  },
+  'mark.add': (binding, context) => {
+    context.battle.enemyMarks = Math.min(
+      mechanicNumber(binding, 'maximum'),
+      context.battle.enemyMarks + mechanicNumber(binding, 'amount'),
+    )
+  },
+  'tiles.convert': (binding, context) => {
+    context.battle.board = convertRandomBattleTiles(
+      context.battle.board,
+      skillTargetEcology(binding, context),
+      mechanicNumber(binding, 'count'),
+      context.random,
+    )
+    if (mechanicBoolean(binding, 'resolve')) resolveSkillBoard(context)
+  },
+  'tiles.resolve': (_binding, context) => {
+    resolveSkillBoard(context)
+  },
+  'heal.party': (binding, context) => {
+    queuePartyHealing(
+      context.battle,
+      skillHpBasis(binding, context) * mechanicNumber(binding, 'ratio') * context.scale,
+    )
+  },
+  'shield.party': (binding, context) => {
+    queuePartyShielding(
+      context.battle,
+      skillHpBasis(binding, context) * mechanicNumber(binding, 'ratio') * context.scale,
+    )
+  },
+  'affinity.floor': (binding, context) => {
+    context.battle.affinityFloorActions = Math.max(
+      context.battle.affinityFloorActions,
+      mechanicNumber(binding, 'actions'),
+    )
+  },
+  'counter.arm': (binding, context) => {
+    context.member.counterPower = mechanicNumber(binding, 'power') * context.scale
+  },
+  'burn.add': (binding, context) => {
+    const amount = mechanicNumber(binding, 'amount')
+      * (mechanicBoolean(binding, 'scaled') ? context.scale : 1)
+    context.battle.enemyBurn = Math.min(
+      mechanicNumber(binding, 'maximum'),
+      context.battle.enemyBurn + amount,
+    )
+  },
+  'armor.break': (binding, context) => {
+    context.battle.wildArmor = Math.max(
+      0,
+      context.battle.wildArmor - mechanicNumber(binding, 'amount'),
+    )
+  },
+  'tiles.clear': (binding, context) => {
+    const resolution = resolveForcedTiles(
+      context.battle.board,
+      selectedIndexes(
+        context.battle.board,
+        mechanicEcology(binding),
+        mechanicNumber(binding, 'count'),
+      ),
+      context.random,
+    )
+    context.damage += applyResolution(context.battle, resolution, context.random, false)
+    context.animationFrames.push(...resolution.frames)
+  },
+  'tiles.guaranteed-match': (binding, context) => {
+    context.battle.board = createGuaranteedMatch(context.battle.board, mechanicEcology(binding))
+    if (mechanicBoolean(binding, 'resolve')) resolveSkillBoard(context)
+  },
+  'tiles.reshuffle': (_binding, context) => {
+    context.battle.board = reshuffleBattleBoard(context.battle.board, context.random)
+  },
+  'repeat.arm': (binding, context) => {
+    const power = mechanicNumber(binding, 'power')
+      * (mechanicBoolean(binding, 'scaled') ? context.scale : 1)
+    context.battle.repeatPower = Math.max(
+      context.battle.repeatPower,
+      Math.min(mechanicNumber(binding, 'maximum'), power),
+    )
+  },
+  'energy.party': (binding, context) => {
+    const amount = mechanicNumber(binding, 'amount')
+      * (mechanicBoolean(binding, 'scaled') ? context.scale : 1)
+    for (const ally of livingMembers(context.battle)) grantEnergy(ally, Math.round(amount))
+  },
+  'enemy.delay': (binding, context) => {
+    context.battle.enemyDelayed = Math.max(
+      context.battle.enemyDelayed,
+      mechanicNumber(binding, 'actions'),
+    )
+  },
+  'board.lock': (binding, context) => {
+    context.battle.boardLockActions = Math.max(
+      context.battle.boardLockActions,
+      mechanicNumber(binding, 'actions'),
+    )
+  },
+  'shield.enemy-clear': (_binding, context) => {
+    context.battle.wildShield = 0
+  },
+  'runtime.self-damage': (binding, context) => {
+    const amount = Math.max(1, Math.round(skillHpBasis(binding, context) * mechanicNumber(binding, 'ratio')))
+    context.battle.partyHp = Math.max(
+      mechanicNumber(binding, 'minimumRemaining'),
+      context.battle.partyHp - amount,
+    )
+    syncLegacyPartyHealth(context.battle)
+  },
+}
+
 function castActiveSkill(state: TraceWildState, creatureInstanceId: string, random: RandomSource): MatchCascadeFrame[] {
   const battle = state.battle
   if (battle === undefined || battle.turnOwner !== 'player' || battle.captureWindow || battle.actionsRemaining <= 0) {
@@ -1885,124 +2370,25 @@ function castActiveSkill(state: TraceWildState, creatureInstanceId: string, rand
   if (definition === undefined || member.energy < definition.energyCost) throw new TraceWildRuleError('invalid-action')
   member.energy -= definition.energyCost
   member.skillUsedStage = true
-  let scale = qualityMultiplier(member)
-  if (member.creatureId === 'glitch-overflow-maw') {
-    scale *= 1 + member.overcharge * 0.03
-    member.overcharge = 0
+  const context: SkillMechanicContext = {
+    state,
+    battle,
+    member,
+    random,
+    scale: qualityMultiplier(member),
+    damage: 0,
+    animationFrames: [],
   }
-  let damage = 0
-  const animationFrames: MatchCascadeFrame[] = []
-  switch (member.creatureId) {
-    case 'lumen-indeximp':
-      damage += applyRawHit(battle, member, 0.8 * scale)
-      battle.enemyMarks = Math.min(3, battle.enemyMarks + 1)
-      battle.board = convertRandomBattleTiles(battle.board, 'lumen', 3, random)
-      animationFrames.push(...resolveConvertedBoard(battle, random))
-      break
-    case 'lumen-foliomoth':
-      queuePartyHealing(battle, battle.partyMaxHp * 0.08 * scale)
-      queuePartyShielding(battle, member.maxHp * 0.1 * scale)
-      break
-    case 'lumen-lensel': {
-      const wild = creatureById(battleEncounterCreatureId(battle))!
-      battle.board = convertRandomBattleTiles(battle.board, ecologyThatCounters(wild.ecology), 4, random)
-      animationFrames.push(...resolveConvertedBoard(battle, random))
-      break
-    }
-    case 'lumen-echocoil':
-      damage += applyWildDamage(battle, Math.max(memberStats(member).attack, battle.lastPlayerDamage) * 0.75 * scale)
-      break
-    case 'lumen-atlashart':
-      battle.affinityFloorActions = Math.max(battle.affinityFloorActions, 2)
-      break
-    case 'forge-sparkmite':
-      for (let hit = 0; hit < 3; hit += 1) damage += applyRawHit(battle, member, 0.55 * scale)
-      break
-    case 'forge-rivetclaw':
-      queuePartyShielding(battle, member.maxHp * 0.18 * scale)
-      member.counterPower = 0.8 * scale
-      break
-    case 'forge-solderling':
-      battle.board = convertRandomBattleTiles(battle.board, 'forge', 4, random)
-      battle.enemyBurn = Math.min(4.2, battle.enemyBurn + scale)
-      animationFrames.push(...resolveConvertedBoard(battle, random))
-      break
-    case 'forge-anvilback':
-      damage += applyRawHit(battle, member, 1.8 * scale)
-      battle.wildArmor = Math.max(0, battle.wildArmor - 3)
-      break
-    case 'forge-kiln-colossus': {
-      const resolution = resolveForcedTiles(battle.board, selectedIndexes(battle.board, 'forge', MATCH_BOARD_CELLS), random)
-      damage += applyResolution(battle, resolution, random, false)
-      animationFrames.push(...resolution.frames)
-      break
-    }
-    case 'relay-pingfly': {
-      battle.board = createGuaranteedMatch(battle.board, 'relay')
-      animationFrames.push(...resolveConvertedBoard(battle, random))
-      break
-    }
-    case 'relay-duplex-hare':
-      battle.repeatPower = Math.max(battle.repeatPower, Math.min(0.9, 0.6 * scale))
-      break
-    case 'relay-routeray':
-      battle.board = reshuffleBattleBoard(battle.board, random)
-      break
-    case 'relay-forktail':
-      battle.repeatPower = Math.max(battle.repeatPower, Math.min(0.95, 0.7 * scale))
-      break
-    case 'relay-mesh-jelly':
-      for (const ally of livingMembers(battle)) grantEnergy(ally, Math.round(2 * scale))
-      battle.board = convertRandomBattleTiles(battle.board, 'relay', 3, random)
-      animationFrames.push(...resolveConvertedBoard(battle, random))
-      break
-    case 'aegis-veribud':
-      queuePartyHealing(battle, battle.partyMaxHp * 0.1 * scale)
-      break
-    case 'aegis-loop-tortoise':
-      queuePartyShielding(battle, battle.partyMaxHp * 0.2 * scale)
-      break
-    case 'aegis-anchorbee':
-      battle.enemyDelayed = Math.max(1, battle.enemyDelayed)
-      battle.boardLockActions = Math.max(3, battle.boardLockActions)
-      break
-    case 'aegis-steady-ram':
-      queuePartyShielding(battle, member.maxHp * 0.1 * scale)
-      damage += applyRawHit(battle, member, 1.4 * scale)
-      break
-    case 'aegis-dawnguard':
-      queuePartyHealing(battle, battle.partyMaxHp * 0.16 * scale)
-      queuePartyShielding(battle, battle.partyMaxHp * 0.08 * scale)
-      break
-    case 'glitch-null-nibbler':
-      battle.wildShield = 0
-      battle.wildArmor = Math.max(0, battle.wildArmor - 2)
-      damage += applyRawHit(battle, member, scale)
-      break
-    case 'glitch-stack-weaver':
-      battle.board = convertRandomBattleTiles(battle.board, 'glitch', 5, random)
-      battle.enemyMarks = Math.min(3, battle.enemyMarks + 1)
-      animationFrames.push(...resolveConvertedBoard(battle, random))
-      break
-    case 'glitch-lagtoad':
-      damage += applyRawHit(battle, member, 1.1 * scale)
-      battle.enemyDelayed = Math.max(1, battle.enemyDelayed)
-      break
-    case 'glitch-crashfox':
-      damage += applyRawHit(battle, member, 2.2 * scale)
-      battle.partyHp = Math.max(1, battle.partyHp - Math.max(1, Math.round(member.hp * 0.08)))
-      syncLegacyPartyHealth(battle)
-      break
-    case 'glitch-overflow-maw': {
-      const resolution = resolveForcedTiles(battle.board, selectedIndexes(battle.board, 'glitch', 12), random)
-      damage += applyResolution(battle, resolution, random, false)
-      animationFrames.push(...resolution.frames)
-      break
-    }
-  }
-  battle.lastPlayerDamage = Math.max(battle.lastPlayerDamage, damage)
-  appendBattleLog(battle, { turn: battle.turn, kind: 'skill', amount: damage, creatureId: member.creatureId })
-  return animationFrames
+  runMechanics(member.creatureId, 'skill:before', SKILL_BEFORE_HANDLERS, context)
+  runMechanics(member.creatureId, 'skill:cast', SKILL_CAST_HANDLERS, context)
+  battle.lastPlayerDamage = Math.max(battle.lastPlayerDamage, context.damage)
+  appendBattleLog(battle, {
+    turn: battle.turn,
+    kind: 'skill',
+    amount: context.damage,
+    creatureId: member.creatureId,
+  })
+  return context.animationFrames
 }
 
 function addCapturedCreature(

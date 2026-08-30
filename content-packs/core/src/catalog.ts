@@ -114,3 +114,15 @@ export function creaturesInEcology(ecology: TraceEcology): readonly CreatureDefi
 export const STARTER_CREATURE_IDS = Object.freeze([
   'lumen-indeximp', 'forge-sparkmite', 'aegis-veribud',
 ] as const)
+
+export const SIGNAL_VARIANT_CREATURE_IDS: Readonly<Record<string, string>> = Object.freeze({
+  missing: 'glitch-null-nibbler',
+  stack: 'glitch-stack-weaver',
+  timeout: 'glitch-lagtoad',
+  crash: 'glitch-crashfox',
+  overflow: 'glitch-overflow-maw',
+})
+
+export function creatureIdForSignalVariant(variant: string): string | undefined {
+  return SIGNAL_VARIANT_CREATURE_IDS[variant]
+}

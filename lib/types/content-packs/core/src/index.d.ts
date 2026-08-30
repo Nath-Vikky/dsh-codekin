@@ -1,5 +1,6 @@
 export * from './catalog.ts';
 export * from './skills.ts';
+export * from './mechanics.ts';
 export declare const CORE_CONTENT_PACK: {
     readonly manifest: {
         readonly id: "@nath-vikky/codekin-core";
@@ -87,6 +88,10 @@ export declare const CORE_CONTENT_PACK: {
             };
         };
     }[];
+    readonly mechanics: readonly import("../../../packages/content-sdk/src/types.ts").ContentCreatureMechanicsDefinition[];
+    readonly encounters: {
+        readonly variants: Readonly<Record<string, string>>;
+    };
     readonly starters: readonly ["lumen-indeximp", "forge-sparkmite", "aegis-veribud"];
     readonly tower: {
         readonly rotation: string[];

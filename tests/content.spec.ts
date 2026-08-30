@@ -14,12 +14,17 @@ describe('Codekin content packs', () => {
     expect(registry.qualities).toHaveLength(5)
     expect(registry.creatures).toHaveLength(25)
     expect(registry.skills).toHaveLength(25)
+    expect(registry.mechanics).toHaveLength(25)
     expect(registry.assets).toHaveLength(26)
     expect(registry.creature('forge-rivetclaw')).toMatchObject({
       name: { zhCN: '铆钉蟹', en: 'Rivetclaw' },
       sprite: 'creature:forge-rivetclaw:sprite',
     })
     expect(registry.skill('forge-rivetclaw')?.active.name.en).toBe('Rivet Rebound')
+    expect(registry.creatureMechanics('forge-rivetclaw')?.bindings).toContainEqual(
+      expect.objectContaining({ trigger: 'damage:taken', opcode: 'damage.arm-counter' }),
+    )
+    expect(registry.encounterCreature('overflow')?.id).toBe('glitch-overflow-maw')
     expect(registry.asset('creature:forge-rivetclaw:sprite')?.path).toBe(
       'sprites/forge-rivetclaw.webp',
     )

@@ -11,6 +11,9 @@ importers:
       ajv:
         specifier: 8.20.0
         version: 8.20.0
+      semver:
+        specifier: 7.8.5
+        version: 7.8.5
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.1
@@ -48,6 +51,9 @@ importers:
       '@types/react-dom':
         specifier: 18.3.7
         version: 18.3.7(@types/react@18.3.26)
+      '@types/semver':
+        specifier: 7.8.0
+        version: 7.8.0
       lightningcss:
         specifier: 1.33.0
         version: 1.33.0
@@ -74,8 +80,49 @@ importers:
       ajv:
         specifier: 8.20.0
         version: 8.20.0
+      semver:
+        specifier: 7.8.5
+        version: 7.8.5
 
-  packages/engine: {}
+  packages/dsh-adapter:
+    dependencies:
+      '@nath-vikky/codekin-content-sdk':
+        specifier: workspace:*
+        version: link:../content-sdk
+      '@nath-vikky/codekin-engine':
+        specifier: workspace:*
+        version: link:../engine
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: 4.0.1
+        version: 4.0.1(@deepseek-ai/cordis-plugin-include@1.0.6)(@deepseek-ai/cordis-plugin-loader@1.0.2)
+      '@deepseek-ai/dsh-host-webserver':
+        specifier: link:../../../deepseek-harness-alpha/packages/host/webserver
+        version: link:../../../deepseek-harness-alpha/packages/host/webserver
+      '@deepseek-ai/dsh-session':
+        specifier: link:../../../deepseek-harness-alpha/packages/core/session
+        version: link:../../../deepseek-harness-alpha/packages/core/session
+
+  packages/engine:
+    dependencies:
+      '@nath-vikky/codekin-content-sdk':
+        specifier: workspace:*
+        version: link:../content-sdk
+
+  packages/renderer-react:
+    dependencies:
+      '@nath-vikky/codekin-content-sdk':
+        specifier: workspace:*
+        version: link:../content-sdk
+      '@nath-vikky/codekin-engine':
+        specifier: workspace:*
+        version: link:../engine
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.2.0
+        version: 18.3.1(react@18.3.1)
 
 packages:
 
@@ -303,6 +350,9 @@ packages:
 
   '@types/react@18.3.26':
     resolution: {integrity: sha512-RFA/bURkcKzx/X9oumPG9Vp3D3JUgus/d0b67KB0t5S/raciymilkOa66olh78MUI92QLbEJevO7rvqU/kjwKA==}
+
+  '@types/semver@7.8.0':
+    resolution: {integrity: sha512-1mAINjtQCXXeLkJ9ehXkwOcBpqtLxiVtKhpUf83DdRNdQKV0iXZpaHYqRr7nj+wvxuJzoAmAwXI+sCNMv1CzLQ==}
 
   '@vitest/expect@4.1.11':
     resolution: {integrity: sha512-VX2x5vNJXET47KAFzwERI+KRMtTTCSWTfSMKsW7JsUsXV4psq++e3DvZpuTDOpHcxytiDs6p2nhVb2tVDiiUYw==}
@@ -821,6 +871,11 @@ packages:
   scheduler@0.23.2:
     resolution: {integrity: sha512-UOShsPwz7NrMUqhR6t0hWjFduvOzbtv7toDH1/hIrfRNIDBnnBWd0CwJTGvTpngVlmwGCdP9/Zl/tVrDqcuYzQ==}
 
+  semver@7.8.5:
+    resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
+    engines: {node: '>=10'}
+    hasBin: true
+
   siginfo@2.0.0:
     resolution: {integrity: sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==}
 
@@ -1220,6 +1275,8 @@ snapshots:
     dependencies:
       '@types/prop-types': 15.7.15
       csstype: 3.2.3
+
+  '@types/semver@7.8.0': {}
 
   '@vitest/expect@4.1.11':
     dependencies:
@@ -1661,6 +1718,8 @@ snapshots:
   scheduler@0.23.2:
     dependencies:
       loose-envify: 1.4.0
+
+  semver@7.8.5: {}
 
   siginfo@2.0.0: {}
 

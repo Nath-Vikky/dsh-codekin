@@ -1,11 +1,7 @@
 import {
   CAPTURE_CORE_QUALITIES,
-  STARTER_CREATURE_IDS,
   TRACE_ECOLOGIES,
-  creatureById,
-  creatureIdForSignalVariant,
-  creaturesInEcology,
-} from './catalog.ts'
+} from '../../content-sdk/src/types.ts'
 import {
   BASE_ACTIONS_PER_CREATURE,
   BASE_BOSS_ACTIONS,
@@ -49,9 +45,10 @@ import {
   resolveExistingBattleMatches,
   resolveForcedTiles,
 } from './match3.ts'
-import { QUALITY_SKILL_MULTIPLIERS, skillByCreatureId } from './skills.ts'
-import { CORE_CREATURE_MECHANICS, mechanicsByCreatureId } from './mechanics.ts'
-import { assertMechanicsContract } from './mechanics-contract.ts'
+import {
+  QUALITY_SKILL_MULTIPLIERS,
+  currentEngineContent,
+} from './content.ts'
 import {
   MAX_TOWER_FLOOR,
   emptyTowerMaterialReward,
@@ -98,7 +95,11 @@ const MAX_IDLE_ELAPSED_MS = 12 * 60 * 60 * 1000
 const AMPLIFIER_DURATION_ROUNDS = 2
 const MAX_AMPLIFIERS_PER_SIDE = 8
 
-assertMechanicsContract(CORE_CREATURE_MECHANICS)
+const creatureById = (id: string) => currentEngineContent().creature(id)
+const creaturesInEcology = (ecology: TraceEcology) => currentEngineContent().creaturesInEcology(ecology)
+const skillByCreatureId = (creatureId: string) => currentEngineContent().skill(creatureId)
+const mechanicsByCreatureId = (creatureId: string) => currentEngineContent().creatureMechanics(creatureId)
+const creatureIdForSignalVariant = (variant: string) => currentEngineContent().encounterVariantCreatureId(variant)
 
 export const ECOLOGY_ADVANTAGE: Readonly<Record<TraceEcology, TraceEcology>> = Object.freeze({
   lumen: 'glitch',
@@ -2616,7 +2617,7 @@ export function applyTraceWildAction(
   let animation: TraceWildBattleAnimation | undefined
   switch (action.type) {
     case 'choose-starter': {
-      if (next.starterChosen || !STARTER_CREATURE_IDS.includes(action.creatureId as typeof STARTER_CREATURE_IDS[number])) {
+      if (next.starterChosen || !currentEngineContent().starterCreatureIds.includes(action.creatureId)) {
         throw new TraceWildRuleError('conflict')
       }
       const definition = creatureById(action.creatureId)

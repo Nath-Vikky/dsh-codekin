@@ -1,4 +1,4 @@
-import { CAPTURE_CORE_QUALITIES } from './catalog.ts'
+import { CAPTURE_CORE_QUALITIES } from '../../content-sdk/src/types.ts'
 import { MATCH_BOARD_CELLS } from './match3.ts'
 import type { CaptureCoreQuality, TraceWildAction } from './types.ts'
 

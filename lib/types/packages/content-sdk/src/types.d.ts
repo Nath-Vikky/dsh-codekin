@@ -1,7 +1,9 @@
 export declare const CONTENT_API_VERSION: 1;
-export type TraceEcology = 'lumen' | 'forge' | 'relay' | 'aegis' | 'glitch';
+export declare const TRACE_ECOLOGIES: readonly ["lumen", "forge", "relay", "aegis", "glitch"];
+export declare const CAPTURE_CORE_QUALITIES: readonly ["pebble", "pulse", "prism", "nova", "origin"];
+export type TraceEcology = typeof TRACE_ECOLOGIES[number];
 export type TraceRarity = 'common' | 'uncommon' | 'rare' | 'apex';
-export type CaptureCoreQuality = 'pebble' | 'pulse' | 'prism' | 'nova' | 'origin';
+export type CaptureCoreQuality = typeof CAPTURE_CORE_QUALITIES[number];
 export type IndividualQuality = CaptureCoreQuality;
 export type GrowthMaterialQuality = CaptureCoreQuality;
 export interface CreatureStats {

@@ -1,8 +1,15 @@
 export const CONTENT_API_VERSION = 1 as const
 
-export type TraceEcology = 'lumen' | 'forge' | 'relay' | 'aegis' | 'glitch'
+export const TRACE_ECOLOGIES = Object.freeze([
+  'lumen', 'forge', 'relay', 'aegis', 'glitch',
+] as const)
+export const CAPTURE_CORE_QUALITIES = Object.freeze([
+  'pebble', 'pulse', 'prism', 'nova', 'origin',
+] as const)
+
+export type TraceEcology = typeof TRACE_ECOLOGIES[number]
 export type TraceRarity = 'common' | 'uncommon' | 'rare' | 'apex'
-export type CaptureCoreQuality = 'pebble' | 'pulse' | 'prism' | 'nova' | 'origin'
+export type CaptureCoreQuality = typeof CAPTURE_CORE_QUALITIES[number]
 export type IndividualQuality = CaptureCoreQuality
 export type GrowthMaterialQuality = CaptureCoreQuality
 

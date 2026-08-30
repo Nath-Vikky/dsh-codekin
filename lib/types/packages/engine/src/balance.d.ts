@@ -16,7 +16,7 @@ export declare const QUALITY_ORDER: readonly ["pebble", "pulse", "prism", "nova"
 export declare const PLAYER_QUALITY_BASE_MULTIPLIERS: Readonly<Record<IndividualQuality, number>>;
 export declare const PLAYER_QUALITY_GROWTH_BONUSES: Readonly<Record<IndividualQuality, number>>;
 /** @deprecated Use PLAYER_QUALITY_BASE_MULTIPLIERS for new balance work. */
-export declare const PLAYER_QUALITY_MULTIPLIERS: Readonly<Record<CaptureCoreQuality, number>>;
+export declare const PLAYER_QUALITY_MULTIPLIERS: Readonly<Record<"pebble" | "pulse" | "prism" | "nova" | "origin", number>>;
 export declare const XP_QUALITY_MULTIPLIERS: Readonly<Record<IndividualQuality, number>>;
 export declare const CORE_CAPTURE_POWER: Readonly<Record<CaptureCoreQuality, number>>;
 export declare const WILD_QUALITY_RESISTANCE: Readonly<Record<IndividualQuality, number>>;

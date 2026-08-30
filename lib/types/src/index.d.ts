@@ -1,8 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis';
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver';
 import type { Session, SessionEvent, SessionStore } from '@deepseek-ai/dsh-session';
-export * from '../packages/engine/src/index.ts';
-export { TraceWildService } from './host/service.ts';
+export * from './core-runtime.ts';
+export { TraceWildService } from '../packages/dsh-adapter/src/service.ts';
 export declare const name = "dsh-codekin";
 export declare const inject: string[];
 declare module '@deepseek-ai/cordis' {

@@ -2,8 +2,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createInitialTraceWildState } from '../packages/engine/src/engine.ts'
-import { TraceWildPersistence } from '../src/host/persistence.ts'
+import { CORE_CODEKIN_RUNTIME, createInitialTraceWildState } from '../src/core-runtime.ts'
+import { TraceWildPersistence } from '../packages/dsh-adapter/src/persistence.ts'
 
 const roots: string[] = []
 
@@ -22,7 +22,7 @@ describe('Codekin save persistence', () => {
     mkdirSync(join(root, 'tracewild'), { recursive: true })
     writeFileSync(legacy, JSON.stringify(state), 'utf8')
 
-    const loaded = new TraceWildPersistence(current, legacy).load(200)
+    const loaded = new TraceWildPersistence(CORE_CODEKIN_RUNTIME, current, legacy).load(200)
 
     expect(loaded.cores.prism).toBe(7)
     expect(existsSync(legacy)).toBe(false)
@@ -39,7 +39,7 @@ describe('Codekin save persistence', () => {
       writeFileSync(filename, '{}', 'utf8')
     }
 
-    new TraceWildPersistence(current, legacy).clear()
+    new TraceWildPersistence(CORE_CODEKIN_RUNTIME, current, legacy).clear()
 
     expect([legacy, current, `${legacy}.tmp`, `${current}.tmp`].some(existsSync)).toBe(false)
   })

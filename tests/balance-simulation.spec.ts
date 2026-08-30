@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { totalXpForLevel } from '../packages/engine/src/balance.ts'
-import { applyTraceWildAction, createInitialTraceWildState } from '../packages/engine/src/engine.ts'
+import { applyTraceWildAction, createInitialTraceWildState } from '../src/core-runtime.ts'
 import { findFirstLegalBattleSwap } from '../packages/engine/src/match3.ts'
 import type { CaptureCoreQuality, TraceWildState } from '../packages/engine/src/types.ts'
 

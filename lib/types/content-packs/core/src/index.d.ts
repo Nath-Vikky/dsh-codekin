@@ -9,7 +9,7 @@ export declare const CORE_CONTENT_PACK: {
         readonly contentApi: 1;
     };
     readonly ecologies: {
-        id: import("../../../src/index.ts").TraceEcology;
+        id: "lumen" | "forge" | "relay" | "aegis" | "glitch";
         order: number;
         name: {
             readonly zhCN: "智算";
@@ -30,7 +30,7 @@ export declare const CORE_CONTENT_PACK: {
         tileRole: "sync" | "overclock" | "guard" | "repair" | "breach";
     }[];
     readonly qualities: {
-        id: import("../../../src/index.ts").CaptureCoreQuality;
+        id: "pebble" | "pulse" | "prism" | "nova" | "origin";
         order: number;
         name: {
             readonly zhCN: "砾石";
@@ -56,13 +56,13 @@ export declare const CORE_CONTENT_PACK: {
             zhCN: string;
             en: string;
         };
-        ecology: import("../../../src/index.ts").TraceEcology;
-        rarity: import("../../../src/index.ts").TraceRarity;
+        ecology: "lumen" | "forge" | "relay" | "aegis" | "glitch";
+        rarity: import("../../../src/core-runtime.ts").TraceRarity;
         combatRole: string;
         baseCaptureRate: number;
         signatureProtocol: string;
         sprite: string;
-        stats: import("../../../src/index.ts").CreatureStats;
+        stats: import("../../../src/core-runtime.ts").CreatureStats;
     }[];
     readonly skills: {
         creatureId: string;

@@ -1,0 +1,24 @@
+{
+  "name": "@nath-vikky/codekin-renderer-react",
+  "description": "React renderer and browser connection for Codekin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit --pretty false"
+  },
+  "dependencies": {
+    "@nath-vikky/codekin-content-sdk": "workspace:*",
+    "@nath-vikky/codekin-engine": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true },
+    "react-dom": { "optional": true }
+  },
+  "license": "MIT"
+}

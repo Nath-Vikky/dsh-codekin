@@ -55,7 +55,6 @@ export declare const CONTENT_PACK_SCHEMA: {
         };
         readonly ecologies: {
             readonly type: "array";
-            readonly minItems: 1;
             readonly maxItems: 32;
             readonly items: {
                 readonly type: "object";
@@ -96,7 +95,6 @@ export declare const CONTENT_PACK_SCHEMA: {
         };
         readonly qualities: {
             readonly type: "array";
-            readonly minItems: 1;
             readonly maxItems: 32;
             readonly items: {
                 readonly type: "object";
@@ -416,7 +414,6 @@ export declare const CONTENT_PACK_SCHEMA: {
             readonly properties: {
                 readonly rotation: {
                     readonly type: "array";
-                    readonly minItems: 1;
                     readonly maxItems: 2048;
                     readonly items: {
                         readonly type: "string";

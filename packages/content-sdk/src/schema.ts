@@ -44,7 +44,7 @@ export const CONTENT_PACK_SCHEMA = {
       },
     },
     ecologies: {
-      type: 'array', minItems: 1, maxItems: 32,
+      type: 'array', maxItems: 32,
       items: {
         type: 'object', additionalProperties: false,
         required: ['id', 'order', 'name', 'tileRole'],
@@ -57,7 +57,7 @@ export const CONTENT_PACK_SCHEMA = {
       },
     },
     qualities: {
-      type: 'array', minItems: 1, maxItems: 32,
+      type: 'array', maxItems: 32,
       items: {
         type: 'object', additionalProperties: false,
         required: ['id', 'order', 'name'],
@@ -177,7 +177,7 @@ export const CONTENT_PACK_SCHEMA = {
       type: 'object', additionalProperties: false, required: ['rotation'],
       properties: {
         rotation: {
-          type: 'array', minItems: 1, maxItems: 2048,
+          type: 'array', maxItems: 2048,
           items: { type: 'string', pattern: ID_PATTERN },
         },
       },

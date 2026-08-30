@@ -1,4 +1,4 @@
-import { TRACE_ECOLOGIES } from './catalog.ts'
+import { TRACE_ECOLOGIES } from '../../content-sdk/src/types.ts'
 import type { MatchCascadeFrame, MatchTile, RandomSource, TileSpecial, TraceEcology } from './types.ts'
 
 export const MATCH_BOARD_SIZE = 8

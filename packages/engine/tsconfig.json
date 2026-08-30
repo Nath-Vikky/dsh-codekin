@@ -10,5 +10,5 @@
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
     "types": []
   },
-  "include": ["src", "../content-sdk/src", "../../content-packs/core/src"]
+  "include": ["src", "../content-sdk/src"]
 }

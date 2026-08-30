@@ -4,7 +4,86 @@ import {
   ContentPackValidationError,
   contentPackIssues,
   createContentRegistry,
+  createContentView,
+  defineContentPack,
 } from '../packages/content-sdk/src/index.ts'
+import { CODEKIN_ENGINE_VERSION, createEngineContent } from '../packages/engine/src/content.ts'
+import { createCodekinRuntime } from '../packages/engine/src/runtime.ts'
+
+const ADDON_CONTENT_PACK = defineContentPack({
+  manifest: {
+    id: '@example/codekin-addon',
+    version: '1.0.0',
+    engine: '>=0.3.2 <0.4.0',
+    contentApi: 1,
+    dependencies: { '@nath-vikky/codekin-core': '0.3.2' },
+  },
+  ecologies: [],
+  qualities: [],
+  creatures: [{
+    number: 1001,
+    id: 'addon-pulsebeetle',
+    name: { zhCN: '脉冲甲', en: 'Pulsebeetle' },
+    ecology: 'lumen',
+    rarity: 'common',
+    combatRole: 'burst',
+    baseCaptureRate: 0.42,
+    signatureProtocol: 'pulse-burst',
+    sprite: 'creature:addon-pulsebeetle:sprite',
+    stats: { hp: 90, attack: 28, defense: 18, speed: 30 },
+  }],
+  skills: [{
+    creatureId: 'addon-pulsebeetle',
+    energyCost: 4,
+    passive: {
+      name: { zhCN: '脉冲蓄能', en: 'Pulse Charge' },
+      description: { zhCN: '积蓄一次稳定脉冲。', en: 'Stores one stable pulse.' },
+    },
+    active: {
+      name: { zhCN: '原始脉冲', en: 'Raw Pulse' },
+      description: { zhCN: '造成一次固定倍率攻击。', en: 'Deals one fixed-power hit.' },
+    },
+  }],
+  mechanics: [{
+    creatureId: 'addon-pulsebeetle',
+    bindings: [{ trigger: 'skill:cast', opcode: 'damage.raw-hit', params: { power: 1 } }],
+  }],
+  encounters: { variants: {} },
+  starters: ['addon-pulsebeetle'],
+  tower: { rotation: ['addon-pulsebeetle'] },
+  assets: [{
+    key: 'creature:addon-pulsebeetle:sprite',
+    path: 'sprites/addon-pulsebeetle.webp',
+    mime: 'image/webp',
+    kind: 'creature',
+  }],
+})
+
+function emptyPack(
+  id: string,
+  dependencies: Readonly<Record<string, string>> = {},
+  conflicts: readonly string[] = [],
+) {
+  return defineContentPack({
+    manifest: {
+      id,
+      version: '1.0.0',
+      engine: '>=0.3.2 <0.4.0',
+      contentApi: 1,
+      dependencies,
+      conflicts,
+    },
+    ecologies: [],
+    qualities: [],
+    creatures: [],
+    skills: [],
+    mechanics: [],
+    encounters: { variants: {} },
+    starters: [],
+    tower: { rotation: [] },
+    assets: [],
+  })
+}
 
 describe('Codekin content packs', () => {
   it('validates and indexes the complete 0.3.2 core pack', () => {
@@ -70,5 +149,74 @@ describe('Codekin content packs', () => {
     expect(registry.resolveId('legacy-indeximp')).toBe('lumen-indeximp')
     expect(registry.creature('legacy-indeximp')).toBe(registry.creature('lumen-indeximp'))
     expect(registry.creature('lumen-indeximp')?.id).toBe('lumen-indeximp')
+  })
+
+  it('composes a dependency-ordered extension pack into the engine and client view', () => {
+    const registry = createContentRegistry(
+      [ADDON_CONTENT_PACK, CORE_CONTENT_PACK],
+      { engineVersion: CODEKIN_ENGINE_VERSION },
+    )
+    expect(registry.packs.map(pack => pack.manifest.id)).toEqual([
+      '@nath-vikky/codekin-core',
+      '@example/codekin-addon',
+    ])
+    expect(registry.creatures).toHaveLength(26)
+
+    const view = createContentView(registry)
+    expect(view.creatures.at(-1)?.id).toBe('addon-pulsebeetle')
+    expect(view.towerRotation.at(-1)).toBe('addon-pulsebeetle')
+    expect(JSON.stringify(view)).not.toContain('mechanics')
+
+    const runtime = createCodekinRuntime(createEngineContent(registry))
+    const initial = runtime.createInitialTraceWildState(1_000)
+    const result = runtime.applyTraceWildAction(
+      initial,
+      { type: 'choose-starter', creatureId: 'addon-pulsebeetle' },
+      () => 0,
+      1_001,
+    )
+    expect(result.state.creatures[0]?.creatureId).toBe('addon-pulsebeetle')
+  })
+
+  it('rejects incompatible engines, dependency versions, conflicts, and cycles', () => {
+    expect(() => createContentRegistry(
+      [CORE_CONTENT_PACK],
+      { engineVersion: '0.4.0' },
+    )).toThrowError(expect.objectContaining({
+      issues: expect.arrayContaining([
+        expect.objectContaining({ message: expect.stringContaining('engine 0.4.0') }),
+      ]),
+    }))
+
+    const incompatibleDependency = {
+      ...ADDON_CONTENT_PACK,
+      manifest: {
+        ...ADDON_CONTENT_PACK.manifest,
+        dependencies: { '@nath-vikky/codekin-core': '^9.0.0' },
+      },
+    }
+    expect(() => createContentRegistry([CORE_CONTENT_PACK, incompatibleDependency]))
+      .toThrowError(expect.objectContaining({
+        issues: expect.arrayContaining([
+          expect.objectContaining({ message: 'version 0.3.2 does not satisfy ^9.0.0' }),
+        ]),
+      }))
+
+    const conflicting = emptyPack('@example/conflicting', {}, ['@nath-vikky/codekin-core'])
+    expect(() => createContentRegistry([CORE_CONTENT_PACK, conflicting]))
+      .toThrowError(expect.objectContaining({
+        issues: expect.arrayContaining([
+          expect.objectContaining({ message: 'conflicts with loaded pack @nath-vikky/codekin-core' }),
+        ]),
+      }))
+
+    const cycleA = emptyPack('@example/cycle-a', { '@example/cycle-b': '1.0.0' })
+    const cycleB = emptyPack('@example/cycle-b', { '@example/cycle-a': '1.0.0' })
+    expect(() => createContentRegistry([cycleA, cycleB]))
+      .toThrowError(expect.objectContaining({
+        issues: expect.arrayContaining([
+          expect.objectContaining({ message: 'dependency cycle: @example/cycle-a, @example/cycle-b' }),
+        ]),
+      }))
   })
 })

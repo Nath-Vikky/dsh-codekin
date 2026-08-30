@@ -1,5 +1,5 @@
-import { CREATURE_CATALOG } from './catalog.ts'
 import { QUALITY_ORDER, wildStats } from './balance.ts'
+import { currentEngineContent } from './content.ts'
 import type {
   CreatureDefinition,
   CreatureStats,
@@ -46,10 +46,11 @@ export function towerQualityForFloor(floorValue: number): IndividualQuality {
 export function towerFloorProfile(floorValue: number): TowerFloorProfile {
   const floor = boundedTowerFloor(floorValue)
   const skillTier = towerSkillTierForFloor(floor)
-  const creature = CREATURE_CATALOG[(floor - 1) % CREATURE_CATALOG.length]!
+  const rotation = currentEngineContent().towerRotation
+  const creatureId = rotation[(floor - 1) % rotation.length]!
   return Object.freeze({
     floor,
-    creatureId: creature.id,
+    creatureId,
     level: Math.min(9_999, floor + 1),
     quality: towerQualityForFloor(floor),
     skillTier,

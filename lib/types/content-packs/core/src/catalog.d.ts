@@ -1,6 +1,6 @@
+import { CAPTURE_CORE_QUALITIES, TRACE_ECOLOGIES } from '../../../packages/content-sdk/src/types.ts';
 import type { CaptureCoreQuality, CreatureDefinition, TraceEcology } from '../../../packages/content-sdk/src/types.ts';
-export declare const TRACE_ECOLOGIES: readonly TraceEcology[];
-export declare const CAPTURE_CORE_QUALITIES: readonly CaptureCoreQuality[];
+export { CAPTURE_CORE_QUALITIES, TRACE_ECOLOGIES };
 export declare const CORE_DROP_WEIGHTS: Readonly<Record<CaptureCoreQuality, number>>;
 export declare const CORE_CAPTURE_MULTIPLIERS: Readonly<Record<CaptureCoreQuality, number>>;
 export declare const CREATURE_CATALOG: readonly CreatureDefinition[];

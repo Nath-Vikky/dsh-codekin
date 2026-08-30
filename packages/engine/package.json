@@ -17,6 +17,9 @@
     "clean": "node --eval \"import('node:fs/promises').then(({rm}) => rm('dist', { recursive: true, force: true }))\"",
     "typecheck": "tsc -p tsconfig.json --noEmit --pretty false"
   },
+  "dependencies": {
+    "@nath-vikky/codekin-content-sdk": "workspace:*"
+  },
   "files": ["dist"],
   "license": "MIT"
 }

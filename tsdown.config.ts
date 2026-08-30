@@ -40,7 +40,7 @@ const host: UserConfig = {
   name: PACKAGE_ID,
   entry: {
     index: 'lib/types/src/index.js',
-    engine: 'lib/types/packages/engine/src/index.js',
+    engine: 'lib/types/src/core-runtime.js',
     content: 'lib/types/packages/content-sdk/src/index.js',
     'content-core': 'lib/types/content-packs/core/src/index.js',
   },
@@ -59,7 +59,7 @@ const host: UserConfig = {
 
 const client: UserConfig = {
   name: `${PACKAGE_ID}/client`,
-  entry: { client: 'lib/types/src/client/index.js' },
+  entry: { client: 'lib/types/packages/renderer-react/src/index.js' },
   outDir: 'lib',
   format: 'cjs',
   platform: 'browser',

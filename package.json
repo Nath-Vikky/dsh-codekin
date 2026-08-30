@@ -10,9 +10,9 @@
   },
   "scripts": {
     "build": "node --run clean && pnpm --filter @nath-vikky/codekin-engine build && tsc -p tsconfig.json && tsdown",
-    "clean": "node --eval \"import('node:fs/promises').then(async ({rm}) => { await rm('lib', { recursive: true, force: true }); await rm('packages/engine/dist', { recursive: true, force: true }) })\"",
+    "clean": "node --eval \"import('node:fs/promises').then(async ({rm}) => { for (const path of ['lib', 'packages/engine/dist', 'packages/content-sdk/dist']) await rm(path, { recursive: true, force: true }) })\"",
     "test": "vitest run",
-    "typecheck": "pnpm --filter @nath-vikky/codekin-engine typecheck && tsc -p tsconfig.json --noEmit --pretty false && tsc -p tsconfig.vitest.json --noEmit --pretty false",
+    "typecheck": "pnpm --filter @nath-vikky/codekin-content-sdk typecheck && pnpm --filter @nath-vikky/codekin-engine typecheck && pnpm --filter @nath-vikky/codekin-dsh-adapter typecheck && pnpm --filter @nath-vikky/codekin-renderer-react typecheck && tsc -p tsconfig.json --noEmit --pretty false && tsc -p tsconfig.vitest.json --noEmit --pretty false",
     "check": "node --run typecheck && node --run test && node --run build",
     "prepack": "node --run check"
   },
@@ -24,11 +24,11 @@
       "default": "./lib/index.js"
     },
     "./client": {
-      "types": "./lib/types/src/client/index.d.ts",
+      "types": "./lib/types/packages/renderer-react/src/index.d.ts",
       "default": "./lib/client.js"
     },
     "./engine": {
-      "types": "./lib/types/packages/engine/src/index.d.ts",
+      "types": "./lib/types/src/core-runtime.d.ts",
       "default": "./lib/engine.js"
     },
     "./content": {
@@ -119,6 +119,7 @@
     "@types/node": "22.20.0",
     "@types/react": "18.3.26",
     "@types/react-dom": "18.3.7",
+    "@types/semver": "7.8.0",
     "lightningcss": "1.33.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
@@ -156,6 +157,7 @@
     "README.zh-CN.md"
   ],
   "dependencies": {
-    "ajv": "8.20.0"
+    "ajv": "8.20.0",
+    "semver": "7.8.5"
   }
 }

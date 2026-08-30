@@ -1,3 +1,7 @@
+import {
+  CAPTURE_CORE_QUALITIES,
+  TRACE_ECOLOGIES,
+} from '../../../packages/content-sdk/src/types.ts'
 import type {
   CaptureCoreQuality,
   CreatureDefinition,
@@ -6,13 +10,7 @@ import type {
   TraceRarity,
 } from '../../../packages/content-sdk/src/types.ts'
 
-export const TRACE_ECOLOGIES: readonly TraceEcology[] = Object.freeze([
-  'lumen', 'forge', 'relay', 'aegis', 'glitch',
-])
-
-export const CAPTURE_CORE_QUALITIES: readonly CaptureCoreQuality[] = Object.freeze([
-  'pebble', 'pulse', 'prism', 'nova', 'origin',
-])
+export { CAPTURE_CORE_QUALITIES, TRACE_ECOLOGIES }
 
 export const CORE_DROP_WEIGHTS: Readonly<Record<CaptureCoreQuality, number>> = Object.freeze({
   pebble: 55,

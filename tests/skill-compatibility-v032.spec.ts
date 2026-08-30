@@ -5,7 +5,7 @@ import { CREATURE_CATALOG } from '../content-packs/core/src/catalog.ts'
 import {
   applyTraceWildAction,
   createInitialTraceWildState,
-} from '../packages/engine/src/engine.ts'
+} from '../src/core-runtime.ts'
 import type { RandomSource } from '../packages/engine/src/types.ts'
 
 // Captured from the immutable 0.3.2 release tarball whose SHA-256 is

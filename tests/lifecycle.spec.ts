@@ -1,8 +1,9 @@
 import { EventEmitter } from 'node:events'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { describe, expect, it, vi } from 'vitest'
-import { createTraceWildRoutes, TRACEWILD_API_PREFIX } from '../src/host/routes.ts'
-import type { TraceWildService } from '../src/host/service.ts'
+import { CORE_CONTENT_VIEW } from '../src/core-runtime.ts'
+import { createTraceWildRoutes, TRACEWILD_API_PREFIX } from '../packages/dsh-adapter/src/routes.ts'
+import type { TraceWildService } from '../packages/dsh-adapter/src/service.ts'
 
 interface FakeResponse {
   readonly response: ServerResponse
@@ -60,7 +61,7 @@ describe('TraceWild Cordis lifecycle', () => {
     const act = vi.fn()
     const subscribe = vi.fn()
     const service = { snapshot, act, subscribe } as unknown as TraceWildService
-    const group = createTraceWildRoutes(service, '.')
+    const group = createTraceWildRoutes(service, '.', CORE_CONTENT_VIEW)
 
     await Promise.all(group.routes.map(async (route) => {
       const res = response()
@@ -77,7 +78,7 @@ describe('TraceWild Cordis lifecycle', () => {
   it('accepts the full loopback range but rejects non-loopback and foreign-origin requests', () => {
     const snapshot = vi.fn(() => ({ ok: true }))
     const service = { snapshot } as unknown as TraceWildService
-    const group = createTraceWildRoutes(service, '.')
+    const group = createTraceWildRoutes(service, '.', CORE_CONTENT_VIEW)
     const state = group.routes.find(route => route.path === `${TRACEWILD_API_PREFIX}/state`)!
 
     const local = response()
@@ -100,6 +101,24 @@ describe('TraceWild Cordis lifecycle', () => {
     expect(snapshot).toHaveBeenCalledOnce()
   })
 
+  it('serves the client-safe content view over the loopback API', () => {
+    const group = createTraceWildRoutes({} as TraceWildService, '.', CORE_CONTENT_VIEW)
+    const content = group.routes.find(route => route.path === `${TRACEWILD_API_PREFIX}/content`)!
+    const res = response()
+
+    content.handler(request('GET', {
+      host: '127.0.0.1:63214',
+      origin: 'http://127.0.0.1:63214',
+      'sec-fetch-site': 'same-origin',
+    }), res.response)
+
+    expect(res.statuses).toEqual([200])
+    const body = JSON.parse(res.writes.join('')) as Record<string, unknown>
+    expect(body.id).toBe(CORE_CONTENT_VIEW.id)
+    expect(body.creatures).toHaveLength(25)
+    expect(body).not.toHaveProperty('mechanics')
+  })
+
   it('ends active event streams and removes their subscriptions when unloaded', () => {
     let subscribed = 0
     let unsubscribed = 0
@@ -110,7 +129,7 @@ describe('TraceWild Cordis lifecycle', () => {
         return () => { unsubscribed += 1 }
       },
     } as unknown as TraceWildService
-    const group = createTraceWildRoutes(service, '.')
+    const group = createTraceWildRoutes(service, '.', CORE_CONTENT_VIEW)
     const events = group.routes.find(route => route.path === `${TRACEWILD_API_PREFIX}/events`)!
     const res = response()
 
@@ -128,7 +147,7 @@ describe('TraceWild Cordis lifecycle', () => {
   it('requires the explicit cleanup phrase before deleting the local save', async () => {
     const clearLocalData = vi.fn(() => ({ ok: true, schemaVersion: 3, state: { schemaVersion: 3 }, serverTime: 1 }))
     const service = { clearLocalData } as unknown as TraceWildService
-    const group = createTraceWildRoutes(service, '.')
+    const group = createTraceWildRoutes(service, '.', CORE_CONTENT_VIEW)
     const route = group.routes.find(candidate => candidate.path === `${TRACEWILD_API_PREFIX}/save`)!
     const req = request('DELETE', {
       host: '127.0.0.1:63214',
@@ -149,7 +168,7 @@ describe('TraceWild Cordis lifecycle', () => {
   it('fails closed without committing an action that was awaiting its body during unload', async () => {
     const act = vi.fn()
     const service = { act } as unknown as TraceWildService
-    const group = createTraceWildRoutes(service, '.')
+    const group = createTraceWildRoutes(service, '.', CORE_CONTENT_VIEW)
     const action = group.routes.find(route => route.path === `${TRACEWILD_API_PREFIX}/action`)!
     const req = request('POST', {
       host: '127.0.0.1:63214',

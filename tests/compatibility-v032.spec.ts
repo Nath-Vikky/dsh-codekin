@@ -1,15 +1,15 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { CREATURE_CATALOG } from '../packages/engine/src/catalog.ts'
+import { CREATURE_CATALOG } from '../content-packs/core/src/catalog.ts'
 import {
   applyTraceSignal,
   applyTraceWildAction,
   createInitialTraceWildState,
   restoreTraceWildState,
   settleTraceWildIdleRewards,
-} from '../packages/engine/src/engine.ts'
+} from '../src/core-runtime.ts'
 import { findFirstLegalBattleSwap } from '../packages/engine/src/match3.ts'
-import { CREATURE_SKILLS } from '../packages/engine/src/skills.ts'
+import { CREATURE_SKILLS } from '../content-packs/core/src/skills.ts'
 import type { TraceSignal, TraceWildState } from '../packages/engine/src/types.ts'
 
 function seededRandom(seedValue: number): () => number {

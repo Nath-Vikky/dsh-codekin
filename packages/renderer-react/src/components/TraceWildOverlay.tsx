@@ -17,6 +17,7 @@ import { MATCH_BOARD_SIZE, areAdjacentTiles } from '../../../engine/src/match3.t
 import type {
   BattleAmplifier,
   CaptureCoreQuality,
+  CapturedCreature,
   CreatureDefinition,
   EnemyIntent,
   MatchDamageEffectiveness,
@@ -123,7 +124,6 @@ const RARITY_KEYS = {
 } as const
 
 const BOSS_ACTION_PAUSE_MS = 860
-const SQUAD_PAGE_SIZE = 24
 
 const CreatureSprite = memo(function CreatureSprite(props: {
   creature: CreatureDefinition
@@ -426,7 +426,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   const [launcherPosition, setLauncherPosition] = useState<WindowPosition>()
   const [draggingLauncher, setDraggingLauncher] = useState(false)
   const [squadDraft, setSquadDraft] = useState<string[]>([])
-  const [growthTarget, setGrowthTarget] = useState<string>()
+  const [codekinDetail, setCodekinDetail] = useState<string>()
   const [rewardQueue, setRewardQueue] = useState<AcquiredItem[][]>([])
   const [releaseCandidate, setReleaseCandidate] = useState<string>()
   const [battleTransition, setBattleTransition] = useState<BattleTransition>()
@@ -516,11 +516,11 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   }, [snapshot?.state.revision])
 
   useEffect(() => {
-    if (snapshot === undefined) return
-    setGrowthTarget(current => snapshot.state.creatures.some(creature => creature.instanceId === current)
-      ? current
-      : snapshot.state.creatures[0]?.instanceId)
-  }, [snapshot?.state.createdAt, snapshot?.state.revision])
+    if (codekinDetail === undefined) return
+    if (snapshot?.state.creatures.some(creature => creature.instanceId === codekinDetail) !== true) {
+      setCodekinDetail(undefined)
+    }
+  }, [codekinDetail, snapshot?.state.revision])
 
   useEffect(() => {
     if (releaseCandidate === undefined) return
@@ -570,11 +570,12 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
       if (event.key !== 'Escape') return
       if (rewardQueue.length > 0) setRewardQueue(queue => queue.slice(1))
       else if (releaseCandidate !== undefined) setReleaseCandidate(undefined)
+      else if (codekinDetail !== undefined) setCodekinDetail(undefined)
       else if (snapshot?.state.battle === undefined) setOpen(false)
     }
     window.addEventListener('keydown', onKey)
     return () => { window.removeEventListener('keydown', onKey) }
-  }, [open, releaseCandidate, rewardQueue.length, snapshot?.state.battle])
+  }, [codekinDetail, open, releaseCandidate, rewardQueue.length, snapshot?.state.battle])
 
   useEffect(() => {
     const clampCurrentPosition = (): void => {
@@ -795,7 +796,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
       {pendingIdleReward === undefined
         ? <img
             className={css.launcherAvatar}
-            src={contentAssetUrl('launcher:default') ?? '/api/tracewild/assets/sprites/codekin-launcher-v1.webp'}
+            src={contentAssetUrl('launcher:default') ?? '/api/tracewild/assets/sprites/codekin-launcher-v2.webp'}
             alt=""
             aria-hidden="true"
             width={384}
@@ -901,15 +902,15 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
                   />
                 )}
                 {tab === 'squad' && (
-                  <SquadView
+                  <CodekinView
                     state={state}
                     t={t}
                     zh={zh}
                     draft={squadDraft}
                     setDraft={setSquadDraft}
                     busy={busy}
-                    save={() => act({ type: 'set-squad', instanceIds: squadDraft })}
-                    release={setReleaseCandidate}
+                    save={async () => (await act({ type: 'set-squad', instanceIds: squadDraft })) !== undefined}
+                    inspect={setCodekinDetail}
                   />
                 )}
                 {tab === 'dex' && <DexView state={state} t={t} zh={zh} />}
@@ -918,10 +919,6 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
                     state={state}
                     t={t}
                     zh={zh}
-                    busy={busy}
-                    act={act}
-                    growthTarget={growthTarget}
-                    setGrowthTarget={setGrowthTarget}
                   />
                 )}
               </main>
@@ -945,6 +942,27 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
                   dismiss={() => { setRewardQueue(queue => queue.slice(1)) }}
                 />
               )}
+              {codekinDetail !== undefined && (() => {
+                const captured = state.creatures.find(row => row.instanceId === codekinDetail)
+                const creature = captured === undefined ? undefined : creatureById(captured.creatureId)
+                if (captured === undefined || creature === undefined) return null
+                return (
+                  <CodekinDetailModal
+                    captured={captured}
+                    creature={creature}
+                    state={state}
+                    t={t}
+                    zh={zh}
+                    busy={busy}
+                    act={act}
+                    dismiss={() => { setCodekinDetail(undefined) }}
+                    release={() => {
+                      setCodekinDetail(undefined)
+                      setReleaseCandidate(captured.instanceId)
+                    }}
+                  />
+                )
+              })()}
               {releaseCandidate !== undefined && (() => {
                 const captured = state.creatures.find(row => row.instanceId === releaseCandidate)
                 const creature = captured === undefined ? undefined : creatureById(captured.creatureId)
@@ -1161,22 +1179,17 @@ function TowerView(props: {
   )
 }
 
-function SquadView(props: {
+function CodekinView(props: {
   state: TraceWildSnapshot['state']
   t: TraceWildOverlayProps['t']
   zh: boolean
   draft: string[]
   setDraft: (value: string[]) => void
   busy: boolean
-  save: () => void
-  release: (instanceId: string) => void
+  save: () => Promise<boolean>
+  inspect: (instanceId: string) => void
 }) {
-  const [page, setPage] = useState(0)
-  const pageCount = Math.max(1, Math.ceil(props.state.creatures.length / SQUAD_PAGE_SIZE))
-  const visibleCreatures = props.state.creatures.slice(page * SQUAD_PAGE_SIZE, (page + 1) * SQUAD_PAGE_SIZE)
-  useEffect(() => {
-    setPage(current => Math.min(current, pageCount - 1))
-  }, [pageCount])
+  const [editing, setEditing] = useState(false)
   const toggle = (instanceId: string): void => {
     if (props.draft.includes(instanceId)) {
       if (props.draft.length > 1) props.setDraft(props.draft.filter(id => id !== instanceId))
@@ -1184,63 +1197,203 @@ function SquadView(props: {
     }
     if (props.draft.length < 3) props.setDraft([...props.draft, instanceId])
   }
+  const beginEditing = (): void => {
+    props.setDraft([...props.state.squad])
+    setEditing(true)
+  }
+  const cancelEditing = (): void => {
+    props.setDraft([...props.state.squad])
+    setEditing(false)
+  }
+  const save = async (): Promise<void> => {
+    if (await props.save()) setEditing(false)
+  }
   return (
-    <div className={css.panelPage}>
+    <div className={`${css.panelPage} ${editing ? css.codekinEditMode : ''}`}>
       <div className={css.pageHeading}>
-        <div><h2>{props.t('squad')}</h2><p>{props.t('squadHelp')}</p></div>
-        <button type="button" disabled={props.busy || props.draft.length === 0} onClick={props.save}>{props.t('saveSquad')}</button>
+        <div>
+          <h2>{props.t('squad')}</h2>
+          <p>{props.t(editing ? 'squadEditHelp' : 'squadHelp')}</p>
+        </div>
+        <div className={css.squadActions}>
+          {editing
+            ? <>
+                <span>{props.t('squadSelection', { count: props.draft.length })}</span>
+                <button type="button" className={css.squadCancel} disabled={props.busy} onClick={cancelEditing}>{props.t('cancelSquad')}</button>
+                <button type="button" disabled={props.busy || props.draft.length === 0} onClick={() => { void save() }}>{props.t('saveSquad')}</button>
+              </>
+            : <button type="button" disabled={props.busy} onClick={beginEditing}>{props.t('editSquad')}</button>}
+        </div>
       </div>
-      <nav className={css.rosterPagination} aria-label={props.t('squad')}>
-        <button type="button" disabled={page === 0} onClick={() => { setPage(current => Math.max(0, current - 1)) }}>
-          {props.t('previousPage')}
-        </button>
-        <span>{props.t('rosterPage', { page: page + 1, pages: pageCount, count: props.state.creatures.length })}</span>
-        <button type="button" disabled={page + 1 >= pageCount} onClick={() => { setPage(current => Math.min(pageCount - 1, current + 1)) }}>
-          {props.t('nextPage')}
-        </button>
-      </nav>
       <div className={css.creatureCards}>
-        {visibleCreatures.map((captured) => {
+        {props.state.creatures.map((captured) => {
           const creature = creatureById(captured.creatureId)
           if (creature === undefined) return null
           const position = props.draft.indexOf(captured.instanceId)
-          const stats = playerStats(creature.stats, captured.level, captured.quality)
+          const selectionLocked = editing && position < 0 && props.draft.length >= 3
           return (
             <article
               key={captured.instanceId}
-              className={`${css.creatureCard} ${position >= 0 ? css.creatureSelected : ''}`}
+              className={`${css.creatureCard} ${css.codekinCard} ${editing && position >= 0 ? css.creatureSelected : ''} ${selectionLocked ? css.codekinSelectionLocked : ''}`}
             >
-              {position >= 0 && <span className={css.partyIndex}>{position + 1}</span>}
-              <button
-                type="button"
-                className={css.releaseButton}
-                disabled={props.busy || props.state.creatures.length <= 1}
-                title={props.state.creatures.length <= 1 ? props.t('releaseLastBlocked') : props.t('releaseCreature')}
-                aria-label={`${props.t('releaseCreature')} · ${creatureName(creature, props.zh)}`}
-                onClick={() => { props.release(captured.instanceId) }}
-              >
-                <span aria-hidden="true">↗</span>
-              </button>
+              <span className={css.codekinNumber}>#{String(creature.number).padStart(2, '0')}</span>
+              {editing && position >= 0 && <span className={css.partyIndex}>{position + 1}</span>}
               <button
                 type="button"
                 className={css.creatureSelect}
-                onClick={() => { toggle(captured.instanceId) }}
+                aria-pressed={editing ? position >= 0 : undefined}
+                aria-label={editing
+                  ? `${creatureName(creature, props.zh)} · ${props.t('squadSelection', { count: props.draft.length })}`
+                  : `${creatureName(creature, props.zh)} · ${props.t('codekinDetail')}`}
+                onClick={() => { editing ? toggle(captured.instanceId) : props.inspect(captured.instanceId) }}
               >
                 <CreatureSprite creature={creature} size="medium" />
                 <strong>{creatureName(creature, props.zh)}</strong>
-                <span>{props.t(ECOLOGY_KEYS[creature.ecology])} · {props.t(RARITY_KEYS[creature.rarity])}</span>
-                <small>{props.t('level')} {captured.level} · {props.t('quality')} {props.t(CORE_KEYS[captured.quality])} · {props.t('wins')} {captured.wins}</small>
-                <span className={css.creatureStats}>
-                  <span><b>{stats.hp.toLocaleString()}</b>{props.t('statRuntime')}</span>
-                  <span><b>{stats.attack.toLocaleString()}</b>{props.t('statCompute')}</span>
-                  <span><b>{stats.defense.toLocaleString()}</b>{props.t('statGuard')}</span>
-                  <span><b>{stats.speed.toLocaleString()}</b>{props.t('statResponse')}</span>
-                </span>
+                <span className={css.codekinAttribute}>{props.t(ECOLOGY_KEYS[creature.ecology])}</span>
+                <small>{props.t(RARITY_KEYS[creature.rarity])} · {props.t(CORE_KEYS[captured.quality])}</small>
               </button>
             </article>
           )
         })}
       </div>
+    </div>
+  )
+}
+
+function CodekinDetailModal(props: {
+  captured: CapturedCreature
+  creature: CreatureDefinition
+  state: TraceWildSnapshot['state']
+  t: TraceWildOverlayProps['t']
+  zh: boolean
+  busy: boolean
+  act: (action: TraceWildAction) => Promise<TraceWildActionResponse | undefined>
+  dismiss: () => void
+  release: () => void
+}) {
+  const stats = playerStats(props.creature.stats, props.captured.level, props.captured.quality)
+  const skill = skillByCreatureId(props.creature.id)
+  const levelBaseXp = totalXpForLevel(props.captured.level, props.captured.quality)
+  const progress = Math.max(0, props.captured.xp - levelBaseXp)
+  const needed = props.captured.level >= MAX_PLAYER_LEVEL
+    ? 0
+    : xpToNextLevel(props.captured.level, props.captured.quality)
+  const progressPercent = needed <= 0 ? 100 : Math.min(100, Math.round(progress / needed * 100))
+  return (
+    <div
+      className={`${css.modalBackdrop} ${css.codekinDetailBackdrop}`}
+      onClick={(event) => {
+        if (event.target === event.currentTarget && !props.busy) props.dismiss()
+      }}
+    >
+      <section
+        className={css.codekinDetailModal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="codekin-detail-title"
+        onClick={(event) => { event.stopPropagation() }}
+      >
+        <button
+          type="button"
+          className={css.codekinDetailClose}
+          disabled={props.busy}
+          onClick={props.dismiss}
+          title={props.t('closeCodekinDetail')}
+          aria-label={props.t('closeCodekinDetail')}
+          autoFocus
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+        <header className={css.codekinDetailHero}>
+          <CreatureSprite creature={props.creature} size="large" eager />
+          <div>
+            <p>CODEKIN #{String(props.creature.number).padStart(2, '0')}</p>
+            <h2 id="codekin-detail-title">{creatureName(props.creature, props.zh)}</h2>
+            <div className={css.codekinDetailTags}>
+              <span>{props.t(ECOLOGY_KEYS[props.creature.ecology])}</span>
+              <span>{props.t(RARITY_KEYS[props.creature.rarity])}</span>
+              <span>{props.t(CORE_KEYS[props.captured.quality])}</span>
+            </div>
+            <small>{props.t('level')} {props.captured.level} · {props.t('wins')} {props.captured.wins}</small>
+          </div>
+        </header>
+
+        <section className={css.codekinDetailSection}>
+          <h3>{props.t('codekinStats')}</h3>
+          <div className={css.codekinDetailStats}>
+            <span><b>{stats.hp.toLocaleString()}</b>{props.t('statRuntime')}</span>
+            <span><b>{stats.attack.toLocaleString()}</b>{props.t('statCompute')}</span>
+            <span><b>{stats.defense.toLocaleString()}</b>{props.t('statGuard')}</span>
+            <span><b>{stats.speed.toLocaleString()}</b>{props.t('statResponse')}</span>
+          </div>
+        </section>
+
+        {skill !== undefined && (
+          <section className={css.codekinDetailSection}>
+            <h3>{props.t('codekinProtocols')}</h3>
+            <div className={css.codekinProtocols}>
+              <article>
+                <span>{props.t('passiveSkill')}</span>
+                <strong>{props.zh ? skill.passiveNameZh : skill.passiveNameEn}</strong>
+                <p>{props.zh ? skill.passiveDescriptionZh : skill.passiveDescriptionEn}</p>
+              </article>
+              <article>
+                <span>{props.t('activeSkill')} · {skill.energyCost} {props.t('energy')}</span>
+                <strong>{props.zh ? skill.activeNameZh : skill.activeNameEn}</strong>
+                <p>{props.zh ? skill.activeDescriptionZh : skill.activeDescriptionEn}</p>
+              </article>
+            </div>
+          </section>
+        )}
+
+        <section className={`${css.codekinDetailSection} ${css.codekinGrowth}`}>
+          <header>
+            <div>
+              <h3>{props.t('growth')}</h3>
+              <small>
+                {props.captured.level >= MAX_PLAYER_LEVEL
+                  ? props.t('levelCap')
+                  : `${props.t('xp')} ${progress}/${needed}`}
+              </small>
+            </div>
+            <b>Lv.{props.captured.level}</b>
+          </header>
+          <div className={css.growthXpTrack} aria-hidden="true">
+            <i style={{ width: `${progressPercent}%` }} />
+          </div>
+          <p>{props.t('growthMaterialChoice')}</p>
+          <div className={css.codekinGrowthActions}>
+            {CAPTURE_CORE_QUALITIES.map(quality => (
+              <button
+                key={quality}
+                type="button"
+                className={css[`core_${quality}`]}
+                disabled={props.busy || props.captured.level >= MAX_PLAYER_LEVEL || props.state.materials[quality] <= 0}
+                onClick={() => { void props.act({ type: 'feed-material', creatureInstanceId: props.captured.instanceId, quality, count: 1 }) }}
+                title={`${props.t('feed')} · ${materialItemName(props.t, quality)} · +${MATERIAL_XP[quality]} EXP`}
+                aria-label={`${props.t('feed')} ${materialItemName(props.t, quality)} · +${MATERIAL_XP[quality]} EXP`}
+              >
+                <i className={css.materialShard} />
+                <strong>{props.t(CORE_KEYS[quality])}</strong>
+                <span>+{MATERIAL_XP[quality]}</span>
+                <small>×{props.state.materials[quality]}</small>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <footer className={css.codekinDetailFooter}>
+          <button
+            type="button"
+            className={css.codekinReleaseFromDetail}
+            disabled={props.busy || props.state.creatures.length <= 1}
+            title={props.state.creatures.length <= 1 ? props.t('releaseLastBlocked') : props.t('releaseCreature')}
+            onClick={props.release}
+          >
+            {props.t('releaseCreature')}
+          </button>
+        </footer>
+      </section>
     </div>
   )
 }
@@ -1279,23 +1432,8 @@ function InventoryView(props: {
   state: TraceWildSnapshot['state']
   t: TraceWildOverlayProps['t']
   zh: boolean
-  busy: boolean
-  act: (action: TraceWildAction) => Promise<TraceWildActionResponse | undefined>
-  growthTarget: string | undefined
-  setGrowthTarget: (instanceId: string) => void
 }) {
   const stats = props.state.stats
-  const selectedCaptured = props.state.creatures.find(captured => captured.instanceId === props.growthTarget)
-    ?? props.state.creatures[0]
-  const selectedCreature = selectedCaptured === undefined ? undefined : creatureById(selectedCaptured.creatureId)
-  const selectedLevelBaseXp = selectedCaptured === undefined
-    ? 0
-    : totalXpForLevel(selectedCaptured.level, selectedCaptured.quality)
-  const selectedProgress = selectedCaptured === undefined ? 0 : Math.max(0, selectedCaptured.xp - selectedLevelBaseXp)
-  const selectedNeeded = selectedCaptured === undefined || selectedCaptured.level >= MAX_PLAYER_LEVEL
-    ? 0
-    : xpToNextLevel(selectedCaptured.level, selectedCaptured.quality)
-  const selectedProgressPercent = selectedNeeded <= 0 ? 100 : Math.min(100, Math.round(selectedProgress / selectedNeeded * 100))
   return (
     <div className={css.inventoryLayout}>
       <section className={css.inventoryPanel}>
@@ -1337,66 +1475,6 @@ function InventoryView(props: {
               </span>
             </div>
           ))}
-        </div>
-        <h2>{props.t('growth')}</h2>
-        <div className={css.growthWorkbench}>
-          <label className={css.growthSelector}>
-            <span>{props.t('growthTarget')}</span>
-            <select
-              value={selectedCaptured?.instanceId ?? ''}
-              disabled={props.busy || props.state.creatures.length === 0}
-              onChange={(event) => { props.setGrowthTarget(event.currentTarget.value) }}
-            >
-              {props.state.creatures.map((captured) => {
-                const creature = creatureById(captured.creatureId)
-                if (creature === undefined) return null
-                return (
-                  <option key={captured.instanceId} value={captured.instanceId}>
-                    {creatureName(creature, props.zh)} · Lv.{captured.level} · {props.t(CORE_KEYS[captured.quality])}
-                  </option>
-                )
-              })}
-            </select>
-            <small>{props.t('growthTargetHint', { count: props.state.creatures.length })}</small>
-          </label>
-          {selectedCaptured !== undefined && selectedCreature !== undefined && (
-            <article className={css.growthSelected}>
-              <div className={css.growthSummary}>
-                <CreatureSprite creature={selectedCreature} size="small" />
-                <div>
-                  <strong>{creatureName(selectedCreature, props.zh)}</strong>
-                  <span>
-                    {props.t(ECOLOGY_KEYS[selectedCreature.ecology])} · {props.t('quality')} {props.t(CORE_KEYS[selectedCaptured.quality])} · Lv.{selectedCaptured.level}
-                  </span>
-                  <small>
-                    {selectedCaptured.level >= MAX_PLAYER_LEVEL
-                      ? props.t('levelCap')
-                      : `${props.t('xp')} ${selectedProgress}/${selectedNeeded}`}
-                  </small>
-                  <div className={css.growthXpTrack} aria-hidden="true">
-                    <i style={{ width: `${selectedProgressPercent}%` }} />
-                  </div>
-                </div>
-              </div>
-              <div className={css.growthActions}>
-                {CAPTURE_CORE_QUALITIES.map(quality => (
-                  <button
-                    key={quality}
-                    type="button"
-                    className={css[`core_${quality}`]}
-                    disabled={props.busy || selectedCaptured.level >= MAX_PLAYER_LEVEL || props.state.materials[quality] <= 0}
-                    onClick={() => { void props.act({ type: 'feed-material', creatureInstanceId: selectedCaptured.instanceId, quality, count: 1 }) }}
-                    title={`${props.t('feed')} · ${materialItemName(props.t, quality)} · +${MATERIAL_XP[quality]} EXP`}
-                    aria-label={`${props.t('feed')} ${materialItemName(props.t, quality)} · +${MATERIAL_XP[quality]} EXP`}
-                  >
-                    <i />
-                    <span>+{MATERIAL_XP[quality]}</span>
-                    <small>×{props.state.materials[quality]}</small>
-                  </button>
-                ))}
-              </div>
-            </article>
-          )}
         </div>
         {props.state.idle.lastReward !== undefined && (
           <p className={css.idleReward}>

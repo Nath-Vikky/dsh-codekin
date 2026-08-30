@@ -80,7 +80,7 @@ export const CORE_CONTENT_PACK = defineContentPack({
   starters: [...STARTER_CREATURE_IDS],
   tower: { rotation: CREATURE_CATALOG.map(creature => creature.id) },
   assets: [
-    { key: 'launcher:default', path: 'sprites/codekin-launcher-v1.webp', mime: 'image/webp', kind: 'launcher' },
+    { key: 'launcher:default', path: 'sprites/codekin-launcher-v2.webp', mime: 'image/webp', kind: 'launcher' },
     ...CREATURE_CATALOG.map(creature => ({
       key: `creature:${creature.id}:sprite`,
       path: `sprites/${creature.id}.webp`,

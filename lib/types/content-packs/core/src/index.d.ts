@@ -98,7 +98,7 @@ export declare const CORE_CONTENT_PACK: {
     };
     readonly assets: readonly [{
         readonly key: "launcher:default";
-        readonly path: "sprites/codekin-launcher-v1.webp";
+        readonly path: "sprites/codekin-launcher-v2.webp";
         readonly mime: "image/webp";
         readonly kind: "launcher";
     }, ...{

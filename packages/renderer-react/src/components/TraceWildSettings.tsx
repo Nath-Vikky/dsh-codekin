@@ -87,7 +87,7 @@ export function TraceWildSettings({ t }: TraceWildSettingsProps) {
     <section className={css.settingsPage} aria-labelledby="codekin-settings-title">
       <header className={css.settingsHero}>
         <img
-          src="/api/tracewild/assets/sprites/codekin-launcher-v1.webp"
+          src="/api/tracewild/assets/sprites/codekin-launcher-v2.webp"
           alt=""
           width={384}
           height={384}

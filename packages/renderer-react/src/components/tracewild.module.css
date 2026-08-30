@@ -1837,3 +1837,103 @@
 .wildVitals, .captureBoardOverlay, .battleTransition { backdrop-filter: none; }
 .overlayDragging .header { backdrop-filter: none; }
 .overlayDragging .content * { animation-play-state: paused !important; }
+
+/* Owned Codekin roster, squad editing, and growth details */
+.creatureCards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding-bottom: 14px; }
+.codekinCard { min-width: 0; min-height: 184px; content-visibility: auto; contain-intrinsic-size: auto 184px; }
+.codekinCard .creatureSelect { min-height: 184px; justify-content: flex-start; padding: 10px 5px 11px; }
+.codekinCard .sprite_medium { width: 96px; height: 96px; margin-top: 2px; }
+.codekinCard .creatureSelect > strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.codekinCard .creatureSelect > .codekinAttribute { margin-top: 5px; color: #3c8f78; font-size: 9px; font-weight: 800; }
+.codekinCard .creatureSelect > small { margin-top: 4px; color: #7b8e89; font-size: 8px; }
+.codekinNumber {
+  position: absolute; z-index: 2; left: 8px; top: 8px; margin: 0 !important; border: 1px solid #75968d28; border-radius: 999px;
+  background: #ffffffe3; color: #718680 !important; padding: 4px 6px; font: 800 8px/1 ui-monospace, SFMono-Regular, Consolas, monospace !important;
+  box-shadow: 0 4px 11px #647a7215;
+}
+.codekinCard .partyIndex { left: auto; right: 8px; top: 8px; margin: 0; border-radius: 999px; }
+.codekinEditMode .codekinCard { border-style: dashed; }
+.codekinEditMode .codekinCard.creatureSelected { border-style: solid; }
+.codekinSelectionLocked { opacity: .52; }
+.codekinSelectionLocked .creatureSelect { cursor: not-allowed; }
+.squadActions { flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.squadActions > span { color: #668078; font-size: 8px; white-space: nowrap; }
+.squadActions button { min-height: 32px; border: 1px solid #64ad964d; border-radius: 11px; padding: 0 10px; cursor: pointer; font: 750 9px/1 ui-sans-serif, system-ui, sans-serif; }
+.squadActions .squadCancel { border-color: #829a9335; background: #f4f7f5; color: #60736e; }
+.squadActions button:disabled { cursor: wait; opacity: .48; }
+
+.codekinDetailBackdrop {
+  z-index: 75; padding: 10px; cursor: default;
+  background: radial-gradient(circle at 50% 18%, #b9dcd0b8, transparent 51%), #edf1eedb;
+}
+.codekinDetailModal {
+  position: relative; width: min(424px, 100%); max-height: calc(100% - 4px); overflow-x: hidden; overflow-y: auto;
+  border: 1px solid #ffffffdc; border-radius: 26px; background: linear-gradient(155deg, #fffefbf5, #edf5f1f2);
+  color: #314846; padding: 16px; box-shadow: 0 30px 90px #50665f45, inset 0 1px #fff;
+  animation: rewardModalIn .24s cubic-bezier(.22,1.2,.36,1) both; scrollbar-color: #78a6995c transparent;
+}
+.codekinDetailClose {
+  position: absolute; z-index: 3; right: 13px; top: 13px; width: 34px; height: 34px; border: 1px solid #a74f5c52;
+  border-radius: 12px; background: linear-gradient(145deg, #d76f7c, #b95665); color: #fff; cursor: pointer; display: grid; place-items: center;
+  padding: 0; box-shadow: 0 8px 19px #a8495950, inset 0 1px #ffffff66; transition: transform .15s ease, filter .15s ease;
+}
+.codekinDetailClose span { font: 800 20px/1 system-ui, sans-serif; transform: translateY(-1px); }
+.codekinDetailClose:hover:not(:disabled) { transform: translateY(-1px) scale(1.03); filter: brightness(1.05); }
+.codekinDetailClose:disabled { cursor: wait; opacity: .55; }
+.codekinDetailHero {
+  min-height: 148px; display: grid; grid-template-columns: 140px minmax(0, 1fr); align-items: center; gap: 9px;
+  border: 1px solid #ffffffd5; border-radius: 21px; background: radial-gradient(circle at 16% 44%, #b7e4d8a6, transparent 46%), #ffffffa6;
+  padding: 5px 45px 5px 3px; box-shadow: inset 0 1px #fff, 0 10px 28px #60766d14;
+}
+.codekinDetailHero .sprite_large { width: 140px; height: 140px; }
+.codekinDetailHero > div { min-width: 0; }
+.codekinDetailHero p { margin: 0 0 6px; color: #4f9c87; font: 850 8px/1 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .12em; }
+.codekinDetailHero h2 { margin: 0; color: #2a4142; font: 760 22px/1.12 ui-sans-serif, system-ui, sans-serif; overflow-wrap: anywhere; }
+.codekinDetailHero small { display: block; margin-top: 8px; color: #718681; font-size: 9px; }
+.codekinDetailTags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 9px; }
+.codekinDetailTags span { border: 1px solid #69a99532; border-radius: 999px; background: #eef8f4; color: #4d766c; padding: 4px 7px; font-size: 8px; font-weight: 750; }
+.codekinDetailSection { margin-top: 9px; border: 1px solid #ffffffd0; border-radius: 18px; background: #ffffffa3; padding: 11px; box-shadow: inset 0 1px #fff; }
+.codekinDetailSection > h3, .codekinGrowth h3 { margin: 0 0 8px; color: #3a5452; font: 760 10px/1.2 ui-sans-serif, system-ui, sans-serif; letter-spacing: .03em; }
+.codekinDetailStats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.codekinDetailStats span { min-width: 0; border: 1px solid #789e9322; border-radius: 11px; background: #f2f8f5c7; color: #718681; padding: 8px 2px; display: grid; gap: 3px; place-items: center; font-size: 7px; }
+.codekinDetailStats b { max-width: 100%; overflow: hidden; color: #345952; font: 780 13px/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.codekinProtocols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.codekinProtocols article { min-width: 0; border: 1px solid #7b9b9320; border-radius: 13px; background: linear-gradient(145deg, #f8fbf9, #edf4f1); padding: 9px; }
+.codekinProtocols span { display: block; color: #7d7fbc; font-size: 7px; font-weight: 800; }
+.codekinProtocols strong { display: block; margin-top: 4px; color: #3c5351; font-size: 10px; }
+.codekinProtocols p { margin: 5px 0 0; color: #71847f; font-size: 8px; line-height: 1.45; }
+.codekinGrowth > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.codekinGrowth > header h3 { margin-bottom: 3px; }
+.codekinGrowth > header small { color: #71847f; font-size: 8px; }
+.codekinGrowth > header > b { color: #4d766c; font: 800 15px/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.codekinGrowth .growthXpTrack { height: 7px; margin-top: 8px; background: #dfeae5; }
+.codekinGrowth > p { margin: 9px 0 6px; color: #6d827d; font-size: 8px; font-weight: 750; }
+.codekinGrowthActions { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+.codekinGrowthActions button {
+  min-width: 0; min-height: 70px; border: 1px solid color-mix(in srgb, currentColor 35%, transparent); border-radius: 12px;
+  background: linear-gradient(155deg, #fff, #edf3f0); color: inherit; cursor: pointer; padding: 6px 2px; display: grid; place-items: center; gap: 2px;
+  box-shadow: inset 0 1px #fff, 0 5px 12px #64776f10;
+}
+.codekinGrowthActions button .materialShard { width: 15px; height: 19px; }
+.codekinGrowthActions button strong { max-width: 100%; color: #526966; font-size: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.codekinGrowthActions button span { font: 800 7px/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.codekinGrowthActions button small { color: #778783; font-size: 7px; }
+.codekinGrowthActions button:disabled { cursor: not-allowed; opacity: .34; }
+.codekinDetailFooter { display: flex; justify-content: flex-end; margin-top: 9px; }
+.codekinReleaseFromDetail {
+  min-height: 31px; border: 1px solid #bc7a8340; border-radius: 11px; background: #fff5f5; color: #a45f69;
+  cursor: pointer; padding: 0 11px; font: 750 8px/1 ui-sans-serif, system-ui, sans-serif;
+}
+.codekinReleaseFromDetail:disabled { cursor: not-allowed; opacity: .42; }
+
+@media (max-width: 470px) {
+  .pageHeading { align-items: flex-start; }
+  .squadActions { max-width: 190px; flex-wrap: wrap; }
+  .codekinCard { min-height: 174px; }
+  .codekinCard .creatureSelect { min-height: 174px; }
+  .codekinCard .sprite_medium { width: 84px; height: 84px; margin-top: 7px; }
+  .codekinDetailModal { border-radius: 22px; padding: 12px; }
+  .codekinDetailHero { grid-template-columns: 118px minmax(0, 1fr); min-height: 132px; padding-left: 0; }
+  .codekinDetailHero .sprite_large { width: 118px; height: 118px; }
+  .codekinDetailHero h2 { font-size: 19px; }
+}

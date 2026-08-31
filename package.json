@@ -10,9 +10,15 @@
   "scripts": {
     "build": "node --run clean && pnpm --filter @nath-vikky/codekin-engine build && tsc -p tsconfig.json && tsdown",
     "clean": "node --eval \"import('node:fs/promises').then(async ({rm}) => { for (const path of ['lib', 'packages/engine/dist', 'packages/content-sdk/dist']) await rm(path, { recursive: true, force: true }) })\"",
+    "content:lint": "node tools/content-pack-lint.ts",
+    "replay": "node tools/replay.ts",
+    "replay:check": "node tools/replay.ts tests/fixtures/replays/core-smoke-v1.json",
+    "simulate": "node tools/simulation.ts",
+    "simulate:check": "node tools/simulation.ts --check --quiet",
     "test": "vitest run",
-    "typecheck": "pnpm --filter @nath-vikky/codekin-content-sdk typecheck && pnpm --filter @nath-vikky/codekin-engine typecheck && pnpm --filter @nath-vikky/codekin-dsh-adapter typecheck && pnpm --filter @nath-vikky/codekin-renderer-react typecheck && tsc -p tsconfig.json --noEmit --pretty false && tsc -p tsconfig.vitest.json --noEmit --pretty false",
-    "check": "node --run typecheck && node --run test && node --run build",
+    "typecheck:tools": "tsc -p tools/tsconfig.json --noEmit --pretty false",
+    "typecheck": "pnpm --filter @nath-vikky/codekin-content-sdk typecheck && pnpm --filter @nath-vikky/codekin-engine typecheck && pnpm --filter @nath-vikky/codekin-dsh-adapter typecheck && pnpm --filter @nath-vikky/codekin-renderer-react typecheck && tsc -p tsconfig.json --noEmit --pretty false && tsc -p tsconfig.vitest.json --noEmit --pretty false && node --run typecheck:tools",
+    "check": "node --run typecheck && node --run test && node --run content:lint && node --run replay:check && node --run simulate:check && node --run build",
     "prepack": "node --run check"
   },
   "main": "lib/index.js",

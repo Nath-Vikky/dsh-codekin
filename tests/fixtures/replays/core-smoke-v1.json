@@ -1,0 +1,39 @@
+{
+  "format": "codekin-replay-v1",
+  "random": "lcg32-v1",
+  "seed": 3237998081,
+  "startedAt": 1000,
+  "engineVersion": "0.3.5-alpha.2",
+  "contentPacks": [
+    {
+      "id": "@nath-vikky/codekin-core",
+      "version": "0.3.5-alpha.2"
+    }
+  ],
+  "steps": [
+    {
+      "kind": "action",
+      "at": 1001,
+      "action": {
+        "type": "choose-starter",
+        "creatureId": "lumen-indeximp"
+      }
+    },
+    {
+      "kind": "signal",
+      "signal": {
+        "id": "replay-smoke-signal",
+        "at": 1010,
+        "ecology": "forge",
+        "outcome": "completed",
+        "intensity": 1,
+        "activeMinutes": 5,
+        "enhanced": false
+      }
+    }
+  ],
+  "expect": {
+    "finalStateSha256": "5b0502970e188e770045d823da144975336f6aadb3740f5b724b84e6e06cf415",
+    "revision": 2
+  }
+}

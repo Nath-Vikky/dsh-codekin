@@ -31,9 +31,12 @@ export interface CodekinEngineContent {
 export const CODEKIN_ENGINE_VERSION = '0.3.5-alpha.2' as const
 
 export class EngineContentError extends TypeError {
-  constructor(readonly issues: readonly string[]) {
+  readonly issues: readonly string[]
+
+  constructor(issues: readonly string[]) {
     super(`incompatible Codekin engine content: ${issues.join('; ')}`)
     this.name = 'EngineContentError'
+    this.issues = issues
   }
 }
 

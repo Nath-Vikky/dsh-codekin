@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": [
+    "*.ts",
+    "../src",
+    "../packages/content-sdk/src",
+    "../packages/engine/src",
+    "../content-packs/core/src"
+  ]
+}

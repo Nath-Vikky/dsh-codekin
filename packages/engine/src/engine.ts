@@ -104,8 +104,11 @@ export const ECOLOGY_ADVANTAGE: Readonly<Record<TraceEcology, TraceEcology>> = O
 })
 
 export class TraceWildRuleError extends Error {
-  constructor(readonly code: 'invalid-action' | 'conflict') {
+  readonly code: 'invalid-action' | 'conflict'
+
+  constructor(code: 'invalid-action' | 'conflict') {
     super(code)
+    this.code = code
   }
 }
 

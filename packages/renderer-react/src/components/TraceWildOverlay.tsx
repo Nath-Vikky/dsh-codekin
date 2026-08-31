@@ -49,6 +49,7 @@ import {
   ECOLOGY_KEYS,
   creatureName,
 } from './creature-presentation.tsx'
+import { useDialogAccessibility } from './dialog-accessibility.ts'
 import css from './tracewild.module.css'
 
 type Tab = 'map' | 'tower' | 'squad' | 'dex' | 'inventory'
@@ -242,12 +243,21 @@ function AcquiredItemsModal(props: {
   zh: boolean
   dismiss: () => void
 }) {
+  const dialog = useDialogAccessibility(props.dismiss)
   return (
     <div
       className={css.rewardBackdrop}
       onClick={(event) => { if (event.target === event.currentTarget) props.dismiss() }}
     >
-      <section className={css.rewardModal} role="dialog" aria-modal="true" aria-labelledby="tracewild-reward-title">
+      <section
+        ref={dialog.dialogRef}
+        className={css.rewardModal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tracewild-reward-title"
+        tabIndex={-1}
+        onKeyDown={dialog.onDialogKeyDown}
+      >
         <span className={css.rewardHalo} aria-hidden="true" />
         <p>{props.t('rewardKicker')}</p>
         <h2 id="tracewild-reward-title">{props.t('rewardTitle')}</h2>
@@ -256,7 +266,9 @@ function AcquiredItemsModal(props: {
             <RewardItemTile key={`${item.kind}-${item.quality}-${item.kind === 'creature' ? item.creatureId : index}`} item={item} t={props.t} zh={props.zh} />
           ))}
         </div>
-        <small>{props.t('rewardDismiss')}</small>
+        <button type="button" className={css.rewardDismissButton} data-dialog-initial-focus onClick={props.dismiss}>
+          {props.t('rewardDismiss')}
+        </button>
       </section>
     </div>
   )
@@ -271,6 +283,7 @@ function ReleaseCreatureModal(props: {
   dismiss: () => void
   confirm: () => void
 }) {
+  const dialog = useDialogAccessibility(props.dismiss, props.busy)
   return (
     <div
       className={css.modalBackdrop}
@@ -279,10 +292,13 @@ function ReleaseCreatureModal(props: {
       }}
     >
       <section
+        ref={dialog.dialogRef}
         className={css.releaseModal}
         role="dialog"
         aria-modal="true"
         aria-labelledby="codekin-release-title"
+        tabIndex={-1}
+        onKeyDown={dialog.onDialogKeyDown}
         onMouseDown={(event) => { event.stopPropagation() }}
       >
         <header>
@@ -305,7 +321,7 @@ function ReleaseCreatureModal(props: {
           <small>+{MATERIAL_XP[props.captured.quality]} EXP</small>
         </div>
         <div className={css.releaseActions}>
-          <button type="button" disabled={props.busy} onClick={props.dismiss}>{props.t('releaseCancel')}</button>
+          <button type="button" data-dialog-initial-focus disabled={props.busy} onClick={props.dismiss}>{props.t('releaseCancel')}</button>
           <button type="button" className={css.releaseDanger} disabled={props.busy} onClick={props.confirm}>
             {props.t('releaseConfirm')}
           </button>
@@ -952,16 +968,25 @@ function StarterSelection(props: {
   busy: boolean
   choose: (creatureId: string) => void
 }) {
+  const dialog = useDialogAccessibility<HTMLDivElement>()
   return (
     <div className={css.modalBackdrop}>
-      <div className={css.starterModal} role="dialog" aria-modal="true" aria-labelledby="tracewild-starter-title">
+      <div
+        ref={dialog.dialogRef}
+        className={css.starterModal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tracewild-starter-title"
+        tabIndex={-1}
+        onKeyDown={dialog.onDialogKeyDown}
+      >
         <h2 id="tracewild-starter-title">{props.t('starterTitle')}</h2>
         <p>{props.t('starterBody')}</p>
         <div className={css.starterGrid}>
           {starterCreatureIds().map((id) => {
             const creature = creatureById(id)!
             return (
-              <button key={id} type="button" disabled={props.busy} onClick={() => { props.choose(id) }}>
+              <button key={id} type="button" data-dialog-initial-focus={id === starterCreatureIds()[0] ? true : undefined} disabled={props.busy} onClick={() => { props.choose(id) }}>
                 <CreatureSprite creature={creature} size="large" eager />
                 <strong>{creatureName(creature, props.zh)}</strong>
                 <span>{props.t(ECOLOGY_KEYS[creature.ecology])}</span>
@@ -1374,6 +1399,7 @@ function BattleView(props: {
   transition?: BattleTransition | undefined
 }) {
   const battle = props.state.battle!
+  const dialog = useDialogAccessibility()
   const [selectedTile, setSelectedTile] = useState<number>()
   const [gesture, setGesture] = useState<TileGesture>()
   const [swapMotion, setSwapMotion] = useState<SwapMotion>()
@@ -1913,7 +1939,15 @@ function BattleView(props: {
 
   return (
     <div className={css.battleBackdrop}>
-      <section className={`${css.battlePanel} ${partyHitKey > 0 ? css.battleWasHit : ''}`} role="dialog" aria-modal="true" aria-label={battle.mode === 'tower' ? props.t('towerBattle') : props.t('battle')}>
+      <section
+        ref={dialog.dialogRef}
+        className={`${css.battlePanel} ${partyHitKey > 0 ? css.battleWasHit : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={battle.mode === 'tower' ? props.t('towerBattle') : props.t('battle')}
+        tabIndex={-1}
+        onKeyDown={dialog.onDialogKeyDown}
+      >
         {attackPresentation !== undefined && (
           <div
             key={attackPresentation.key}

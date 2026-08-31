@@ -63,7 +63,7 @@ export const COMBAT_SIMULATION_SCENARIOS: readonly CombatSimulationScenario[] = 
   { name: 'solo pebble 1 vs origin 22', levels: [1], qualities: ['pebble'], wildLevel: 22, wildQuality: 'origin' },
 ])
 
-function startScenario(scenario: CombatSimulationScenario, random: () => number): TraceWildState {
+export function createCombatSimulationBattle(scenario: CombatSimulationScenario, random: () => number): TraceWildState {
   if (scenario.levels.length === 0 || scenario.levels.length > 3
     || scenario.levels.length !== scenario.qualities.length) {
     throw new RangeError('simulation scenarios require one to three matching levels and qualities')
@@ -100,7 +100,7 @@ export function simulateCombatScenario(
   seed: number,
 ): CombatSimulationSample {
   const random = createSeededRandom(seed)
-  let state = startScenario(scenario, random.next)
+  let state = createCombatSimulationBattle(scenario, random.next)
   let playerPhases = 0
   let bossPhases = 0
   let firstPlayerRatio = 0

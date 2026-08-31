@@ -1,0 +1,13 @@
+{
+  "format": "codekin-performance-budget-v1",
+  "minimumIterations": 100,
+  "actionP95Ms": 8,
+  "restoreLargeRosterP95Ms": 15,
+  "contentRegistryP95Ms": 10,
+  "simulationMatrixMs": 8000,
+  "clientBundleBytes": 400000,
+  "clientBundleGzipBytes": 90000,
+  "shippedJavaScriptBytes": 800000,
+  "coreAssetBytes": 750000,
+  "largeRosterJsonBytes": 500000
+}

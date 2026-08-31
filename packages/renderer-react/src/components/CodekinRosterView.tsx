@@ -32,6 +32,7 @@ import {
   RARITY_KEYS,
   creatureName,
 } from './creature-presentation.tsx'
+import { useDialogAccessibility } from './dialog-accessibility.ts'
 import css from './tracewild.module.css'
 
 type TraceWildTranslate = PropsLocale<'tracewild'>['t']
@@ -257,6 +258,7 @@ export function CodekinDetailModal(props: {
   dismiss: () => void
   release: () => void
 }) {
+  const dialog = useDialogAccessibility(props.dismiss, props.busy)
   const stats = playerStats(props.creature.stats, props.captured.level, props.captured.quality)
   const skill = skillByCreatureId(props.creature.id)
   const levelBaseXp = totalXpForLevel(props.captured.level, props.captured.quality)
@@ -273,10 +275,13 @@ export function CodekinDetailModal(props: {
       }}
     >
       <section
+        ref={dialog.dialogRef}
         className={css.codekinDetailModal}
         role="dialog"
         aria-modal="true"
         aria-labelledby="codekin-detail-title"
+        tabIndex={-1}
+        onKeyDown={dialog.onDialogKeyDown}
         onClick={(event) => { event.stopPropagation() }}
       >
         <button
@@ -286,6 +291,7 @@ export function CodekinDetailModal(props: {
           onClick={props.dismiss}
           title={props.t('closeCodekinDetail')}
           aria-label={props.t('closeCodekinDetail')}
+          data-dialog-initial-focus
           autoFocus
         >
           <span aria-hidden="true">×</span>

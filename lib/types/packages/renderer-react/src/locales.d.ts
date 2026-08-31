@@ -221,7 +221,7 @@ export declare const zh: {
     readonly rewardUnavailable: "补给已失效或已被领取";
     readonly rewardKicker: "CODE CACHE";
     readonly rewardTitle: "获得物品";
-    readonly rewardDismiss: "点击空白处继续";
+    readonly rewardDismiss: "继续";
     readonly captureCoreItem: "{quality}核心";
     readonly growthMaterialItem: "{quality}素材";
     readonly captureCoreDescription: "捕捉道具 · 捕捉效能 ×{power}";

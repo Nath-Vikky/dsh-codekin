@@ -13,9 +13,9 @@
 
 ### DSH `0.1.2-alpha.2` 预览版
 
-码灵 `0.3.5-alpha.2` 以 npm 发布的 DSH `0.1.2-alpha.2` 为当前开发与验证基线。本版本通过 npm
-`latest` 与 GitHub Releases 分发，当前 `main` 分支会提交经过检查的运行时 Bundle。安装和启动
-Alpha DSH 时应显式指定版本：
+码灵 `0.3.6-alpha.1` 以 npm 发布的 DSH `0.1.2-alpha.2` 为开发与验证基线。`0.3.6-alpha.1`
+通过 GitHub Releases 分发；npm `latest` 仍为 `0.3.5-alpha.2`。发布标签与活跃开发分支会提交
+经过检查的运行时 Bundle。安装当前 npm 版本并启动 Alpha DSH 时应显式指定版本：
 
 ```sh
 pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add @nath-vikky/dsh-codekin@latest
@@ -27,10 +27,10 @@ pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add @nath-vikky/dsh
 pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add @nath-vikky/dsh-codekin@0.3.5-alpha.2
 ```
 
-也可以使用 GitHub Release 附件进行等价的版本固定安装：
+如需使用当前稳定基线，请安装 `0.3.6-alpha.1` 的 GitHub Release 附件：
 
 ```sh
-pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.5-alpha.2/nath-vikky-dsh-codekin-0.3.5-alpha.2.tgz
+pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.6-alpha.1/nath-vikky-dsh-codekin-0.3.6-alpha.1.tgz
 ```
 
 安装后重启 DSH Web，再前往 **DSH 设置 → 码灵** 启用插件。入口图标可以拖动，重复点击可
@@ -89,7 +89,7 @@ dsh plugin --profile web add @nath-vikky/dsh-codekin@0.2.0
 - 获得物品弹窗、悬浮信息、明确的素材经验值，以及放生等不可逆操作的二次确认。
 - 由 Host 校验的游戏操作与原子化本地存档。
 
-## 0.3.5-alpha.2 引擎与内容包预览
+## 0.3.6-alpha.1 稳定基线
 
 - 运行时重新组合为确定性的无头引擎、经过校验的 Content API v1 注册表、官方核心内容包、
   DSH 适配层与独立 React 渲染层。
@@ -97,6 +97,9 @@ dsh plugin --profile web add @nath-vikky/dsh-codekin@0.2.0
 - 版本化存档封装会记录引擎和有序内容包身份，同时继续迁移旧存档，并为旧格式或身份不匹配的存档保留一次备份。
 - 开发依赖与 Windows、macOS、Ubuntu 上 Node.js 22/24 的六组 CI 均锁定 npm 官方发布的 DSH `0.1.2-alpha.2` 包。
 - 编队改为明确的三个唯一位置调整并保存；拥有的码灵以精简卡片浏览，数值、技能和素材升级统一迁移到可关闭的详情面板。
+- 引擎状态、世界进度、存档恢复、码灵列表呈现与弹窗无障碍逻辑形成明确模块边界，后续内容和界面增量可以独立演进。
+- 发布门禁会校验内容与资源、回放固定权威记录、运行七种场景的确定性战斗矩阵、限制性能和 Bundle 体积，并在隔离的 DSH Profile 中完成浏览器操作、重启、卸载与重装。
+- 弹窗提供明确的可访问名称、键盘焦点闭环、适用场景下的 Escape 关闭，以及关闭后返回触发控件的焦点恢复。
 
 ## 0.3.2 战斗更新
 
@@ -127,12 +130,13 @@ dsh plugin --profile web add @nath-vikky/dsh-codekin@0.2.0
 ## 兼容性与状态
 
 - `0.2.0`：适配 DeepSeek Harness Web `0.1.0-rc.5` 的稳定固定版本。
-- `0.3.5-alpha.2`：当前 npm 与 GitHub Latest 的引擎/内容包 Alpha 版，以 `@deepseek-ai/dsh@0.1.2-alpha.2` 为验证基线。
+- `0.3.6-alpha.1`：当前 GitHub Latest 稳定基线，以 `@deepseek-ai/dsh@0.1.2-alpha.2` 为验证基线。
+- `0.3.5-alpha.2`：当前 npm `latest`，也是此前的 GitHub 引擎/内容包 Alpha 版。
 - `0.3.5-alpha.1`：此前的 GitHub 引擎/内容包 Alpha 版。
 - `0.3.2`：此前的战斗系统 GitHub 预发行版，使用同一 DSH Alpha 基线。
 
 Alpha 版本已经在隔离的官方 npm Profile 中验证安装、Client 组合、带认证的状态/操作/资源访问、
-Client Bundle HMR，以及 Cordis 实时禁用和恢复时的资源清理。由于上游 Alpha API 在下一个稳定版
+浏览器与键盘交互、Host 重启，以及卸载和重装后的存档保留。由于上游 Alpha API 在下一个稳定版
 之前仍可能变化，本版本仍标记为兼容性预览版。
 
 ## 许可证

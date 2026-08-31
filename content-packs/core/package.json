@@ -1,7 +1,7 @@
 {
   "name": "@nath-vikky/codekin-content-core",
   "description": "Official Codekin content for the dsh-codekin engine",
-  "version": "0.3.5-alpha.2",
+  "version": "0.3.6-alpha.1",
   "private": true,
   "type": "module",
   "sideEffects": false,

@@ -2,7 +2,7 @@
 
 [English](architecture.md)
 
-码灵 `0.3.5-alpha.2` 由无头游戏引擎和经过校验的内容包组合而成。默认 DSH 插件绑定官方核心内容包；Host 启动前，也可以通过同一组合 API 合并其他经过审查的内容包。
+码灵 `0.3.6-alpha.1` 由无头游戏引擎和经过校验的内容包组合而成。默认 DSH 插件绑定官方核心内容包；Host 启动前，也可以通过同一组合 API 合并其他经过审查的内容包。
 
 ## 包职责
 
@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | `packages/content-sdk` | Content API v1 类型、JSON Schema 校验、依赖解析、不可变注册表和客户端安全视图 | 游戏执行与 Host 权限 |
 | `packages/engine` | 确定性的状态迁移、战斗、奖励、存档恢复和由引擎实现的机制指令 | React、Node.js API、DSH、官方生物 ID |
-| `content-packs/core` | `0.3.5-alpha.2` 的 25 只生物、多语言文本、资源、遭遇、初始选择、爬塔轮换和声明式机制 | Host 逻辑和任意 JavaScript 机制 |
+| `content-packs/core` | `0.3.6-alpha.1` 的 25 只生物、多语言文本、资源、遭遇、初始选择、爬塔轮换和声明式机制 | Host 逻辑和任意 JavaScript 机制 |
 | `packages/dsh-adapter` | DSH 事件分类、持久化、本地 HTTP 路由和运行时注入 | 内容所有权与游戏规则 |
 | `packages/renderer-react` | React 界面、浏览器连接和 Host 内容视图校验 | 服务端机制、别名、依赖元数据和官方核心图鉴导入 |
 | `src/core-runtime.ts` | 引擎与官方核心内容的默认组合 | 新规则或内容定义 |
@@ -68,4 +68,4 @@ DSH 适配器显式接收运行时，并在本机 `/api/tracewild` 下提供状�
 
 ## 验证
 
-`pnpm check` 会执行所有工作区类型检查、单元与集成测试、`0.3.2` 行为指纹、基于属性的存档恢复测试和生产构建。`pnpm pack --dry-run` 还会检查最终安装包的文件清单。
+`pnpm check` 会执行所有工作区类型检查、单元与集成测试、内容包校验、固定确定性回放、战斗模拟矩阵、生产构建，以及性能和体积预算。CI 还会把打包产物安装到隔离的 DSH Web Profile，执行浏览器与键盘流程，重启 Host，卸载并重装插件，再确认进度在每次转换后仍然保留。可使用 `npm pack --dry-run` 检查最终安装包的文件清单。

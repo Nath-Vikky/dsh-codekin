@@ -14,9 +14,10 @@ requests, or agent behavior.
 
 ### DSH `0.1.2-alpha.2` preview
 
-Codekin `0.3.5-alpha.2` uses the npm-published DSH `0.1.2-alpha.2` as its current development and validation
-baseline. This release is distributed through npm `latest` and GitHub Releases. The current `main`
-branch commits its reviewed runtime bundles. Install and launch Alpha DSH with explicit versions:
+Codekin `0.3.6-alpha.1` uses the npm-published DSH `0.1.2-alpha.2` as its development and validation
+baseline. The `0.3.6-alpha.1` build is distributed through GitHub Releases; npm `latest` remains
+`0.3.5-alpha.2`. Release tags and active development branches commit their reviewed runtime bundles.
+Install the current npm build and launch Alpha DSH with explicit versions:
 
 ```sh
 pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add @nath-vikky/dsh-codekin@latest
@@ -28,10 +29,10 @@ For a reproducible npm install, pin the Codekin version too:
 pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add @nath-vikky/dsh-codekin@0.3.5-alpha.2
 ```
 
-The GitHub Release asset remains available as an equivalent version-pinned installation source:
+Install the `0.3.6-alpha.1` GitHub Release asset to use the current stability baseline:
 
 ```sh
-pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.5-alpha.2/nath-vikky-dsh-codekin-0.3.5-alpha.2.tgz
+pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.6-alpha.1/nath-vikky-dsh-codekin-0.3.6-alpha.1.tgz
 ```
 
 Restart DSH Web after installation, then open **DSH Settings → Codekin** and enable the plugin.
@@ -98,7 +99,7 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
 - Reward popups, item details, visible material experience values, and explicit confirmations for irreversible roster actions.
 - Host-validated game actions and atomic local persistence.
 
-## 0.3.5-alpha.2 engine and content-pack preview
+## 0.3.6-alpha.1 stability baseline
 
 - The runtime is now composed from a deterministic headless engine, a validated Content API v1 registry,
   the official core content pack, a DSH adapter, and an independent React renderer.
@@ -110,6 +111,13 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
   Windows, macOS, and Ubuntu CI matrix for Node.js 22 and 24.
 - Squad management is now an explicit three-slot edit-and-save flow. The owned roster shows compact identity
   cards, while combat values, skills, and upgrading live in a closeable Codekin detail panel.
+- Engine state, world progression, restoration, roster presentation, and dialog accessibility now have
+  explicit module boundaries to keep later content and UI increments isolated.
+- Release gates validate content and assets, replay a fixed authoritative transcript, run a deterministic
+  seven-scenario combat matrix, enforce performance and bundle-size budgets, and exercise an installed DSH
+  profile through browser use, restart, removal, and reinstallation.
+- Dialogs provide labelled controls, contained keyboard focus, Escape dismissal where safe, and focus
+  restoration to the invoking control.
 
 ## 0.3.2 battle update
 
@@ -152,14 +160,15 @@ identity while retaining automatic migration from the previous raw state format.
 ## Compatibility and status
 
 - `0.2.0`: stable pinned version for DeepSeek Harness Web `0.1.0-rc.5`.
-- `0.3.5-alpha.2`: current npm and GitHub Latest engine/content-pack Alpha release, validated against `@deepseek-ai/dsh@0.1.2-alpha.2`.
+- `0.3.6-alpha.1`: current GitHub Latest stability baseline, validated against `@deepseek-ai/dsh@0.1.2-alpha.2`.
+- `0.3.5-alpha.2`: current npm `latest` and previous GitHub engine/content-pack Alpha release.
 - `0.3.5-alpha.1`: previous GitHub engine/content-pack Alpha release.
 - `0.3.2`: previous GitHub-only battle-system prerelease on the same DSH Alpha baseline.
 
-The Alpha build has been validated in an isolated official npm profile for package installation,
-client composition, authenticated state/action/assets, client-bundle HMR, and live Cordis
-disable/re-enable cleanup. It is still a compatibility preview because upstream Alpha APIs may
-change again before the next stable DSH release.
+The Alpha build has been validated in isolated official npm profiles for package installation,
+client composition, authenticated state/action/assets, browser and keyboard interaction, host restarts,
+and uninstall/reinstall save preservation. It is still a compatibility preview because upstream Alpha
+APIs may change again before the next stable DSH release.
 
 ## License
 

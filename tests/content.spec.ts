@@ -200,7 +200,7 @@ describe('Codekin content packs', () => {
     expect(() => createContentRegistry([CORE_CONTENT_PACK, incompatibleDependency]))
       .toThrowError(expect.objectContaining({
         issues: expect.arrayContaining([
-          expect.objectContaining({ message: 'version 0.3.5-alpha.2 does not satisfy ^9.0.0' }),
+          expect.objectContaining({ message: 'version 0.3.6-alpha.1 does not satisfy ^9.0.0' }),
         ]),
       }))
 

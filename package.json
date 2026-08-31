@@ -1,7 +1,7 @@
 {
   "name": "@nath-vikky/dsh-codekin",
   "description": "Codekin creature collection and match-three RPG for DeepSeek Harness Web",
-  "version": "0.3.5-alpha.2",
+  "version": "0.3.6-alpha.1",
   "type": "module",
   "packageManager": "pnpm@11.7.0",
   "engines": {

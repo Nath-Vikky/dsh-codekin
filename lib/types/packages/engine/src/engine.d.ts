@@ -1,14 +1,11 @@
-import type { CaptureCoreQuality, RandomSource, TraceEcology, TraceSignal, TraceWildAction, TraceWildBattleAnimation, TraceWildState } from './types.ts';
+import type { CaptureCoreQuality, RandomSource, TraceEcology, TraceWildAction, TraceWildBattleAnimation, TraceWildState } from './types.ts';
+export { createInitialTraceWildState } from './state.ts';
+export { applyTraceSignal, expireTraceWildEncounters, settleTraceWildIdleRewards } from './world.ts';
 export declare const ECOLOGY_ADVANTAGE: Readonly<Record<TraceEcology, TraceEcology>>;
 export declare class TraceWildRuleError extends Error {
     readonly code: 'invalid-action' | 'conflict';
     constructor(code: 'invalid-action' | 'conflict');
 }
-export declare function createInitialTraceWildState(now?: number): TraceWildState;
-export declare function settleTraceWildIdleRewards(current: TraceWildState, now: number, random: RandomSource): TraceWildState;
-/** Removes elapsed map encounters without disturbing an encounter in an active wild battle. */
-export declare function expireTraceWildEncounters(current: TraceWildState, now: number): TraceWildState;
-export declare function applyTraceSignal(current: TraceWildState, signal: TraceSignal, random: RandomSource): TraceWildState;
 export declare function captureChanceForBattle(state: TraceWildState, quality: CaptureCoreQuality): number;
 export declare function applyTraceWildAction(current: TraceWildState, action: TraceWildAction, random: RandomSource, now?: number): {
     state: TraceWildState;

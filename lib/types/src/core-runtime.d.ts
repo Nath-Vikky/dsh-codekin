@@ -14,6 +14,6 @@ export declare const expireTraceWildEncounters: typeof import("../packages/engin
 export declare const applyTraceSignal: typeof import("../packages/engine/src/world.ts").applyTraceSignal;
 export declare const applyTraceWildAction: typeof import("../packages/engine/src/engine.ts").applyTraceWildAction;
 export declare const captureChanceForBattle: typeof import("../packages/engine/src/engine.ts").captureChanceForBattle;
-export declare const restoreTraceWildState: typeof import("../packages/engine/src/engine.ts").restoreTraceWildState;
+export declare const restoreTraceWildState: typeof import("../packages/engine/src/restore.ts").restoreTraceWildState;
 export declare const towerFloorProfile: typeof import("../packages/engine/src/tower.ts").towerFloorProfile;
 //# sourceMappingURL=core-runtime.d.ts.map

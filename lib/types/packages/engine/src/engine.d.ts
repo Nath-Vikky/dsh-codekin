@@ -1,6 +1,7 @@
 import type { CaptureCoreQuality, RandomSource, TraceEcology, TraceWildAction, TraceWildBattleAnimation, TraceWildState } from './types.ts';
 export { createInitialTraceWildState } from './state.ts';
 export { applyTraceSignal, expireTraceWildEncounters, settleTraceWildIdleRewards } from './world.ts';
+export { restoreTraceWildState } from './restore.ts';
 export declare const ECOLOGY_ADVANTAGE: Readonly<Record<TraceEcology, TraceEcology>>;
 export declare class TraceWildRuleError extends Error {
     readonly code: 'invalid-action' | 'conflict';
@@ -12,6 +13,4 @@ export declare function applyTraceWildAction(current: TraceWildState, action: Tr
     notice?: 'capture-success' | 'capture-failed' | 'battle-lost' | 'wild-defeated' | 'tower-cleared' | 'skill-cast' | 'material-used' | 'idle-claimed' | 'creature-released';
     animation?: TraceWildBattleAnimation;
 };
-/** Tolerant, bounded loader with schema-v1/v2 migration. Invalid or future data starts a fresh profile. */
-export declare function restoreTraceWildState(value: unknown, now?: number): TraceWildState;
 //# sourceMappingURL=engine.d.ts.map

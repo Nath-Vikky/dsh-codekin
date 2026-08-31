@@ -1,6 +1,6 @@
 # 码灵（Codekin）
 
-[English](README.md) · [稳定版 npm 包](https://www.npmjs.com/package/@nath-vikky/dsh-codekin) · [GitHub 版本发布](https://github.com/Nath-Vikky/dsh-codekin/releases)
+[English](README.md) · [npm 包](https://www.npmjs.com/package/@nath-vikky/dsh-codekin) · [GitHub 版本发布](https://github.com/Nath-Vikky/dsh-codekin/releases)
 
 [游戏引擎与内容包架构](docs/architecture.zh-CN.md)
 
@@ -13,18 +13,24 @@
 
 ### DSH `0.1.2-alpha.2` 预览版
 
-码灵 `0.3.5-alpha.1` 以 npm 发布的 DSH `0.1.2-alpha.2` 为当前开发与验证基线。码灵预览版本身仍只通过
-GitHub 分发，并通过包清单主动禁止 npm 发布。当前 `main` 分支会提交经过检查的运行时 Bundle。
-由于 npm 的 `latest` 仍指向 RC 发布线，安装和启动 Alpha DSH 时应显式锁定版本：
+码灵 `0.3.5-alpha.2` 以 npm 发布的 DSH `0.1.2-alpha.2` 为当前开发与验证基线。本版本通过 npm
+`latest` 与 GitHub Releases 分发，当前 `main` 分支会提交经过检查的运行时 Bundle。安装和启动
+Alpha DSH 时应显式指定版本：
 
 ```sh
-pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add https://github.com/Nath-Vikky/dsh-codekin
+pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add @nath-vikky/dsh-codekin@latest
 ```
 
-如需锁定到可复现的具体版本，请改用 Release 附件：
+如需可复现的 npm 安装，请同时锁定码灵版本：
 
 ```sh
-pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.5-alpha.1/nath-vikky-dsh-codekin-0.3.5-alpha.1.tgz
+pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add @nath-vikky/dsh-codekin@0.3.5-alpha.2
+```
+
+也可以使用 GitHub Release 附件进行等价的版本固定安装：
+
+```sh
+pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.5-alpha.2/nath-vikky-dsh-codekin-0.3.5-alpha.2.tgz
 ```
 
 安装后重启 DSH Web，再前往 **DSH 设置 → 码灵** 启用插件。入口图标可以拖动，重复点击可
@@ -44,10 +50,11 @@ pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add --ignore-script
 如果你仍在使用 DSH Web `0.1.0-rc.5`，请继续安装稳定版码灵 `0.2.0`：
 
 ```sh
-dsh plugin --profile web add @nath-vikky/dsh-codekin@latest
+dsh plugin --profile web add @nath-vikky/dsh-codekin@0.2.0
 ```
 
-请不要把 Alpha `.tgz` 安装到 rc.5。两个发布线保持隔离，兼容预览版不会替换当前 npm 稳定版。
+请不要把 Alpha 包安装到 rc.5。即使 npm `latest` 已转向 DSH Alpha 发布线，稳定版码灵 `0.2.0`
+仍可通过显式版本继续安装。
 
 ## 核心循环
 
@@ -82,7 +89,7 @@ dsh plugin --profile web add @nath-vikky/dsh-codekin@latest
 - 获得物品弹窗、悬浮信息、明确的素材经验值，以及放生等不可逆操作的二次确认。
 - 由 Host 校验的游戏操作与原子化本地存档。
 
-## 0.3.5-alpha.1 引擎与内容包预览
+## 0.3.5-alpha.2 引擎与内容包预览
 
 - 运行时重新组合为确定性的无头引擎、经过校验的 Content API v1 注册表、官方核心内容包、
   DSH 适配层与独立 React 渲染层。
@@ -119,8 +126,9 @@ dsh plugin --profile web add @nath-vikky/dsh-codekin@latest
 
 ## 兼容性与状态
 
-- `0.2.0`：npm `latest` 稳定版，适配 DeepSeek Harness Web `0.1.0-rc.5`。
-- `0.3.5-alpha.1`：当前仅 GitHub 提供的引擎/内容包预发行版，以 npm 包 `@deepseek-ai/dsh@0.1.2-alpha.2` 为验证基线。
+- `0.2.0`：适配 DeepSeek Harness Web `0.1.0-rc.5` 的稳定固定版本。
+- `0.3.5-alpha.2`：当前 npm 与 GitHub Latest 的引擎/内容包 Alpha 版，以 `@deepseek-ai/dsh@0.1.2-alpha.2` 为验证基线。
+- `0.3.5-alpha.1`：此前的 GitHub 引擎/内容包 Alpha 版。
 - `0.3.2`：此前的战斗系统 GitHub 预发行版，使用同一 DSH Alpha 基线。
 
 Alpha 版本已经在隔离的官方 npm Profile 中验证安装、Client 组合、带认证的状态/操作/资源访问、

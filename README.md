@@ -1,6 +1,6 @@
 # Codekin
 
-[简体中文](README.zh-CN.md) · [Stable npm package](https://www.npmjs.com/package/@nath-vikky/dsh-codekin) · [GitHub Releases](https://github.com/Nath-Vikky/dsh-codekin/releases)
+[简体中文](README.zh-CN.md) · [npm package](https://www.npmjs.com/package/@nath-vikky/dsh-codekin) · [GitHub Releases](https://github.com/Nath-Vikky/dsh-codekin/releases)
 
 [Engine and content-pack architecture](docs/architecture.md)
 
@@ -14,19 +14,24 @@ requests, or agent behavior.
 
 ### DSH `0.1.2-alpha.2` preview
 
-Codekin `0.3.5-alpha.1` uses the npm-published DSH `0.1.2-alpha.2` as its current development and validation
-baseline. The Codekin preview itself remains GitHub-only and is intentionally blocked from npm
-publishing. The current `main` branch commits its reviewed runtime bundles. Because npm's `latest`
-tag still points to the RC release line, install and launch Alpha DSH with an explicit version:
+Codekin `0.3.5-alpha.2` uses the npm-published DSH `0.1.2-alpha.2` as its current development and validation
+baseline. This release is distributed through npm `latest` and GitHub Releases. The current `main`
+branch commits its reviewed runtime bundles. Install and launch Alpha DSH with explicit versions:
 
 ```sh
-pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add https://github.com/Nath-Vikky/dsh-codekin
+pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add @nath-vikky/dsh-codekin@latest
 ```
 
-For a reproducible version-pinned install, use the release asset instead:
+For a reproducible npm install, pin the Codekin version too:
 
 ```sh
-pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.5-alpha.1/nath-vikky-dsh-codekin-0.3.5-alpha.1.tgz
+pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add @nath-vikky/dsh-codekin@0.3.5-alpha.2
+```
+
+The GitHub Release asset remains available as an equivalent version-pinned installation source:
+
+```sh
+pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.5-alpha.2/nath-vikky-dsh-codekin-0.3.5-alpha.2.tgz
 ```
 
 Restart DSH Web after installation, then open **DSH Settings → Codekin** and enable the plugin.
@@ -49,11 +54,11 @@ The previous npm-compatible source line is preserved on the `stable/0.2.x` branc
 For DSH Web `0.1.0-rc.5`, keep using the stable Codekin `0.2.0` package:
 
 ```sh
-dsh plugin --profile web add @nath-vikky/dsh-codekin@latest
+dsh plugin --profile web add @nath-vikky/dsh-codekin@0.2.0
 ```
 
-Do not install the Alpha `.tgz` on rc.5. The two release lines are kept separate so the compatibility
-preview cannot replace the current stable npm package.
+Do not install the Alpha package on rc.5. The stable Codekin `0.2.0` remains available by explicit
+version even though npm `latest` now follows the DSH Alpha release line.
 
 ## Core loop
 
@@ -93,7 +98,7 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
 - Reward popups, item details, visible material experience values, and explicit confirmations for irreversible roster actions.
 - Host-validated game actions and atomic local persistence.
 
-## 0.3.5-alpha.1 engine and content-pack preview
+## 0.3.5-alpha.2 engine and content-pack preview
 
 - The runtime is now composed from a deterministic headless engine, a validated Content API v1 registry,
   the official core content pack, a DSH adapter, and an independent React renderer.
@@ -146,8 +151,9 @@ identity while retaining automatic migration from the previous raw state format.
 
 ## Compatibility and status
 
-- `0.2.0`: stable npm `latest`, for DeepSeek Harness Web `0.1.0-rc.5`.
-- `0.3.5-alpha.1`: current GitHub-only engine/content-pack prerelease, validated against the npm package `@deepseek-ai/dsh@0.1.2-alpha.2`.
+- `0.2.0`: stable pinned version for DeepSeek Harness Web `0.1.0-rc.5`.
+- `0.3.5-alpha.2`: current npm and GitHub Latest engine/content-pack Alpha release, validated against `@deepseek-ai/dsh@0.1.2-alpha.2`.
+- `0.3.5-alpha.1`: previous GitHub engine/content-pack Alpha release.
 - `0.3.2`: previous GitHub-only battle-system prerelease on the same DSH Alpha baseline.
 
 The Alpha build has been validated in an isolated official npm profile for package installation,

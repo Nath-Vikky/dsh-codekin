@@ -14,7 +14,7 @@ requests, or agent behavior.
 
 ### DSH `0.1.2-alpha.2` preview
 
-Codekin `0.3.2` uses the npm-published DSH `0.1.2-alpha.2` as its current development and validation
+Codekin `0.3.5-alpha.1` uses the npm-published DSH `0.1.2-alpha.2` as its current development and validation
 baseline. The Codekin preview itself remains GitHub-only and is intentionally blocked from npm
 publishing. The current `main` branch commits its reviewed runtime bundles. Because npm's `latest`
 tag still points to the RC release line, install and launch Alpha DSH with an explicit version:
@@ -26,7 +26,7 @@ pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add https://github.
 For a reproducible version-pinned install, use the release asset instead:
 
 ```sh
-pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.2/nath-vikky-dsh-codekin-0.3.2.tgz
+pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.5-alpha.1/nath-vikky-dsh-codekin-0.3.5-alpha.1.tgz
 ```
 
 Restart DSH Web after installation, then open **DSH Settings → Codekin** and enable the plugin.
@@ -77,7 +77,8 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
   distinct signal roles: runtime repair, shared guard, Compute sync, Compile overclock, or Glitch breach;
   on every other turn they remain ordinary damage panels.
 - Level 1–100 progression, five qualities of growth material, idle supplies, and local persistence.
-- A compact growth target selector keeps training usable even with a large roster.
+- The owned-Codekin roster keeps formation editing separate from browsing: three unique slots can be adjusted and saved explicitly, while each roster card stays focused on portrait and identity.
+- Selecting a Codekin opens a dismissible detail panel for combat values, skills, and material-based upgrading, keeping growth tools usable as the collection expands.
 - A persisted enable switch under DSH Settings → Codekin; disabling pauses event rewards and idle time without deleting progress.
 - A two-step release flow in Squad that returns one same-quality growth material regardless of the Codekin's level.
 - Three base actions per active Codekin; direct match-four refunds an action and match-five adds one.
@@ -91,6 +92,19 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
 - Match-four, match-five, and intersecting clears create row, column, burst, and origin tiles.
 - Reward popups, item details, visible material experience values, and explicit confirmations for irreversible roster actions.
 - Host-validated game actions and atomic local persistence.
+
+## 0.3.5-alpha.1 engine and content-pack preview
+
+- The runtime is now composed from a deterministic headless engine, a validated Content API v1 registry,
+  the official core content pack, a DSH adapter, and an independent React renderer.
+- Content manifests declare SemVer engine compatibility, dependencies, conflicts, aliases, assets, and
+  bounded mechanic instructions; invalid or ambiguous packs are rejected before gameplay starts.
+- Versioned save envelopes record both engine and ordered content-pack identities while retaining automatic
+  migration and one-time backups for legacy or mismatched saves.
+- The official npm-published DSH `0.1.2-alpha.2` packages are pinned across development and the six-job
+  Windows, macOS, and Ubuntu CI matrix for Node.js 22 and 24.
+- Squad management is now an explicit three-slot edit-and-save flow. The owned roster shows compact identity
+  cards, while combat values, skills, and upgrading live in a closeable Codekin detail panel.
 
 ## 0.3.2 battle update
 
@@ -133,7 +147,8 @@ identity while retaining automatic migration from the previous raw state format.
 ## Compatibility and status
 
 - `0.2.0`: stable npm `latest`, for DeepSeek Harness Web `0.1.0-rc.5`.
-- `0.3.2`: GitHub-only prerelease, validated against the npm package `@deepseek-ai/dsh@0.1.2-alpha.2`.
+- `0.3.5-alpha.1`: current GitHub-only engine/content-pack prerelease, validated against the npm package `@deepseek-ai/dsh@0.1.2-alpha.2`.
+- `0.3.2`: previous GitHub-only battle-system prerelease on the same DSH Alpha baseline.
 
 The Alpha build has been validated in an isolated official npm profile for package installation,
 client composition, authenticated state/action/assets, client-bundle HMR, and live Cordis

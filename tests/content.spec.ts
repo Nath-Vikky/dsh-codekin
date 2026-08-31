@@ -16,7 +16,7 @@ const ADDON_CONTENT_PACK = defineContentPack({
     version: '1.0.0',
     engine: '>=0.3.2 <0.4.0',
     contentApi: 1,
-    dependencies: { '@nath-vikky/codekin-core': '0.3.2' },
+    dependencies: { '@nath-vikky/codekin-core': '>=0.3.2 <0.4.0' },
   },
   ecologies: [],
   qualities: [],
@@ -86,7 +86,7 @@ function emptyPack(
 }
 
 describe('Codekin content packs', () => {
-  it('validates and indexes the complete 0.3.2 core pack', () => {
+  it('validates and indexes the complete current core pack', () => {
     const registry = createContentRegistry([CORE_CONTENT_PACK])
     expect(registry.packs).toHaveLength(1)
     expect(registry.ecologies).toHaveLength(5)
@@ -200,7 +200,7 @@ describe('Codekin content packs', () => {
     expect(() => createContentRegistry([CORE_CONTENT_PACK, incompatibleDependency]))
       .toThrowError(expect.objectContaining({
         issues: expect.arrayContaining([
-          expect.objectContaining({ message: 'version 0.3.2 does not satisfy ^9.0.0' }),
+          expect.objectContaining({ message: 'version 0.3.5-alpha.1 does not satisfy ^9.0.0' }),
         ]),
       }))
 

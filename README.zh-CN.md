@@ -13,7 +13,7 @@
 
 ### DSH `0.1.2-alpha.2` 预览版
 
-码灵 `0.3.2` 以 npm 发布的 DSH `0.1.2-alpha.2` 为当前开发与验证基线。码灵预览版本身仍只通过
+码灵 `0.3.5-alpha.1` 以 npm 发布的 DSH `0.1.2-alpha.2` 为当前开发与验证基线。码灵预览版本身仍只通过
 GitHub 分发，并通过包清单主动禁止 npm 发布。当前 `main` 分支会提交经过检查的运行时 Bundle。
 由于 npm 的 `latest` 仍指向 RC 发布线，安装和启动 Alpha DSH 时应显式锁定版本：
 
@@ -24,7 +24,7 @@ pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add https://github.
 如需锁定到可复现的具体版本，请改用 Release 附件：
 
 ```sh
-pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.2/nath-vikky-dsh-codekin-0.3.2.tgz
+pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.2 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.5-alpha.1/nath-vikky-dsh-codekin-0.3.5-alpha.1.tgz
 ```
 
 安装后重启 DSH Web，再前往 **DSH 设置 → 码灵** 启用插件。入口图标可以拖动，重复点击可
@@ -69,7 +69,8 @@ dsh plugin --profile web add @nath-vikky/dsh-codekin@latest
 - 五类属性色块构成闭环克制关系；在同属性码灵回合内，分别触发运行修复、共享防护、智算同步、
   编译超频和异常穿透，在其他码灵回合内仍作为普通攻击珠参与克制结算。
 - 1–100 级养成、五种品质升级素材、挂机补给与本地进度存档。
-- 养成区通过目标选择器一次只展示一只码灵，即使背包扩大也不会不断拉长页面。
+- 已拥有的码灵与编队编辑分开：三个唯一位置通过单独按钮进入调整并显式保存，码灵卡片只保留立绘与身份基础信息。
+- 点击码灵会打开可点空白处或红色叉号关闭的详情面板，集中展示战斗数值、技能和使用素材升级等养成功能。
 - 可在 DSH“设置 → 码灵”中随时启停；停用时保留存档并暂停事件奖励与挂机计时。
 - 编队中的码灵可经二次确认放生，并按自身品质返还一份升级素材；返还量不受等级影响。
 - 每只出战码灵拥有三个基础行动；四连返还行动、五连增加行动，消除同属性色块可为队员积累指令值。
@@ -80,6 +81,15 @@ dsh plugin --profile web add @nath-vikky/dsh-codekin@latest
 - 四连、五连与交叉消除会生成横排、竖排、爆破和源初特殊色块。
 - 获得物品弹窗、悬浮信息、明确的素材经验值，以及放生等不可逆操作的二次确认。
 - 由 Host 校验的游戏操作与原子化本地存档。
+
+## 0.3.5-alpha.1 引擎与内容包预览
+
+- 运行时重新组合为确定性的无头引擎、经过校验的 Content API v1 注册表、官方核心内容包、
+  DSH 适配层与独立 React 渲染层。
+- 内容清单声明引擎 SemVer 范围、依赖、冲突、别名、资源和有界机制指令；不完整或有歧义的内容包会在游戏启动前被拒绝。
+- 版本化存档封装会记录引擎和有序内容包身份，同时继续迁移旧存档，并为旧格式或身份不匹配的存档保留一次备份。
+- 开发依赖与 Windows、macOS、Ubuntu 上 Node.js 22/24 的六组 CI 均锁定 npm 官方发布的 DSH `0.1.2-alpha.2` 包。
+- 编队改为明确的三个唯一位置调整并保存；拥有的码灵以精简卡片浏览，数值、技能和素材升级统一迁移到可关闭的详情面板。
 
 ## 0.3.2 战斗更新
 
@@ -110,7 +120,8 @@ dsh plugin --profile web add @nath-vikky/dsh-codekin@latest
 ## 兼容性与状态
 
 - `0.2.0`：npm `latest` 稳定版，适配 DeepSeek Harness Web `0.1.0-rc.5`。
-- `0.3.2`：仅 GitHub 提供的预发行版，以 npm 包 `@deepseek-ai/dsh@0.1.2-alpha.2` 为验证基线。
+- `0.3.5-alpha.1`：当前仅 GitHub 提供的引擎/内容包预发行版，以 npm 包 `@deepseek-ai/dsh@0.1.2-alpha.2` 为验证基线。
+- `0.3.2`：此前的战斗系统 GitHub 预发行版，使用同一 DSH Alpha 基线。
 
 Alpha 版本已经在隔离的官方 npm Profile 中验证安装、Client 组合、带认证的状态/操作/资源访问、
 Client Bundle HMR，以及 Cordis 实时禁用和恢复时的资源清理。由于上游 Alpha API 在下一个稳定版

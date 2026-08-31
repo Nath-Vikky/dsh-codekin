@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
-import { CAPTURE_CORE_QUALITIES } from '../../../content-sdk/src/types.ts'
+import { CAPTURE_CORE_QUALITIES, TRACE_ECOLOGIES } from '../../../content-sdk/src/types.ts'
 import {
   CORE_CAPTURE_POWER,
   MATERIAL_XP,
@@ -47,6 +47,13 @@ import {
   starterCreatureIds,
 } from '../content.ts'
 import type { TraceWildLocaleKey } from '../locales.ts'
+import {
+  arrangeCodekinRoster,
+  type CodekinRosterEcology,
+  type CodekinRosterEntry,
+  type CodekinRosterQuality,
+  type CodekinRosterSort,
+} from '../roster.ts'
 import css from './tracewild.module.css'
 
 type Tab = 'map' | 'tower' | 'squad' | 'dex' | 'inventory'
@@ -122,6 +129,16 @@ const CORE_KEYS: Record<CaptureCoreQuality, TraceWildLocaleKey> = {
 const RARITY_KEYS = {
   common: 'rarityCommon', uncommon: 'rarityUncommon', rare: 'rarityRare', apex: 'rarityApex',
 } as const
+
+const ROSTER_SORT_KEYS: Record<CodekinRosterSort, TraceWildLocaleKey> = {
+  default: 'rosterSortDefault',
+  'level-asc': 'rosterSortLevelAsc',
+  'level-desc': 'rosterSortLevelDesc',
+}
+
+const ROSTER_ECOLOGY_FILTERS: readonly CodekinRosterEcology[] = ['all', ...TRACE_ECOLOGIES]
+const ROSTER_QUALITY_FILTERS: readonly CodekinRosterQuality[] = ['all', ...CAPTURE_CORE_QUALITIES]
+const ROSTER_SORT_OPTIONS: readonly CodekinRosterSort[] = ['default', 'level-asc', 'level-desc']
 
 const BOSS_ACTION_PAUSE_MS = 860
 
@@ -1190,6 +1207,28 @@ function CodekinView(props: {
   inspect: (instanceId: string) => void
 }) {
   const [editing, setEditing] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [ecologyFilter, setEcologyFilter] = useState<CodekinRosterEcology>('all')
+  const [qualityFilter, setQualityFilter] = useState<CodekinRosterQuality>('all')
+  const [rosterSort, setRosterSort] = useState<CodekinRosterSort>('default')
+  const roster = useMemo<CodekinRosterEntry[]>(() => {
+    const entries: CodekinRosterEntry[] = []
+    props.state.creatures.forEach((captured, sourceIndex) => {
+      const creature = creatureById(captured.creatureId)
+      if (creature !== undefined) entries.push({ captured, creature, sourceIndex })
+    })
+    return entries
+  }, [props.state.creatures])
+  const visibleRoster = useMemo(() => editing
+    ? roster
+    : arrangeCodekinRoster(roster, {
+        ecology: ecologyFilter,
+        quality: qualityFilter,
+        sort: rosterSort,
+      }), [editing, ecologyFilter, qualityFilter, roster, rosterSort])
+  const activeFilterCount = Number(ecologyFilter !== 'all')
+    + Number(qualityFilter !== 'all')
+    + Number(rosterSort !== 'default')
   const toggle = (instanceId: string): void => {
     if (props.draft.includes(instanceId)) {
       if (props.draft.length > 1) props.setDraft(props.draft.filter(id => id !== instanceId))
@@ -1199,6 +1238,7 @@ function CodekinView(props: {
   }
   const beginEditing = (): void => {
     props.setDraft([...props.state.squad])
+    setFiltersOpen(false)
     setEditing(true)
   }
   const cancelEditing = (): void => {
@@ -1207,6 +1247,11 @@ function CodekinView(props: {
   }
   const save = async (): Promise<void> => {
     if (await props.save()) setEditing(false)
+  }
+  const resetFilters = (): void => {
+    setEcologyFilter('all')
+    setQualityFilter('all')
+    setRosterSort('default')
   }
   return (
     <div className={`${css.panelPage} ${editing ? css.codekinEditMode : ''}`}>
@@ -1222,40 +1267,127 @@ function CodekinView(props: {
                 <button type="button" className={css.squadCancel} disabled={props.busy} onClick={cancelEditing}>{props.t('cancelSquad')}</button>
                 <button type="button" disabled={props.busy || props.draft.length === 0} onClick={() => { void save() }}>{props.t('saveSquad')}</button>
               </>
-            : <button type="button" disabled={props.busy} onClick={beginEditing}>{props.t('editSquad')}</button>}
+            : <>
+                <button
+                  type="button"
+                  className={`${css.squadFilterToggle} ${activeFilterCount > 0 ? css.squadFilterActive : ''}`}
+                  disabled={props.busy}
+                  aria-expanded={filtersOpen}
+                  aria-controls="codekin-roster-controls"
+                  onClick={() => { setFiltersOpen(value => !value) }}
+                >
+                  <span aria-hidden="true">≡</span>
+                  {props.t('rosterClassify')}
+                  {activeFilterCount > 0 && <b>{activeFilterCount}</b>}
+                </button>
+                <button type="button" disabled={props.busy} onClick={beginEditing}>{props.t('editSquad')}</button>
+              </>}
         </div>
       </div>
+      {!editing && filtersOpen && (
+        <section id="codekin-roster-controls" className={css.rosterControls} aria-label={props.t('rosterControls')}>
+          <div className={css.rosterControlRow}>
+            <strong>{props.t('rosterAttribute')}</strong>
+            <div className={css.rosterControlOptions} role="group" aria-label={props.t('rosterAttribute')}>
+              {ROSTER_ECOLOGY_FILTERS.map(ecology => (
+                <button
+                  key={ecology}
+                  type="button"
+                  aria-pressed={ecologyFilter === ecology}
+                  onClick={() => { setEcologyFilter(ecology) }}
+                >
+                  {ecology === 'all' ? props.t('rosterAll') : props.t(ECOLOGY_KEYS[ecology])}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className={css.rosterControlRow}>
+            <strong>{props.t('quality')}</strong>
+            <div className={css.rosterControlOptions} role="group" aria-label={props.t('quality')}>
+              {ROSTER_QUALITY_FILTERS.map(quality => (
+                <button
+                  key={quality}
+                  type="button"
+                  className={quality === 'all' ? undefined : css[`core_${quality}`]}
+                  aria-pressed={qualityFilter === quality}
+                  onClick={() => { setQualityFilter(quality) }}
+                >
+                  {quality === 'all' ? props.t('rosterAll') : props.t(CORE_KEYS[quality])}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className={css.rosterControlRow}>
+            <strong>{props.t('rosterSort')}</strong>
+            <div className={css.rosterControlOptions} role="group" aria-label={props.t('rosterSort')}>
+              {ROSTER_SORT_OPTIONS.map(sort => (
+                <button
+                  key={sort}
+                  type="button"
+                  aria-pressed={rosterSort === sort}
+                  onClick={() => { setRosterSort(sort) }}
+                >
+                  {props.t(ROSTER_SORT_KEYS[sort])}
+                </button>
+              ))}
+            </div>
+          </div>
+          <footer className={css.rosterControlSummary}>
+            <span>{props.t('rosterResults', { count: visibleRoster.length })}</span>
+            <button type="button" disabled={activeFilterCount === 0} onClick={resetFilters}>{props.t('rosterReset')}</button>
+          </footer>
+        </section>
+      )}
       <div className={css.creatureCards}>
-        {props.state.creatures.map((captured) => {
-          const creature = creatureById(captured.creatureId)
-          if (creature === undefined) return null
-          const position = props.draft.indexOf(captured.instanceId)
-          const selectionLocked = editing && position < 0 && props.draft.length >= 3
+        {visibleRoster.map(({ captured, creature }) => {
+          const draftPosition = props.draft.indexOf(captured.instanceId)
+          const squadPosition = props.state.squad.indexOf(captured.instanceId)
+          const deployed = squadPosition >= 0
+          const selectionLocked = editing && draftPosition < 0 && props.draft.length >= 3
           return (
             <article
               key={captured.instanceId}
-              className={`${css.creatureCard} ${css.codekinCard} ${editing && position >= 0 ? css.creatureSelected : ''} ${selectionLocked ? css.codekinSelectionLocked : ''}`}
+              className={`${css.creatureCard} ${css.codekinCard} ${css[`core_${captured.quality}`]} ${deployed ? css.codekinDeployed : ''} ${editing && draftPosition >= 0 ? css.creatureSelected : ''} ${selectionLocked ? css.codekinSelectionLocked : ''}`}
+              data-quality={captured.quality}
+              data-deployed={deployed ? 'true' : undefined}
             >
               <span className={css.codekinNumber}>#{String(creature.number).padStart(2, '0')}</span>
-              {editing && position >= 0 && <span className={css.partyIndex}>{position + 1}</span>}
+              {editing && draftPosition >= 0 && <span className={css.partyIndex}>{draftPosition + 1}</span>}
+              {!editing && deployed && (
+                <span className={css.codekinDeployment}>
+                  <i aria-hidden="true" />
+                  {props.t('rosterDeployed')}
+                  <b>{squadPosition + 1}</b>
+                </span>
+              )}
               <button
                 type="button"
                 className={css.creatureSelect}
-                aria-pressed={editing ? position >= 0 : undefined}
+                aria-pressed={editing ? draftPosition >= 0 : undefined}
                 aria-label={editing
                   ? `${creatureName(creature, props.zh)} · ${props.t('squadSelection', { count: props.draft.length })}`
-                  : `${creatureName(creature, props.zh)} · ${props.t('codekinDetail')}`}
+                  : `${creatureName(creature, props.zh)} · ${props.t('level')} ${captured.level} · ${props.t(ECOLOGY_KEYS[creature.ecology])} · ${props.t(CORE_KEYS[captured.quality])}${deployed ? ` · ${props.t('rosterDeployed')} ${squadPosition + 1}` : ''} · ${props.t('codekinDetail')}`}
                 onClick={() => { editing ? toggle(captured.instanceId) : props.inspect(captured.instanceId) }}
               >
                 <CreatureSprite creature={creature} size="medium" />
                 <strong>{creatureName(creature, props.zh)}</strong>
-                <span className={css.codekinAttribute}>{props.t(ECOLOGY_KEYS[creature.ecology])}</span>
-                <small>{props.t(RARITY_KEYS[creature.rarity])} · {props.t(CORE_KEYS[captured.quality])}</small>
+                <span className={css.codekinBasics}>
+                  <b>Lv.{captured.level}</b>
+                  <i aria-hidden="true" />
+                  <span>{props.t(ECOLOGY_KEYS[creature.ecology])}</span>
+                </span>
+                <small>{props.t(CORE_KEYS[captured.quality])} · {props.t(RARITY_KEYS[creature.rarity])}</small>
               </button>
             </article>
           )
         })}
       </div>
+      {!editing && visibleRoster.length === 0 && (
+        <div className={css.rosterEmpty}>
+          <strong>{props.t('rosterNoMatches')}</strong>
+          <button type="button" onClick={resetFilters}>{props.t('rosterReset')}</button>
+        </div>
+      )}
     </div>
   )
 }

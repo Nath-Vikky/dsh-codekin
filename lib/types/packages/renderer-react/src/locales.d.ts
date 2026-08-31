@@ -155,6 +155,18 @@ export declare const zh: {
     readonly saveSquad: "保存";
     readonly cancelSquad: "取消";
     readonly squadSelection: "已选择 {count}/3";
+    readonly rosterClassify: "分类";
+    readonly rosterControls: "码灵分类与排序";
+    readonly rosterAttribute: "属性";
+    readonly rosterSort: "排序";
+    readonly rosterAll: "全部";
+    readonly rosterSortDefault: "默认顺序";
+    readonly rosterSortLevelAsc: "等级升序";
+    readonly rosterSortLevelDesc: "等级降序";
+    readonly rosterResults: "共 {count} 只码灵";
+    readonly rosterReset: "重置";
+    readonly rosterDeployed: "出战";
+    readonly rosterNoMatches: "没有符合当前分类的码灵";
     readonly codekinDetail: "码灵详情";
     readonly closeCodekinDetail: "关闭码灵详情";
     readonly codekinStats: "详细数值";

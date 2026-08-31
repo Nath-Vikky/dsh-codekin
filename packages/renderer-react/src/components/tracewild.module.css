@@ -1839,28 +1839,92 @@
 .overlayDragging .content * { animation-play-state: paused !important; }
 
 /* Owned Codekin roster, squad editing, and growth details */
-.creatureCards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding-bottom: 14px; }
-.codekinCard { min-width: 0; min-height: 184px; content-visibility: auto; contain-intrinsic-size: auto 184px; }
-.codekinCard .creatureSelect { min-height: 184px; justify-content: flex-start; padding: 10px 5px 11px; }
-.codekinCard .sprite_medium { width: 96px; height: 96px; margin-top: 2px; }
+.creatureCards { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 8px; padding-bottom: 14px; }
+.codekinCard {
+  min-width: 0; min-height: 190px; content-visibility: auto; contain-intrinsic-size: auto 190px; isolation: isolate;
+  border: 2px solid color-mix(in srgb, var(--core-color, #7b9398) 68%, white);
+  background:
+    radial-gradient(circle at 50% 28%, color-mix(in srgb, var(--core-light, #e6eef0) 74%, white) 0, transparent 53%),
+    linear-gradient(155deg, #fffffff2, color-mix(in srgb, var(--core-light, #e6eef0) 42%, #edf4f1));
+  box-shadow: inset 0 0 0 1px #ffffffdc, 0 11px 25px color-mix(in srgb, var(--core-color, #7b9398) 19%, transparent);
+}
+.codekinCard::after {
+  content: ''; position: absolute; z-index: 1; inset: 3px; pointer-events: none; border: 1px solid color-mix(in srgb, var(--core-color, #7b9398) 34%, transparent);
+  border-radius: 16px; box-shadow: inset 0 1px #fff;
+}
+.codekinCard:hover {
+  border-color: color-mix(in srgb, var(--core-color, #7b9398) 88%, white);
+  background:
+    radial-gradient(circle at 50% 28%, color-mix(in srgb, var(--core-light, #e6eef0) 88%, white) 0, transparent 55%),
+    #fffffff7;
+}
+.codekinDeployed { box-shadow: inset 0 0 0 1px #fff, 0 0 0 2px color-mix(in srgb, var(--core-color, #7b9398) 18%, transparent), 0 13px 28px color-mix(in srgb, var(--core-color, #7b9398) 24%, transparent); }
+.codekinCard .creatureSelect { position: relative; z-index: 0; min-height: 190px; justify-content: flex-start; padding: 11px 5px 11px; }
+.codekinCard .sprite_medium { width: 92px; height: 92px; margin-top: 3px; }
 .codekinCard .creatureSelect > strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-.codekinCard .creatureSelect > .codekinAttribute { margin-top: 5px; color: #3c8f78; font-size: 9px; font-weight: 800; }
-.codekinCard .creatureSelect > small { margin-top: 4px; color: #7b8e89; font-size: 8px; }
+.codekinCard .creatureSelect > .codekinBasics {
+  margin-top: 6px; border: 1px solid color-mix(in srgb, var(--core-color, #7b9398) 23%, transparent); border-radius: 999px;
+  background: #ffffffa6; color: #55716a; padding: 4px 7px; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 8px; font-weight: 760; box-shadow: inset 0 1px #fff;
+}
+.codekinBasics > b { color: #365d54; font: 820 8px/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.codekinBasics > i { width: 3px; height: 3px; border-radius: 50%; background: var(--core-color, #7b9398); }
+.codekinBasics > span { margin: 0 !important; color: #3c8f78 !important; font-size: 8px !important; }
+.codekinCard .creatureSelect > small { margin-top: 5px; color: #738783; font-size: 8px; font-weight: 720; }
 .codekinNumber {
-  position: absolute; z-index: 2; left: 8px; top: 8px; margin: 0 !important; border: 1px solid #75968d28; border-radius: 999px;
+  position: absolute; z-index: 4; left: 8px; top: 8px; margin: 0 !important; border: 1px solid color-mix(in srgb, var(--core-color, #7b9398) 30%, transparent); border-radius: 999px;
   background: #ffffffe3; color: #718680 !important; padding: 4px 6px; font: 800 8px/1 ui-monospace, SFMono-Regular, Consolas, monospace !important;
   box-shadow: 0 4px 11px #647a7215;
 }
-.codekinCard .partyIndex { left: auto; right: 8px; top: 8px; margin: 0; border-radius: 999px; }
+.codekinCard .partyIndex { z-index: 4; left: auto; right: 8px; top: 8px; margin: 0; border-radius: 999px; }
+.codekinDeployment {
+  position: absolute; z-index: 4; right: 7px; top: 7px; margin: 0 !important; border: 1px solid #4e9e8552; border-radius: 999px;
+  background: #e8f7f1ed; color: #347d68 !important; padding: 4px 5px; display: inline-flex; align-items: center; gap: 3px;
+  font: 820 7px/1 ui-sans-serif, system-ui, sans-serif !important; box-shadow: 0 5px 12px #4b8b7628, inset 0 1px #fff;
+}
+.codekinDeployment > i { width: 5px; height: 5px; border-radius: 50%; background: #43a987; box-shadow: 0 0 0 2px #76cdb34a; }
+.codekinDeployment > b { min-width: 13px; height: 13px; border-radius: 50%; background: #4d9f85; color: #fff; display: grid; place-items: center; font: 850 7px/1 ui-monospace, monospace; }
 .codekinEditMode .codekinCard { border-style: dashed; }
-.codekinEditMode .codekinCard.creatureSelected { border-style: solid; }
+.codekinEditMode .codekinCard.creatureSelected { border-style: solid; outline: 2px solid #58a98f8c; outline-offset: -6px; }
 .codekinSelectionLocked { opacity: .52; }
 .codekinSelectionLocked .creatureSelect { cursor: not-allowed; }
 .squadActions { flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .squadActions > span { color: #668078; font-size: 8px; white-space: nowrap; }
-.squadActions button { min-height: 32px; border: 1px solid #64ad964d; border-radius: 11px; padding: 0 10px; cursor: pointer; font: 750 9px/1 ui-sans-serif, system-ui, sans-serif; }
+.squadActions button { min-height: 32px; border: 1px solid #64ad964d; border-radius: 11px; padding: 0 10px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 4px; font: 750 9px/1 ui-sans-serif, system-ui, sans-serif; }
+.squadActions .squadFilterToggle { border-color: #829a9338; background: #f7faf8; color: #536c66; }
+.squadFilterToggle > span { color: #4f8f7d; font: 900 13px/1 ui-monospace, monospace; transform: translateY(-1px); }
+.squadFilterToggle > b { min-width: 15px; height: 15px; border-radius: 999px; background: #4d9f85; color: #fff; display: grid; place-items: center; font: 850 7px/1 ui-monospace, monospace; }
+.squadActions .squadFilterActive { border-color: #50a78b70; background: #e3f4ed; color: #367b67; }
 .squadActions .squadCancel { border-color: #829a9335; background: #f4f7f5; color: #60736e; }
 .squadActions button:disabled { cursor: wait; opacity: .48; }
+.rosterControls {
+  margin: -5px 3px 12px; border: 1px solid #79a99a38; border-radius: 17px; background: linear-gradient(145deg, #ffffffd9, #eaf3efcf);
+  padding: 9px; display: grid; gap: 7px; box-shadow: inset 0 1px #fff, 0 9px 24px #60756d17; animation: rosterControlsIn .18s ease-out both;
+}
+.rosterControlRow { min-width: 0; display: grid; grid-template-columns: 42px minmax(0, 1fr); align-items: start; gap: 7px; }
+.rosterControlRow > strong { padding-top: 7px; color: #59736d; font-size: 8px; }
+.rosterControlOptions { min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.rosterControlOptions button {
+  min-height: 25px; border: 1px solid #77998f2b; border-radius: 9px; background: #ffffffb0; color: #6b7f7a; cursor: pointer;
+  padding: 0 7px; font: 720 7px/1 ui-sans-serif, system-ui, sans-serif; box-shadow: inset 0 1px #fff;
+}
+.rosterControlOptions button:hover { border-color: currentColor; background: #fff; }
+.rosterControlOptions button[aria-pressed='true'] {
+  border-color: currentColor; background: color-mix(in srgb, currentColor 12%, white); color: var(--core-color, #337d68);
+  box-shadow: inset 0 1px #fff, 0 3px 9px color-mix(in srgb, currentColor 16%, transparent);
+}
+.rosterControlSummary { min-height: 24px; border-top: 1px solid #799b9020; padding-top: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rosterControlSummary span { color: #718681; font-size: 8px; }
+.rosterControlSummary button, .rosterEmpty button {
+  min-height: 24px; border: 1px solid #739c9038; border-radius: 8px; background: #f8fbf9; color: #527169; cursor: pointer; padding: 0 8px; font-size: 7px;
+}
+.rosterControlSummary button:disabled { cursor: default; opacity: .35; }
+.rosterEmpty {
+  min-height: 160px; margin-top: -2px; border: 1px dashed #789c9145; border-radius: 18px; background: #ffffff72; color: #69807a;
+  display: grid; place-content: center; justify-items: center; gap: 9px; text-align: center;
+}
+.rosterEmpty strong { font-size: 10px; }
+@keyframes rosterControlsIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
 .codekinDetailBackdrop {
   z-index: 75; padding: 10px; cursor: default;
@@ -1928,10 +1992,14 @@
 
 @media (max-width: 470px) {
   .pageHeading { align-items: flex-start; }
-  .squadActions { max-width: 190px; flex-wrap: wrap; }
-  .codekinCard { min-height: 174px; }
-  .codekinCard .creatureSelect { min-height: 174px; }
-  .codekinCard .sprite_medium { width: 84px; height: 84px; margin-top: 7px; }
+  .squadActions { max-width: 205px; flex-wrap: wrap; }
+  .rosterControlRow { grid-template-columns: 1fr; gap: 3px; }
+  .rosterControlRow > strong { padding: 0 2px; }
+  .rosterControlOptions button { padding: 0 6px; }
+  .codekinCard { min-height: 182px; contain-intrinsic-size: auto 182px; }
+  .codekinCard .creatureSelect { min-height: 182px; }
+  .codekinCard .sprite_medium { width: 82px; height: 82px; margin-top: 7px; }
+  .codekinDeployment { right: 5px; top: 6px; padding: 4px; }
   .codekinDetailModal { border-radius: 22px; padding: 12px; }
   .codekinDetailHero { grid-template-columns: 118px minmax(0, 1fr); min-height: 132px; padding-left: 0; }
   .codekinDetailHero .sprite_large { width: 118px; height: 118px; }

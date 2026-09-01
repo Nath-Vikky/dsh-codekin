@@ -8,6 +8,20 @@ Codekin is a creature-collection and match-three battle plugin for DeepSeek Harn
 high-level DSH runtime outcomes into local game events without changing prompts, tools, model
 requests, or agent behavior.
 
+## In-game preview
+
+These views were captured directly from Codekin `0.3.6-alpha.1` running inside DSH Web.
+
+<p align="center">
+  <img src=".github/readme/codekin-tower.webp" alt="Endless Stack Tower challenge screen" width="31%">
+  <img src=".github/readme/codekin-roster.webp" alt="Owned Codekin roster with levels, qualities, and deployed slots" width="31%">
+  <img src=".github/readme/codekin-detail.webp" alt="Codekin detail and growth panel" width="31%">
+</p>
+
+<p align="center"><sub>Endless Stack Tower · owned roster and formation markers · details and growth</sub></p>
+
+### The first 25 Codekin
+
 ![The first 25 Codekin](assets/creatures/sprite-gallery-v1.png)
 
 ## Install and enable
@@ -83,7 +97,8 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
   distinct signal roles: runtime repair, shared guard, Compute sync, Compile overclock, or Glitch breach;
   on every other turn they remain ordinary damage panels.
 - Level 1–100 progression, five qualities of growth material, idle supplies, and local persistence.
-- The owned-Codekin roster keeps formation editing separate from browsing: three unique slots can be adjusted and saved explicitly, while each roster card stays focused on portrait and identity.
+- The owned-Codekin roster keeps formation editing separate from browsing: three unique slots can be adjusted and saved explicitly, while each card shows its portrait, number, level, attribute, quality-colored frame, and deployed slot.
+- Roster controls filter by attribute and quality, and sort by level in either direction without crowding the cards with combat values.
 - Selecting a Codekin opens a dismissible detail panel for combat values, skills, and material-based upgrading, keeping growth tools usable as the collection expands.
 - A persisted enable switch under DSH Settings → Codekin; disabling pauses event rewards and idle time without deleting progress.
 - A two-step release flow in Squad that returns one same-quality growth material regardless of the Codekin's level.

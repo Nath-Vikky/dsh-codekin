@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   alpha:
-    name: DSH Alpha.2 (${{ matrix.os }}, Node ${{ matrix.node }})
+    name: DSH Alpha.4 (${{ matrix.os }}, Node ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:

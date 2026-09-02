@@ -13,7 +13,7 @@ export interface CodekinEngineContent {
     creatureMechanics(creatureId: string): ContentCreatureMechanicsDefinition | undefined;
     encounterVariantCreatureId(variant: string): string | undefined;
 }
-export declare const CODEKIN_ENGINE_VERSION: "0.3.6-alpha.1";
+export declare const CODEKIN_ENGINE_VERSION: "0.3.6-alpha.2";
 export declare class EngineContentError extends TypeError {
     readonly issues: readonly string[];
     constructor(issues: readonly string[]);

@@ -36,10 +36,10 @@ describe('Codekin save persistence', () => {
     expect(JSON.parse(readFileSync(current, 'utf8'))).toMatchObject({
       format: CODEKIN_SAVE_FORMAT,
       version: CODEKIN_SAVE_VERSION,
-      engineVersion: '0.3.6-alpha.2',
+      engineVersion: '0.3.6-alpha.3',
       content: {
         id: CORE_CODEKIN_RUNTIME.content.id,
-        packs: [{ id: '@nath-vikky/codekin-core', version: '0.3.6-alpha.2' }],
+        packs: [{ id: '@nath-vikky/codekin-core', version: '0.3.6-alpha.3' }],
       },
       state: { cores: { prism: 7 } },
     })

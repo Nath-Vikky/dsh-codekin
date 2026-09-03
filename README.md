@@ -26,15 +26,15 @@ These views were captured directly from the Codekin `0.3.6` stability line runni
 
 ## Install and enable
 
-### DSH `0.1.2-alpha.4` preview
+### DSH `0.1.2-alpha.5` preview
 
-Codekin `0.3.6-alpha.2` uses the npm-published DSH `0.1.2-alpha.4` as its development and validation
-baseline. The release candidate and the previous published `0.3.6-alpha.1` asset have both passed
+Codekin `0.3.6-alpha.3` uses the npm-published DSH `0.1.2-alpha.5` as its development and validation
+baseline. The release candidate and the previously published `0.3.6-alpha.2` asset have both passed
 installation, authenticated browser interaction, restart, uninstall/reinstall, and save-preservation
-checks on Alpha.4. Install the current verified build with explicit versions:
+checks on Alpha.5. Install the current verified build with explicit versions:
 
 ```sh
-pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.4 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.6-alpha.2/nath-vikky-dsh-codekin-0.3.6-alpha.2.tgz
+pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.5 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.6-alpha.3/nath-vikky-dsh-codekin-0.3.6-alpha.3.tgz
 ```
 
 The npm `latest` tag remains `0.3.5-alpha.2`, which belongs to the previous DSH Alpha.2 baseline.
@@ -111,7 +111,7 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
 - Reward popups, item details, visible material experience values, and explicit confirmations for irreversible roster actions.
 - Host-validated game actions and atomic local persistence.
 
-## 0.3.6-alpha.2 stability baseline
+## 0.3.6-alpha.3 stability baseline
 
 - The runtime is now composed from a deterministic headless engine, a validated Content API v1 registry,
   the official core content pack, a DSH adapter, and an independent React renderer.
@@ -119,12 +119,12 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
   bounded mechanic instructions; invalid or ambiguous packs are rejected before gameplay starts.
 - Versioned save envelopes record both engine and ordered content-pack identities while retaining automatic
   migration and one-time backups for legacy or mismatched saves.
-- The official npm-published DSH `0.1.2-alpha.4` packages are pinned across development and the six-job
+- The official npm-published DSH `0.1.2-alpha.5` packages are pinned across development and the six-job
   Windows, macOS, and Ubuntu CI matrix for Node.js 22 and 24.
-- Alpha.4 replaces direct `Session.events` access with on-demand read APIs. Codekin does not enumerate
-  session logs; it consumes the host `session/event` stream, so no gameplay or persistence bridge was required.
+- Alpha.5 hardens cross-version recovery for DSH session projection caches. It does not change the Host or
+  Session APIs consumed by Codekin, which continues to use the host `session/event` stream without enumerating logs.
 - This compatibility release keeps the Alpha.1 gameplay and content set while moving every development,
-  CI, packaging, and installed-lifecycle gate to the official Alpha.4 package family.
+  CI, packaging, and installed-lifecycle gate to the official Alpha.5 package family.
 - Squad management is now an explicit three-slot edit-and-save flow. The owned roster shows compact identity
   cards, while combat values, skills, and upgrading live in a closeable Codekin detail panel.
 - Engine state, world progression, restoration, roster presentation, and dialog accessibility now have
@@ -176,8 +176,9 @@ identity while retaining automatic migration from the previous raw state format.
 ## Compatibility and status
 
 - `0.2.0`: stable pinned version for DeepSeek Harness Web `0.1.0-rc.5`.
-- `0.3.6-alpha.2`: current GitHub Latest compatibility baseline for `@deepseek-ai/dsh@0.1.2-alpha.4`.
-- `0.3.6-alpha.1`: previous GitHub stability baseline; its published asset also passes the Alpha.4 lifecycle.
+- `0.3.6-alpha.3`: current GitHub Latest compatibility baseline for `@deepseek-ai/dsh@0.1.2-alpha.5`.
+- `0.3.6-alpha.2`: previous DSH Alpha.4 baseline; its published asset also passes the Alpha.5 lifecycle.
+- `0.3.6-alpha.1`: earlier GitHub stability baseline for DSH Alpha.4.
 - `0.3.5-alpha.2`: current npm `latest` and previous DSH Alpha.2 engine/content-pack release.
 - `0.3.5-alpha.1`: previous GitHub engine/content-pack Alpha release.
 - `0.3.2`: previous GitHub-only battle-system prerelease for the DSH Alpha.2 baseline.

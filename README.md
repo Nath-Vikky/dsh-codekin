@@ -26,15 +26,14 @@ These views were captured directly from the Codekin `0.3.6` stability line runni
 
 ## Install and enable
 
-### DSH `0.1.2-rc.1` compatibility candidate
+### DSH `0.1.2-rc.1` preview
 
-The Codekin `0.3.6-rc.1` source candidate uses the npm-published DSH `0.1.2-rc.1` (`next`) as its
-development and validation baseline. It has passed package installation, authenticated browser interaction,
-restart, uninstall/reinstall, and save-preservation checks on Windows with Node.js 22 and 24. The RC artifact
-has not been published yet; until promotion, install the current GitHub Latest pairing explicitly:
+Codekin `0.3.6-rc.1` uses the npm-published DSH `0.1.2-rc.1` (`next`) as its development and validation
+baseline. It has passed package installation, authenticated browser interaction, restart, uninstall/reinstall,
+and save-preservation checks on Windows with Node.js 22 and 24. Install the verified build explicitly:
 
 ```sh
-pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.5 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.6-alpha.3/nath-vikky-dsh-codekin-0.3.6-alpha.3.tgz
+pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.6-rc.1/nath-vikky-dsh-codekin-0.3.6-rc.1.tgz
 ```
 
 The npm `latest` tag remains `0.3.5-alpha.2`, which belongs to the previous DSH Alpha.2 baseline.
@@ -111,7 +110,7 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
 - Reward popups, item details, visible material experience values, and explicit confirmations for irreversible roster actions.
 - Host-validated game actions and atomic local persistence.
 
-## 0.3.6-rc.1 compatibility candidate
+## 0.3.6-rc.1 compatibility baseline
 
 - The runtime is now composed from a deterministic headless engine, a validated Content API v1 registry,
   the official core content pack, a DSH adapter, and an independent React renderer.
@@ -177,8 +176,8 @@ identity while retaining automatic migration from the previous raw state format.
 ## Compatibility and status
 
 - `0.2.0`: stable pinned version for DeepSeek Harness Web `0.1.0-rc.5`.
-- `0.3.6-rc.1`: source compatibility candidate for `@deepseek-ai/dsh@0.1.2-rc.1`; not yet published.
-- `0.3.6-alpha.3`: current GitHub Latest compatibility baseline for `@deepseek-ai/dsh@0.1.2-alpha.5`.
+- `0.3.6-rc.1`: current GitHub Latest compatibility baseline for `@deepseek-ai/dsh@0.1.2-rc.1` (`next`).
+- `0.3.6-alpha.3`: previous GitHub Latest compatibility baseline for `@deepseek-ai/dsh@0.1.2-alpha.5`.
 - `0.3.6-alpha.2`: previous DSH Alpha.4 baseline; its published asset also passes the Alpha.5 lifecycle.
 - `0.3.6-alpha.1`: earlier GitHub stability baseline for DSH Alpha.4.
 - `0.3.5-alpha.2`: current npm `latest` and previous DSH Alpha.2 engine/content-pack release.

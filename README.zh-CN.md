@@ -25,14 +25,14 @@
 
 ## 安装与启用
 
-### DSH `0.1.2-rc.1` 兼容候选
+### DSH `0.1.2-rc.1` 预览版
 
-码灵 `0.3.6-rc.1` 源码候选以 npm 发布在 `next` 标签下的 DSH `0.1.2-rc.1` 为开发与验证基线。
-它已经在 Windows 的 Node.js 22 和 24 下通过安装、带认证的浏览器交互、重启、卸载重装和存档
-保留测试。RC 附件尚未发布；在正式提升前，请继续通过显式版本安装当前 GitHub Latest 组合：
+码灵 `0.3.6-rc.1` 以 npm 发布在 `next` 标签下的 DSH `0.1.2-rc.1` 为开发与验证基线。它已经在
+Windows 的 Node.js 22 和 24 下通过安装、带认证的浏览器交互、重启、卸载重装和存档保留测试。
+请通过显式版本安装已经验证的构建：
 
 ```sh
-pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.5 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.6-alpha.3/nath-vikky-dsh-codekin-0.3.6-alpha.3.tgz
+pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.6-rc.1/nath-vikky-dsh-codekin-0.3.6-rc.1.tgz
 ```
 
 npm `latest` 仍为 `0.3.5-alpha.2`，属于此前的 DSH Alpha.2 基线。如需复现这套旧版 npm
@@ -101,7 +101,7 @@ dsh plugin --profile web add @nath-vikky/dsh-codekin@0.2.0
 - 获得物品弹窗、悬浮信息、明确的素材经验值，以及放生等不可逆操作的二次确认。
 - 由 Host 校验的游戏操作与原子化本地存档。
 
-## 0.3.6-rc.1 兼容候选
+## 0.3.6-rc.1 兼容基线
 
 - 运行时重新组合为确定性的无头引擎、经过校验的 Content API v1 注册表、官方核心内容包、
   DSH 适配层与独立 React 渲染层。
@@ -147,8 +147,8 @@ dsh plugin --profile web add @nath-vikky/dsh-codekin@0.2.0
 ## 兼容性与状态
 
 - `0.2.0`：适配 DeepSeek Harness Web `0.1.0-rc.5` 的稳定固定版本。
-- `0.3.6-rc.1`：面向 `@deepseek-ai/dsh@0.1.2-rc.1` 的源码兼容候选，尚未发布。
-- `0.3.6-alpha.3`：当前面向 `@deepseek-ai/dsh@0.1.2-alpha.5` 的 GitHub Latest 兼容基线。
+- `0.3.6-rc.1`：当前面向 `@deepseek-ai/dsh@0.1.2-rc.1`（`next`）的 GitHub Latest 兼容基线。
+- `0.3.6-alpha.3`：此前面向 `@deepseek-ai/dsh@0.1.2-alpha.5` 的 GitHub Latest 兼容基线。
 - `0.3.6-alpha.2`：此前面向 DSH Alpha.4 的基线；其原始发布附件同样通过了 Alpha.5 生命周期测试。
 - `0.3.6-alpha.1`：更早面向 DSH Alpha.4 的 GitHub 稳定基线。
 - `0.3.5-alpha.2`：当前 npm `latest`，也是此前面向 DSH Alpha.2 的引擎/内容包版本。

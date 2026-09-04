@@ -4,7 +4,7 @@ export * from './mechanics.ts';
 export declare const CORE_CONTENT_PACK: {
     readonly manifest: {
         readonly id: "@nath-vikky/codekin-core";
-        readonly version: "0.3.6-alpha.3";
+        readonly version: "0.3.6-rc.1";
         readonly engine: ">=0.3.2 <0.4.0";
         readonly contentApi: 1;
     };

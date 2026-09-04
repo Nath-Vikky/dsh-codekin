@@ -26,12 +26,12 @@ These views were captured directly from the Codekin `0.3.6` stability line runni
 
 ## Install and enable
 
-### DSH `0.1.2-alpha.5` preview
+### DSH `0.1.2-rc.1` compatibility candidate
 
-Codekin `0.3.6-alpha.3` uses the npm-published DSH `0.1.2-alpha.5` as its development and validation
-baseline. The release candidate and the previously published `0.3.6-alpha.2` asset have both passed
-installation, authenticated browser interaction, restart, uninstall/reinstall, and save-preservation
-checks on Alpha.5. Install the current verified build with explicit versions:
+The Codekin `0.3.6-rc.1` source candidate uses the npm-published DSH `0.1.2-rc.1` (`next`) as its
+development and validation baseline. It has passed package installation, authenticated browser interaction,
+restart, uninstall/reinstall, and save-preservation checks on Windows with Node.js 22 and 24. The RC artifact
+has not been published yet; until promotion, install the current GitHub Latest pairing explicitly:
 
 ```sh
 pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.5 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.6-alpha.3/nath-vikky-dsh-codekin-0.3.6-alpha.3.tgz
@@ -111,7 +111,7 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
 - Reward popups, item details, visible material experience values, and explicit confirmations for irreversible roster actions.
 - Host-validated game actions and atomic local persistence.
 
-## 0.3.6-alpha.3 stability baseline
+## 0.3.6-rc.1 compatibility candidate
 
 - The runtime is now composed from a deterministic headless engine, a validated Content API v1 registry,
   the official core content pack, a DSH adapter, and an independent React renderer.
@@ -119,12 +119,12 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
   bounded mechanic instructions; invalid or ambiguous packs are rejected before gameplay starts.
 - Versioned save envelopes record both engine and ordered content-pack identities while retaining automatic
   migration and one-time backups for legacy or mismatched saves.
-- The official npm-published DSH `0.1.2-alpha.5` packages are pinned across development and the six-job
+- The official npm-published DSH `0.1.2-rc.1` packages are pinned across development and the six-job
   Windows, macOS, and Ubuntu CI matrix for Node.js 22 and 24.
-- Alpha.5 hardens cross-version recovery for DSH session projection caches. It does not change the Host or
-  Session APIs consumed by Codekin, which continues to use the host `session/event` stream without enumerating logs.
+- RC.1 does not change the Host or Session APIs consumed by Codekin relative to Alpha.5. Codekin continues
+  to use the host `session/event` stream without enumerating logs.
 - This compatibility release keeps the Alpha.1 gameplay and content set while moving every development,
-  CI, packaging, and installed-lifecycle gate to the official Alpha.5 package family.
+  CI, packaging, and installed-lifecycle gate to the official RC.1 package family.
 - Squad management is now an explicit three-slot edit-and-save flow. The owned roster shows compact identity
   cards, while combat values, skills, and upgrading live in a closeable Codekin detail panel.
 - Engine state, world progression, restoration, roster presentation, and dialog accessibility now have
@@ -132,6 +132,7 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
 - Release gates validate content and assets, replay a fixed authoritative transcript, run a deterministic
   seven-scenario combat matrix, enforce performance and bundle-size budgets, and exercise an installed DSH
   profile through browser use, restart, removal, and reinstallation.
+- Installed lifecycle coverage includes Ubuntu with Node.js 22 and Windows with Node.js 24.
 - Dialogs provide labelled controls, contained keyboard focus, Escape dismissal where safe, and focus
   restoration to the invoking control.
 
@@ -176,6 +177,7 @@ identity while retaining automatic migration from the previous raw state format.
 ## Compatibility and status
 
 - `0.2.0`: stable pinned version for DeepSeek Harness Web `0.1.0-rc.5`.
+- `0.3.6-rc.1`: source compatibility candidate for `@deepseek-ai/dsh@0.1.2-rc.1`; not yet published.
 - `0.3.6-alpha.3`: current GitHub Latest compatibility baseline for `@deepseek-ai/dsh@0.1.2-alpha.5`.
 - `0.3.6-alpha.2`: previous DSH Alpha.4 baseline; its published asset also passes the Alpha.5 lifecycle.
 - `0.3.6-alpha.1`: earlier GitHub stability baseline for DSH Alpha.4.
@@ -183,9 +185,9 @@ identity while retaining automatic migration from the previous raw state format.
 - `0.3.5-alpha.1`: previous GitHub engine/content-pack Alpha release.
 - `0.3.2`: previous GitHub-only battle-system prerelease for the DSH Alpha.2 baseline.
 
-The Alpha build has been validated in isolated official npm profiles for package installation,
+The prerelease build has been validated in isolated official npm profiles for package installation,
 client composition, authenticated state/action/assets, browser and keyboard interaction, host restarts,
-and uninstall/reinstall save preservation. It is still a compatibility preview because upstream Alpha
+and uninstall/reinstall save preservation. It is still a compatibility preview because upstream prerelease
 APIs may change again before the next stable DSH release.
 
 ## License

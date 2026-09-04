@@ -18,8 +18,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  alpha:
-    name: DSH Alpha.5 (${{ matrix.os }}, Node ${{ matrix.node }})
+  compatibility:
+    name: DSH 0.1.2 RC.1 (${{ matrix.os }}, Node ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
@@ -61,10 +61,18 @@ jobs:
         run: git diff --exit-code -- lib
 
   lifecycle:
-    name: Installed DSH lifecycle (Node 22)
-    needs: alpha
-    runs-on: ubuntu-latest
+    name: Installed DSH lifecycle (${{ matrix.os }}, Node ${{ matrix.node }})
+    needs: compatibility
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: 22
+          - os: windows-latest
+            node: 24
     steps:
       - name: Checkout Codekin
         uses: actions/checkout@v5
@@ -77,7 +85,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: pnpm
 
       - name: Install lifecycle test dependencies
@@ -88,4 +96,4 @@ jobs:
 
       - name: Verify Git commit installation lifecycle
         if: github.event_name == 'push'
-        run: node tools/dsh-lifecycle.ts --source "https://github.com/${GITHUB_REPOSITORY}.git#${GITHUB_SHA}" --json
+        run: node tools/dsh-lifecycle.ts --source "https://github.com/${{ github.repository }}.git#${{ github.sha }}" --json

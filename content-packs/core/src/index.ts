@@ -40,7 +40,7 @@ const QUALITY_NAMES = {
 export const CORE_CONTENT_PACK = defineContentPack({
   manifest: {
     id: '@nath-vikky/codekin-core',
-    version: '0.3.6-alpha.3',
+    version: '0.3.6-rc.1',
     engine: '>=0.3.2 <0.4.0',
     contentApi: 1,
   },

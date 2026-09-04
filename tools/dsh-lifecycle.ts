@@ -13,7 +13,7 @@ import { chromium } from 'playwright-core'
 import type { Page } from 'playwright-core'
 
 export const DSH_LIFECYCLE_FORMAT = 'codekin-dsh-lifecycle-v1' as const
-const DEFAULT_DSH_VERSION = '0.1.2-alpha.5'
+const DEFAULT_DSH_VERSION = '0.1.2-rc.1'
 const PACKAGE_NAME = '@nath-vikky/dsh-codekin'
 const API_PREFIX = '/api/tracewild'
 const PROCESS_TIMEOUT_MS = 180_000
@@ -564,7 +564,7 @@ export async function dshLifecycleCli(argv: readonly string[]): Promise<number> 
     else if (argument === '--skip-browser') browser = false
     else if (argument === '--json') json = true
     else if (argument === '--help' || argument === '-h') {
-      console.log('Usage: node tools/dsh-lifecycle.ts [--dsh-version 0.1.2-alpha.5] [--source package-spec] [--skip-browser] [--keep] [--json] [--output report.json]')
+      console.log('Usage: node tools/dsh-lifecycle.ts [--dsh-version 0.1.2-rc.1] [--source package-spec] [--skip-browser] [--keep] [--json] [--output report.json]')
       return 0
     } else throw new TypeError(`unknown option ${argument}`)
   }

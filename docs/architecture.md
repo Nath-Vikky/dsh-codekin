@@ -2,7 +2,7 @@
 
 [简体中文](architecture.zh-CN.md)
 
-Codekin `0.3.6-alpha.3` is composed from a headless game engine and validated content packs. The default DSH plugin binds the official core pack, while the same composition API can combine additional packs before the host starts.
+Codekin `0.3.6-rc.1` is composed from a headless game engine and validated content packs. The default DSH plugin binds the official core pack, while the same composition API can combine additional packs before the host starts.
 
 ## Package map
 
@@ -10,7 +10,7 @@ Codekin `0.3.6-alpha.3` is composed from a headless game engine and validated co
 | --- | --- | --- |
 | `packages/content-sdk` | Content API v1 types, JSON Schema validation, dependency resolution, immutable registry, client-safe view | Game execution and host access |
 | `packages/engine` | Deterministic state transitions, combat, rewards, save restoration, reviewed mechanic opcode executors | React, Node.js APIs, DSH, official creature IDs |
-| `content-packs/core` | The 25 creatures, localized text, assets, encounters, starters, tower rotation, and declarative mechanics shipped in `0.3.6-alpha.3` | Host logic and arbitrary JavaScript mechanics |
+| `content-packs/core` | The 25 creatures, localized text, assets, encounters, starters, tower rotation, and declarative mechanics shipped in `0.3.6-rc.1` | Host logic and arbitrary JavaScript mechanics |
 | `packages/dsh-adapter` | DSH event classification, persistence, loopback HTTP routes, runtime injection | Content ownership and game rules |
 | `packages/renderer-react` | React UI, browser connection, validation of the host-provided content view | Server mechanics, aliases, dependency metadata, official core catalog imports |
 | `src/core-runtime.ts` | Default composition of the engine and official core content | New rules or content definitions |

@@ -3,11 +3,11 @@
   "random": "lcg32-v1",
   "seed": 3237998081,
   "startedAt": 1000,
-  "engineVersion": "0.3.6-alpha.3",
+  "engineVersion": "0.3.6-rc.1",
   "contentPacks": [
     {
       "id": "@nath-vikky/codekin-core",
-      "version": "0.3.6-alpha.3"
+      "version": "0.3.6-rc.1"
     }
   ],
   "steps": [

@@ -1,0 +1,45 @@
+.map { display: grid; gap: 12px; min-width: 0; color: #f5fbff; }
+.heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 3px 0; }
+.heading > div { min-width: 0; }
+.heading > div > span { color: #a4e9ff; font: 800 9px/1.2 ui-sans-serif, system-ui, sans-serif; letter-spacing: .16em; }
+.heading h2 { margin: 6px 0 0; font-size: clamp(25px, 6vw, 33px); line-height: 1; font-weight: 950; font-style: italic; letter-spacing: -.04em; }
+.heading p { display: flex; align-items: center; gap: 6px; margin: 0; flex-shrink: 0; }
+.heading p b { color: #a6f5ff; font: italic 900 38px/.9 ui-sans-serif, system-ui, sans-serif; letter-spacing: -.08em; }
+.heading p span { color: #badff5; font: 700 9px/1.5 ui-sans-serif, system-ui, sans-serif; }
+.scene { position: relative; isolation: isolate; aspect-ratio: 600 / 620; overflow: hidden; border: 1px solid #76e3ff8c; border-radius: 2px 24px 2px 2px; background: #0a467c; box-shadow: 0 10px 28px #00133355; }
+.scene::after { content: ''; position: absolute; z-index: 1; inset: 0; pointer-events: none; box-shadow: inset 0 0 65px #09245266; background: linear-gradient(180deg, #030f4355, transparent 22%, transparent 78%, #00194a99); }
+.city, .leaders { display: block; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.leaders { z-index: 2; color: #c7fbff; }
+.coordinate { position: absolute; top: 17px; left: 16px; z-index: 2; display: flex; align-items: center; gap: 8px; color: #d2f6ff; font: 700 8px/1.2 ui-monospace, monospace; letter-spacing: .09em; }
+.coordinate i { width: 4px; height: 4px; border-radius: 50%; background: #b5ffff; box-shadow: 0 0 7px #85ffff; }
+.marker { --signal: #9cf6ff; position: absolute; z-index: 3; width: 25%; display: flex; align-items: center; flex-direction: column; gap: 2px; padding: 2px; border: 0; background: transparent; color: #fff; font-family: inherit; cursor: pointer; transform: translate(-50%, -50%); touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.marker::after { content: ''; position: absolute; z-index: -1; inset: -3px -1px; border: 1px solid transparent; border-radius: 40px 40px 5px 5px; transition: background .25s, border-color .25s; }
+.marker:hover, .marker:focus-visible { z-index: 4; outline: none; }
+.marker:hover::after, .marker:focus-visible::after { border-color: var(--signal); background: #052759e8; box-shadow: 0 8px 20px #00153688; }
+.marker:focus-visible::after { outline: 2px solid #fff; outline-offset: 2px; }
+.marker:disabled { cursor: wait; }
+.marker:disabled .portrait { filter: saturate(.5); }
+.portrait { position: relative; width: clamp(43px, 12vw, 59px); height: clamp(43px, 12vw, 59px); display: grid; place-items: center; flex-shrink: 0; border: 3px solid var(--signal); border-radius: 50%; background: radial-gradient(circle at 35% 20%, #3b75b8, #102760 70%); box-shadow: 0 0 0 2px #075197, 0 0 0 4px #b1ebff5c, 0 5px 9px #00134799; transition: transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .3s; }
+.portrait::after { content: ''; position: absolute; z-index: -1; width: 12px; height: 12px; bottom: -9px; left: calc(50% - 6px); transform: rotate(45deg); border: 2px solid var(--signal); border-top: 0; border-left: 0; background: #0d3975; }
+.portrait > img, .portrait > span { width: 112%; height: 112%; max-width: none; object-fit: contain; margin-top: -6%; filter: drop-shadow(0 3px 2px #00173b70); }
+.portrait i { position: absolute; inset: -9px; border: 1px solid var(--signal); border-radius: 50%; opacity: .45; pointer-events: none; }
+.portrait, .portrait i { corner-shape: round; }
+.portrait b { position: absolute; top: -8px; right: -5px; color: #fff1b1; font-size: 17px; text-shadow: 0 1px 4px #2e2065; }
+.marker[data-special] .portrait i { animation: signalHalo 4s ease-in-out infinite; animation-delay: var(--delay); }
+.marker[data-quality=nova] .portrait { border-color: #f5abec; }
+.marker[data-quality=origin] .portrait { border-color: #ffdf91; }
+.marker:hover .portrait, .marker:focus-visible .portrait { transform: translateY(-4px) scale(1.06); box-shadow: 0 0 0 2px #075197, 0 0 0 5px #c9faff77, 0 10px 20px #001344; }
+.marker strong { max-width: 100%; min-width: 0; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 5px; padding: 3px 7px; color: #fff; background: #0b389bdd; border-left: 2px solid var(--signal); font-size: 12px; font-weight: 850; line-height: 1.2; box-shadow: 0 2px 5px #00184950; }
+.marker small { max-width: 115%; padding: 2px 4px; color: #d7f7ff; background: #052857e8; white-space: nowrap; font: 700 9px/1.2 ui-sans-serif, system-ui, sans-serif; }
+.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px 11px; padding: 0 3px; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; color: #d1e6fb; font-size: 11px; }
+.legend i { width: 7px; height: 7px; border: 1px solid var(--signal); border-radius: 50%; background: color-mix(in srgb, var(--signal) 45%, transparent); }
+.hint { margin: -4px 0 1px; text-align: center; color: #afcbe8; font-size: 11px; line-height: 1.5; }
+.empty { position: absolute; z-index: 3; inset: 34% 10% auto; display: flex; gap: 12px; align-items: center; padding: 16px; background: #072861e8; border-left: 3px solid #a3faff; box-shadow: 0 8px 30px #001b5555; }
+.empty > span { color: #a3faff; font-size: 34px; }
+.empty p { margin: 0; color: #e9faff; font-size: 13px; line-height: 1.7; }
+.ferry { animation: ferryDrift 12s ease-in-out infinite alternate; }
+@keyframes signalHalo { 0%, 100% { transform: scale(1); opacity: .25; } 50% { transform: scale(1.08); opacity: .8; } }
+@keyframes ferryDrift { to { transform: translate(13px, -4px); } }
+:global([data-motion=reduce]) .map *, :global([data-motion=reduce]) .map *::after { animation: none !important; transition: none !important; }
+@media (max-width: 390px) { .heading h2 { font-size: 26px; } .portrait { width: 43px; height: 43px; } .marker strong { font-size: 11px; padding: 3px 4px; } .marker small { font-size: 8px; } .coordinate { font-size: 7px; left: 12px; } .caption { display: none; } }

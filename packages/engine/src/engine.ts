@@ -60,6 +60,7 @@ import {
   updateDex,
 } from './state.ts'
 import { settleTraceWildIdleRewards } from './world.ts'
+import { CREATURE_EVOLUTION_LEVEL } from './appearance.ts'
 import type {
   BattleAmplifier,
   BattlePartyMember,
@@ -2318,6 +2319,19 @@ export function applyTraceWildAction(
     return { state: commit(next, now) }
   }
   if (!current.enabled) throw new TraceWildRuleError('conflict')
+  if (action.type === 'set-creature-appearance') {
+    if (current.battle !== undefined) throw new TraceWildRuleError('conflict')
+    const creature = current.creatures.find(row => row.instanceId === action.creatureInstanceId)
+    if (creature === undefined
+      || (action.appearance !== 'original' && action.appearance !== 'evolved')
+      || (action.appearance === 'evolved' && creature.level < CREATURE_EVOLUTION_LEVEL)) {
+      throw new TraceWildRuleError('invalid-action')
+    }
+    // A cosmetic choice must not settle rewards or consume the gameplay random stream.
+    const next = structuredClone(current)
+    next.creatures.find(row => row.instanceId === action.creatureInstanceId)!.appearance = action.appearance
+    return { state: commit(next, now) }
+  }
   const settled = settleTraceWildIdleRewards(current, now, random)
   const next = structuredClone(settled)
   purgeExpiredEncounters(next, now)
@@ -2438,11 +2452,15 @@ export function applyTraceWildAction(
         throw new TraceWildRuleError('invalid-action')
       }
       next.materials[action.quality] -= action.count
+      const previousLevel = creature.level
       creature.xp = Math.min(
         totalXpForLevel(MAX_PLAYER_LEVEL, creature.quality),
         creature.xp + MATERIAL_XP[action.quality] * action.count,
       )
       creature.level = levelForXp(creature.xp, creature.quality)
+      if (previousLevel < CREATURE_EVOLUTION_LEVEL && creature.level >= CREATURE_EVOLUTION_LEVEL) {
+        creature.appearance = 'evolved'
+      }
       notice = 'material-used'
       break
     }

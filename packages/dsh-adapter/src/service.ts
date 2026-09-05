@@ -111,7 +111,10 @@ export class TraceWildService {
     this.persistence.save(result.state)
     this.stateValue = result.state
     if (result.state.enabled !== previousEnabled) this.classifier = new TraceWildEventClassifier()
-    const snapshot = this.snapshot()
+    // A cosmetic action must not trigger gameplay settlement while preparing its response.
+    const snapshot: TraceWildSnapshot = action.type === 'set-creature-appearance'
+      ? { schemaVersion: 3, state: structuredClone(this.stateValue), serverTime: this.now() }
+      : this.snapshot()
     this.publish(snapshot)
     return {
       ok: true,

@@ -48,5 +48,12 @@ evidence/
 screenshots/private/
 *.private.md
 *.internal.md
+# Evolution review galleries, prompts and working masters stay in the sibling
+# codekin-internal-docs workspace. Only final game sprites belong in assets.
+codekin-internal-docs/
+art/evolution/
+docs/evolution-review/
+**/FEMALE_REVISION_REVIEW.zh-CN.md
+**/catalog-before-female-revision.json
 .codex-*
 .qa-*

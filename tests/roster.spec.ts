@@ -46,6 +46,14 @@ const ROSTER = [
 ] as const
 
 describe('Codekin roster projection', () => {
+  it('searches names and numbers with whitespace, case and full-width normalization', () => {
+    const criteria = { ecology: 'all', quality: 'all', sort: 'default' } as const
+    expect(arrangeCodekinRoster(ROSTER, { ...criteria, query: ' ＦＯＲＧＥ ' }).map(row => row.captured.instanceId)).toEqual(['forge-high'])
+    expect(arrangeCodekinRoster(ROSTER, { ...criteria, query: '#03' }).map(row => row.captured.instanceId)).toEqual(['lumen-high'])
+    expect(arrangeCodekinRoster(ROSTER, { ...criteria, query: 'not found' })).toEqual([])
+    const chinese = entry('索引团', 3, 'lumen', 'pebble', 0)
+    expect(arrangeCodekinRoster([chinese], { ...criteria, query: '索引' })).toEqual([chinese])
+  })
   it('filters by ecology and individual quality together', () => {
     expect(arrangeCodekinRoster(ROSTER, {
       ecology: 'lumen', quality: 'nova', sort: 'default',

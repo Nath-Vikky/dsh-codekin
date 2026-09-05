@@ -8,6 +8,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { TraceWildOverlay } from './components/TraceWildOverlay.tsx'
 import { TraceWildSettings } from './components/TraceWildSettings.tsx'
 import { styleId, styleText } from './components/tracewild.module.css'
+import { styleText as appearanceStyleText } from './components/creature-appearance.module.css'
 import { en, NS, zh } from './locales.ts'
 
 // Standalone plugin declaration builds can resolve Cordis through a different
@@ -36,7 +37,7 @@ function installStyles(): () => void {
   const tag = existing ?? document.createElement('style')
   tag.dataset.plugin = '@nath-vikky/dsh-codekin'
   tag.dataset.pluginCss = styleId
-  tag.textContent = styleText
+  tag.textContent = styleText + '\n' + appearanceStyleText
   if (existing === undefined) document.head.appendChild(tag)
   return () => {
     if (tag.dataset.pluginCss === styleId) tag.remove()

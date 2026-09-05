@@ -1,0 +1,37 @@
+.hanger { position: absolute; z-index: 3; top: 11px; right: 50px; width: 31px; height: 31px; display: grid; place-items: center; padding: 5px; color: #d6f8ff; border: 1px solid #b2eeff9e; background: #041b56; cursor: pointer; }
+.hanger svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.hanger[aria-expanded=true],.hanger:hover:not(:disabled) { background: #5ce3ff; color: #062759; }
+.hanger:focus-visible,.picker button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.hanger:disabled { opacity: .5; cursor: wait; }
+.hero { grid-template-columns: 168px minmax(0,1fr); min-height: 212px; padding-top: 24px; }
+.portrait { position: relative; height: 186px; width: 164px; isolation: isolate; display: grid; place-items: center; }
+.portrait img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; image-rendering: auto; user-select: none; pointer-events: none; filter: drop-shadow(4px 7px 4px #01265a4d); }
+.current { z-index: 1; }
+.departing { z-index: 2; }
+.placeholder { color: #98e2ff; font-size: 80px; }
+.portrait[data-appearance-transition=change] .current { animation: appearanceIn var(--appearance-change) ease both; }
+.portrait[data-appearance-transition=change] .departing { animation: appearanceOut var(--appearance-change) ease both; }
+.portrait[data-appearance-transition=evolution] .current { animation: evolutionIn var(--appearance-evolution) cubic-bezier(.2,.7,.2,1) both; }
+.portrait[data-appearance-transition=evolution] .departing { animation: evolutionOut var(--appearance-evolution) ease both; }
+.evolutionGlow { position: absolute; z-index: 3; inset: 6%; border-radius: 50%; corner-shape: round; pointer-events: none; background: radial-gradient(ellipse,#fff 0 15%,#aeffffb3 32%,#55cfff55 52%,transparent 70%); mix-blend-mode: screen; animation: evolutionGlow var(--appearance-evolution) ease both; }
+.evolutionLabel { position: absolute; z-index: 4; bottom: 0; left: -3px; right: -3px; padding: 4px; text-align: center; font: 800 10px/1.4 system-ui,sans-serif; color: #03275b; background: #a7f6ff; animation: evolutionLabel var(--appearance-evolution) ease both; }
+.picker { margin: 10px 0; padding: 12px; border: 1px solid #91e4ff; background: #032664; color: #ecfbff; }
+.picker header { display: flex; justify-content: space-between; gap: 8px; align-items: start; margin-bottom: 10px; }
+.picker header strong { display: block; font-size: 14px; }
+.picker header small { display: block; margin-top: 5px; font-size: 10px; line-height: 1.5; color: #add8f0; }
+.picker header>button { width: 28px; height: 28px; flex-shrink: 0; color: #d8f8ff; border: 1px solid #82c4eb; background: #092e69; cursor: pointer; }
+.options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.options>button { display: grid; justify-items: center; gap: 5px; min-width: 0; padding: 8px; border: 1px solid #6194c7; color: #d3f3ff; background: #073b7c; cursor: pointer; }
+.options>button[aria-pressed=true] { border-color: #a9ffff; background: #1258a0; box-shadow: inset 0 0 0 1px #a9ffff; }
+.options>button:disabled { cursor: default; }
+.options>button:disabled:not([aria-pressed=true]) { opacity: .6; }
+.options img { max-width: 100%; width: 126px; height: 148px; object-fit: contain; image-rendering: auto; }
+.options strong { font-size: 12px; }
+.options small { font-size: 10px; color: #a1ebff; min-height: 15px; }
+@keyframes appearanceIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes appearanceOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes evolutionIn { 0%,42% { opacity: 0; transform: scale(.92); filter: brightness(2); } 75% { opacity: 1; filter: brightness(1.3); } 100% { opacity: 1; transform: scale(1); filter: brightness(1); } }
+@keyframes evolutionOut { 0%,25% { opacity: 1; filter: brightness(1); } 48% { opacity: 1; filter: brightness(4); } 62%,100% { opacity: 0; } }
+@keyframes evolutionGlow { 0%,15%,100% { opacity: 0; transform: scale(.45); } 45%,55% { opacity: 1; transform: scale(1.15); } 85% { opacity: 0; transform: scale(1.4); } }
+@keyframes evolutionLabel { 0%,35% { opacity: 0; transform: translateY(5px); } 55%,90% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+@media(max-width:420px) { .hero { grid-template-columns: 133px minmax(0,1fr); min-height: 190px; padding-top: 28px; } .portrait { width: 130px; height: 164px; } .options img { width: 106px; height: 130px; } }

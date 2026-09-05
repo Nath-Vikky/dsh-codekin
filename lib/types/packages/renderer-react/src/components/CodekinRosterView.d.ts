@@ -10,6 +10,7 @@ export declare function CodekinView(props: {
     busy: boolean;
     save: () => Promise<boolean>;
     inspect: (instanceId: string) => void;
+    onEditingChange?: (editing: boolean) => void;
 }): import("react/jsx-runtime").JSX.Element;
 export declare function CodekinDetailModal(props: {
     captured: CapturedCreature;
@@ -18,6 +19,7 @@ export declare function CodekinDetailModal(props: {
     t: TraceWildTranslate;
     zh: boolean;
     busy: boolean;
+    reducedMotion?: boolean;
     act: (action: TraceWildAction) => Promise<TraceWildActionResponse | undefined>;
     dismiss: () => void;
     release: () => void;

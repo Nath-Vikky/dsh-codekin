@@ -11,6 +11,7 @@ export interface CodekinRosterCriteria {
     ecology: CodekinRosterEcology;
     quality: CodekinRosterQuality;
     sort: CodekinRosterSort;
+    query?: string;
 }
 /**
  * Produces a display-only roster projection without mutating authoritative

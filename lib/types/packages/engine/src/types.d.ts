@@ -1,10 +1,13 @@
 import type { CaptureCoreQuality, GrowthMaterialQuality, IndividualQuality, TraceEcology } from '../../content-sdk/src/types.ts';
 export type { CaptureCoreQuality, CreatureDefinition, CreatureStats, GrowthMaterialQuality, IndividualQuality, TraceEcology, TraceRarity, } from '../../content-sdk/src/types.ts';
+export type CreatureAppearance = 'original' | 'evolved';
 export interface CapturedCreature {
     instanceId: string;
     creatureId: string;
     quality: CaptureCoreQuality;
     level: number;
+    /** Per-instance cosmetic choice; omitted legacy values follow the level default. */
+    appearance?: CreatureAppearance;
     xp: number;
     wins: number;
     caughtAt: number;
@@ -318,6 +321,10 @@ export type TraceWildAction = {
     creatureInstanceId: string;
     quality: GrowthMaterialQuality;
     count: number;
+} | {
+    type: 'set-creature-appearance';
+    creatureInstanceId: string;
+    appearance: CreatureAppearance;
 } | {
     type: 'release-creature';
     creatureInstanceId: string;

@@ -30,7 +30,8 @@ export function useDialogAccessibility<Element extends HTMLElement = HTMLElement
   useEffect(() => {
     const dialog = dialogRef.current
     if (dialog !== null && !dialog.contains(document.activeElement)) {
-      const initial = dialog.querySelector<HTMLElement>('[data-dialog-initial-focus], button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')
+      const initial = dialog.querySelector<HTMLElement>('[data-dialog-initial-focus]:not([disabled])')
+        ?? dialog.querySelector<HTMLElement>('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')
       initial?.focus()
     }
     return () => {
@@ -55,7 +56,8 @@ export function useDialogAccessibility<Element extends HTMLElement = HTMLElement
     const dialog = dialogRef.current
     if (dialog === null) return
     const controls = [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)]
-      .filter(control => control.getAttribute('aria-hidden') !== 'true')
+      .filter(control => control.tabIndex >= 0 && control.getAttribute('aria-hidden') !== 'true'
+        && control.closest('[inert]') === null && control.getClientRects().length > 0)
     if (controls.length === 0) {
       event.preventDefault()
       dialog.focus()

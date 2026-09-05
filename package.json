@@ -161,6 +161,7 @@
     "lib/types/**/*.d.ts.map",
     "assets/creatures/sprite-gallery-v1.png",
     "assets/creatures/sprites",
+    "assets/creatures/evolved",
     "cordis.patch.yml",
     "docs",
     "LICENSE",

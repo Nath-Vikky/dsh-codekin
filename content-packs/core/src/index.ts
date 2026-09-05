@@ -87,5 +87,11 @@ export const CORE_CONTENT_PACK = defineContentPack({
       mime: 'image/webp' as const,
       kind: 'creature' as const,
     })),
+    ...CREATURE_CATALOG.map(creature => ({
+      key: `creature:${creature.id}:evolved`,
+      path: `evolved/${creature.id}.webp`,
+      mime: 'image/webp' as const,
+      kind: 'creature' as const,
+    })),
   ],
 })

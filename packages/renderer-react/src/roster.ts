@@ -19,6 +19,7 @@ export interface CodekinRosterCriteria {
   ecology: CodekinRosterEcology
   quality: CodekinRosterQuality
   sort: CodekinRosterSort
+  query?: string
 }
 
 /**
@@ -29,9 +30,12 @@ export function arrangeCodekinRoster(
   entries: readonly CodekinRosterEntry[],
   criteria: CodekinRosterCriteria,
 ): CodekinRosterEntry[] {
+  const query = criteria.query?.trim().normalize('NFKC').toLocaleLowerCase().replace(/^#/, '') ?? ''
   const visible = entries.filter(entry => (
     (criteria.ecology === 'all' || entry.creature.ecology === criteria.ecology)
     && (criteria.quality === 'all' || entry.captured.quality === criteria.quality)
+    && (query === '' || [entry.creature.nameZh, entry.creature.nameEn, entry.creature.id,
+      String(entry.creature.number).padStart(2, '0')].some(value => value.normalize('NFKC').toLocaleLowerCase().includes(query)))
   ))
   if (criteria.sort === 'default') return visible
   const direction = criteria.sort === 'level-asc' ? 1 : -1

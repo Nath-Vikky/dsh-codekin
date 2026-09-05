@@ -1,0 +1,87 @@
+.stage { --stage-height: 300px; position: relative; height: var(--stage-height); isolation: isolate; background: linear-gradient(125deg,#196ddd 0 24%,#12488f 24% 48%,#082b64 48%); border: 1px solid #4baee088; color: #effbff; }
+.stage::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: repeating-linear-gradient(155deg,transparent 0 50px,#53d6ff12 51px 52px); }
+.floor { position: absolute; width: 45%; height: 53px; right: 2%; top: 111px; border: 1px solid #91eaff60; border-radius: 50%; transform: rotate(-14deg); box-shadow: 0 0 0 9px #41c9ff0b,0 0 0 21px #41c9ff08; background: radial-gradient(ellipse,#45c1f437,transparent 70%); }
+.stageLabel { position: absolute; left: 17px; top: 20px; font: italic 800 clamp(17px,4vw,24px)/1 system-ui,sans-serif; letter-spacing: -.04em; opacity: .9; transform: rotate(-6deg); }
+.stageLabel i { display: block; margin-top: 7px; font: 8px/1.3 system-ui,sans-serif; letter-spacing: .2em; color: #78defa; }
+.fighter { color: #fff; }
+.enemy,.active { text-align: center; }
+.portraitButton { display: block; position: relative; width: 100%; aspect-ratio: 1; padding: 0; border: 0; background: transparent; cursor: help; color: inherit; overflow: visible; }
+.active .portraitButton { border-radius: 50%; background: radial-gradient(circle at 37% 25%,#fff,#cfedff 70%); box-shadow: 0 5px 15px #0005; }
+.portraitButton:focus-visible { outline: 2px solid #fff; outline-offset: 4px; border-radius: 50%; }
+.portraitButton[data-can-cast] { cursor: pointer; box-shadow: 0 0 0 2px #abf8ff,0 0 20px #6ff4ff66; }
+.portraitButton[data-can-cast]:hover { box-shadow: 0 0 0 2px #fff,0 0 27px #6ff4ffb3; }
+.portraitLayers,.portraitLayers>span { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.portraitLayers { overflow: hidden; border-radius: inherit; }
+.portraitButton, .portraitLayers, .floor, .impact { corner-shape: round; }
+.portraitLayers img { width: 100%; height: 100%; max-width: none; object-fit: contain; transform: none; animation: none; filter: drop-shadow(0 5px 3px #03153555); }
+.arriving { animation: stagePortraitIn var(--portrait-duration,600ms) cubic-bezier(.22,.8,.25,1) both; }
+.departing { animation: stagePortraitOut var(--portrait-duration,600ms) ease both; }
+.halo { position: absolute; inset: -5%; width: 110%; height: 110%; fill: none; transform: rotate(-90deg); pointer-events: none; overflow: visible; }
+.halo circle { stroke: #fff8; stroke-width: 2; }
+.halo circle+circle { stroke: #64f3ff; stroke-width: 3.5; stroke-linecap: round; transition: stroke-dashoffset .65s ease; filter: drop-shadow(0 0 3px #32e0ff); }
+.ready .halo { animation: stageReady 2.8s ease-in-out infinite; }
+.portraitName { display: block; font-size: 12px; line-height: 18px; margin-top: 7px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.enemyMeters { width: 100%; max-width: 170px; margin: 0 auto; display: grid; gap: 5px; }
+.hp,.energy,.skillMeter { display: block; position: relative; background: #020f39b3; overflow: hidden; }
+.hp { height: 14px; border: 1px solid #98edffa8; }
+.hp i,.energy i,.skillMeter i { display: block; height: 100%; background: linear-gradient(90deg,#30bde9,#a3f9ff); transition: width .7s cubic-bezier(.22,.7,.2,1); }
+.hp span { position: absolute; inset: 0; text-align: center; font: 700 9px/12px system-ui,sans-serif; color: #031c49; text-shadow: 0 0 4px #fff; }
+.energy { height: 4px; }
+.energy i { background: #c1a8ff; }
+.damageLane { position: absolute; left: 32%; right: 10px; bottom: 99px; height: 44px; display: grid; grid-template-columns: 1fr 1fr; gap: 9px; pointer-events: none; }
+.damage { position: relative; grid-column: 2; min-width: 0; padding: 1px 0 1px 9px; display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-rows: 12px 30px; border-left: 2px solid #65e9ff; background: linear-gradient(90deg,#031d485c,transparent); }
+.damage small { grid-column: 1; grid-row: 1; font-size: 9px; line-height: 12px; color: #95eaff; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.damage strong { grid-column: 1 / -1; grid-row: 2; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: italic 850 clamp(20px,4.5vw,28px)/1.1 system-ui,sans-serif; letter-spacing: -.05em; animation: stageDamage .45s ease-out both; }
+.damage em { grid-column: 2; grid-row: 1; margin-left: 3px; font: 700 9px/12px system-ui,sans-serif; color: #fff; }
+.damage[data-actor=boss] { border-color: #ff9fba; }
+.damage[data-actor=boss] small,.damage[data-actor=boss] strong { color: #ffb1c8; }
+.damage[data-settled] strong { text-shadow: 0 0 13px #fff6; }
+.tray { position: absolute; left: 32%; right: 10px; bottom: 10px; height: 76px; display: grid; grid-template-columns: minmax(0,1.5fr) repeat(2,minmax(0,1fr)); gap: 7px; }
+.skill { min-width: 0; padding: 9px 8px; color: #062451; background: #a9f3ff; border: 1px solid #e1fcff; display: flex; flex-direction: column; justify-content: center; gap: 7px; text-align: left; cursor: pointer; transition: background .3s,box-shadow .3s; }
+.skill:disabled { color: #9dc5e9; background: #083067; border-color: #6ebbe366; cursor: default; }
+.skill:enabled:hover,.skill:focus-visible { background: #fff; box-shadow: 0 0 15px #8ef1ffa3; }
+.skill small { font-size: 9px; display: flex; justify-content: space-between; gap: 3px; }
+.skill strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
+.skillMeter { height: 3px; flex-shrink: 0; }
+.teammateSlot { min-width: 0; display: grid; align-items: center; background: #083067b3; border: 1px solid #6ebbe366; }
+.teammate .portraitButton { width: 48px; max-width: 78%; margin: 1px auto 0; border-radius: 50%; background: #d5f6ff1c; }
+.teammate .portraitName { font-size: 9px; line-height: 14px; margin: 3px 2px 0; text-align: center; }
+.emptySlot { color: #98c6e180; text-align: center; font-size: 28px; }
+.detail { position: absolute; left: 10px; right: 10px; top: 10px; max-height: calc(var(--stage-height) - 20px); overflow: auto; z-index: 20; visibility: hidden; opacity: 0; padding: 14px 16px; text-align: left; color: #e8faff; background: #031e4af5; border: 1px solid #b6f2ff; box-shadow: 0 8px 26px #0008; transition: opacity .18s; pointer-events: none; }
+.fighter[data-detail-open]>.detail { visibility: visible; opacity: 1; pointer-events: auto; }
+.detail:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.enemy>.detail { right: 42%; }
+.active>.detail { left: 32%; }
+.enemy>.detail dl { grid-template-columns: 1fr; }
+.enemy>.portraitButton,.enemy>.enemyMeters { position: absolute; right: 3%; width: 35%; }
+.enemy>.portraitButton { top: 0; height: 123px; max-width: 183px; }
+.enemy>.enemyMeters { top: 125px; }
+.active>.portraitButton { position: absolute; left: 12px; bottom: 30px; width: 25%; max-width: 132px; }
+.active>.portraitName { position: absolute; left: 9px; bottom: 7px; width: 27%; }
+.teammate .detail { left: -45%; right: 0; top: calc(96px - var(--stage-height)); max-height: calc(var(--stage-height) - 106px); }
+.detail>strong { display: block; font-size: 18px; margin-bottom: 5px; }
+.detail small { display: block; font-size: 11px; color: #9cddf3; }
+.detail dl { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; margin: 12px 0; font-size: 11px; }
+.detail dl div { display: flex; justify-content: space-between; gap: 8px; }
+.detail dt { color: #a0d1e6; }
+.detail dd { margin: 0; font-weight: 700; }
+.detail p { margin: 10px 0; font-size: 11px; line-height: 1.5; }
+.detail p b { display: block; color: #7ae9ff; }
+.strike { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+.wave { position: absolute; width: 56px; height: 16px; left: var(--source-x); top: var(--source-y); margin: -8px 0 0 -28px; border-radius: 60% 30%; transform: rotate(-23deg); background: linear-gradient(90deg,transparent,#60edff 65%,#fff); filter: drop-shadow(0 0 8px #5cdfff); animation: stageFlight var(--strike-flight,1000ms) cubic-bezier(.3,.05,.45,1) both; }
+.strike[data-actor=boss] .wave { background: linear-gradient(90deg,#fff,#ff8ab6 40%,transparent); filter: drop-shadow(0 0 9px #ff729f); }
+.impact { display: none; position: absolute; left: var(--target-x); top: var(--target-y); width: 82px; height: 82px; margin: -41px; border: 3px solid #eaffff; border-radius: 50%; box-shadow: 0 0 20px #70eaff,inset 0 0 20px #70eaff; }
+.strike[data-phase=impact] .wave { display: none; }
+.strike[data-phase=impact] .impact { display: block; animation: stageImpact var(--strike-impact,550ms) ease-out both; }
+.strike[data-actor=boss] .impact { border-color: #ffe4ed; box-shadow: 0 0 20px #ff77ad,inset 0 0 20px #ff77ad; }
+@keyframes stagePortraitIn { from { opacity: 0; transform: translateX(12%) scale(.93); } to { opacity: 1; transform: none; } }
+@keyframes stagePortraitOut { to { opacity: 0; transform: translateX(-12%) scale(.93); } }
+@keyframes stageReady { 0%,100% { opacity: .65; filter: drop-shadow(0 0 2px #77f5ff); } 50% { opacity: 1; filter: drop-shadow(0 0 6px #77f5ff); } }
+@keyframes stageDamage { from { opacity: .4; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes stageFlight { 0% { left: var(--source-x); top: var(--source-y); opacity: 0; scale: .5; } 12% { opacity: 1; } 90%,100% { left: var(--target-x); top: var(--target-y); opacity: 1; scale: 1.2; } }
+@keyframes stageImpact { from { opacity: 1; transform: scale(.3); } to { opacity: 0; transform: scale(1.7); } }
+.stage[data-reduced] .arriving,.stage[data-reduced] .departing,.stage[data-reduced] .halo,.stage[data-reduced] .damage strong { animation: none; }
+.stage[data-reduced] .departing,.stage[data-reduced] .wave { display: none; }
+.stage[data-reduced] .halo circle,.stage[data-reduced] .hp i,.stage[data-reduced] .energy i,.stage[data-reduced] .skillMeter i { transition: none; }
+.stage[data-reduced] .impact { animation: none; opacity: .5; transform: none; }
+@media(max-width:420px) { .stage { --stage-height: 280px; } .stageLabel { font-size: 18px; left: 12px; } .tray { gap: 4px; right: 7px; } .skill { padding: 7px 5px; } .skill strong { font-size: 10px; } .skill small { font-size: 8px; flex-wrap: wrap; gap: 1px; } .damageLane { gap: 5px; right: 7px; bottom: 96px; } .damage { padding-left: 5px; } .damage em { font-size: 8px; } .damage strong { font-size: 22px; } .enemy>.portraitButton { height: 112px; } .enemy>.enemyMeters { top: 114px; } .teammate .portraitName { font-size: 8px; } .active>.portraitName { font-size: 10px; } }

@@ -6,7 +6,6 @@ import { CAPTURE_CORE_QUALITIES } from '../../../content-sdk/src/types.ts'
 import {
   CORE_CAPTURE_POWER,
   MATERIAL_XP,
-  MAX_MAP_ENCOUNTERS,
   captureChance,
 } from '../../../engine/src/balance.ts'
 import { MATCH_BOARD_SIZE, areAdjacentTiles } from '../../../engine/src/match3.ts'
@@ -14,7 +13,6 @@ import type {
   BattleAmplifier,
   CaptureCoreQuality,
   CreatureDefinition,
-  EnemyIntent,
   MatchDamageEffectiveness,
   MatchSignalEffect,
   MatchTile,
@@ -42,7 +40,11 @@ import {
   starterCreatureIds,
 } from '../content.ts'
 import type { TraceWildLocaleKey } from '../locales.ts'
+import { BATTLE_MOTION, cascadeFallTime, tileFallTime } from '../battle-motion.ts'
+import { CodekinMapView } from './CodekinMapView.tsx'
+import { BattleStage } from './BattleStage.tsx'
 import { CodekinDetailModal, CodekinView } from './CodekinRosterView.tsx'
+import type { CreatureLook } from '../appearance-presentation.ts'
 import {
   CORE_KEYS,
   CreatureSprite,
@@ -50,6 +52,8 @@ import {
   creatureName,
 } from './creature-presentation.tsx'
 import { useDialogAccessibility } from './dialog-accessibility.ts'
+import { boardNeighbour, projectRelease, readUiPreferences, saveUiPreferences } from '../motion.ts'
+import { useParticleField, useReducedMotion, useSpringAnimation } from './use-motion.ts'
 import css from './tracewild.module.css'
 
 type Tab = 'map' | 'tower' | 'squad' | 'dex' | 'inventory'
@@ -65,6 +69,22 @@ interface WindowDragState extends WindowPosition {
   startY: number
   width: number
   height: number
+  velocity: WindowPosition
+  lastX: number
+  lastY: number
+  lastTime: number
+}
+
+function sampleDrag(drag: WindowDragState, event: ReactPointerEvent<HTMLElement>): void {
+  const now = performance.now()
+  const dt = Math.max(8, now - drag.lastTime) / 1000
+  drag.velocity = {
+    x: Math.max(-1500, Math.min(1500, (event.clientX - drag.lastX) / dt * 0.55 + drag.velocity.x * 0.45)),
+    y: Math.max(-1500, Math.min(1500, (event.clientY - drag.lastY) / dt * 0.55 + drag.velocity.y * 0.45)),
+  }
+  drag.lastX = event.clientX
+  drag.lastY = event.clientY
+  drag.lastTime = now
 }
 
 const TAB_ICONS: Readonly<Record<Tab, string>> = {
@@ -100,7 +120,7 @@ function clampFloatingPosition(x: number, y: number, width: number, height: numb
 type AcquiredItem =
   | { kind: 'core'; quality: CaptureCoreQuality; quantity: number }
   | { kind: 'material'; quality: CaptureCoreQuality; quantity: number }
-  | { kind: 'creature'; creatureId: string; quality: CaptureCoreQuality; quantity: 1 }
+  | { kind: 'creature'; creatureId: string; quality: CaptureCoreQuality; quantity: 1; captured?: CreatureLook }
 
 type BattleTransitionKind = 'tower-cleared' | 'wild-defeated' | 'capture-success' | 'capture-failed' | 'battle-lost'
 
@@ -112,18 +132,6 @@ interface BattleTransition {
 type BattleActionPresenter = (response: TraceWildActionResponse) => Promise<void>
 
 export type TraceWildOverlayProps = PropsRuntime<'shell.overlay'> & PropsLocale<'tracewild'>
-
-const BOSS_ACTION_PAUSE_MS = 860
-
-function encounterTimeLabel(t: TraceWildOverlayProps['t'], expiresAt: number, now: number): string {
-  if (!Number.isFinite(expiresAt) || !Number.isFinite(now)) return t('encounterResident')
-  const minutes = Math.max(0, Math.ceil((expiresAt - now) / 60_000))
-  if (minutes <= 1) return t('encounterLeavingSoon')
-  if (minutes < 60) return t('encounterLeavesMinutes', { count: minutes })
-  const hours = Math.ceil(minutes / 60)
-  if (hours < 24) return t('encounterLeavesHours', { count: hours })
-  return t('encounterLeavesDays', { count: Math.ceil(hours / 24) })
-}
 
 function coreItemName(t: TraceWildOverlayProps['t'], quality: CaptureCoreQuality): string {
   return t('captureCoreItem', { quality: t(CORE_KEYS[quality]) })
@@ -147,7 +155,7 @@ function acquiredItemsBetween(
   const previousCreatures = new Set(previous.creatures.map(creature => creature.instanceId))
   for (const creature of current.creatures) {
     if (!previousCreatures.has(creature.instanceId)) {
-      items.push({ kind: 'creature', creatureId: creature.creatureId, quality: creature.quality, quantity: 1 })
+      items.push({ kind: 'creature', creatureId: creature.creatureId, quality: creature.quality, quantity: 1, captured: creature })
     }
   }
   return items
@@ -193,7 +201,7 @@ function RewardItemTile(props: {
         <span className={`${css.bigCore} ${css[`core_${props.item.quality}`]}`} aria-hidden="true" />
       )}
       {props.item.kind === 'material' && <span className={css.materialShard} aria-hidden="true" />}
-      {creature !== undefined && <CreatureSprite creature={creature} size={props.compact ? 'tiny' : 'small'} />}
+      {creature !== undefined && <CreatureSprite creature={creature} captured={props.item.kind === 'creature' ? props.item.captured : undefined} size={props.compact ? 'tiny' : 'small'} />}
       <strong>{name}</strong>
       <b>×{props.item.quantity}</b>
       {!props.compact && (
@@ -302,7 +310,7 @@ function ReleaseCreatureModal(props: {
         onMouseDown={(event) => { event.stopPropagation() }}
       >
         <header>
-          <CreatureSprite creature={props.creature} size="medium" />
+          <CreatureSprite creature={props.creature} captured={props.captured} size="medium" />
           <div>
             <p>RELEASE</p>
             <h2 id="codekin-release-title">{props.t('releaseConfirmTitle')}</h2>
@@ -394,15 +402,23 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string>()
   const [pulse, setPulse] = useState(false)
-  const [windowPosition, setWindowPosition] = useState<WindowPosition>({ x: 0, y: 0 })
+  const [windowPosition, setWindowPosition] = useState<WindowPosition>(() => readUiPreferences().windowPosition ?? { x: 0, y: 0 })
   const [draggingWindow, setDraggingWindow] = useState(false)
-  const [launcherPosition, setLauncherPosition] = useState<WindowPosition>()
+  const [launcherPosition, setLauncherPosition] = useState<WindowPosition | undefined>(() => readUiPreferences().launcherPosition)
   const [draggingLauncher, setDraggingLauncher] = useState(false)
   const [squadDraft, setSquadDraft] = useState<string[]>([])
   const [codekinDetail, setCodekinDetail] = useState<string>()
   const [rewardQueue, setRewardQueue] = useState<AcquiredItem[][]>([])
   const [releaseCandidate, setReleaseCandidate] = useState<string>()
   const [battleTransition, setBattleTransition] = useState<BattleTransition>()
+  const [motionPreference, setMotionPreference] = useState(() => readUiPreferences().reducedMotion)
+  const { reducedMotion, systemReducedMotion } = useReducedMotion(motionPreference)
+  const windowSpring = useSpringAnimation(reducedMotion)
+  const launcherSpring = useSpringAnimation(reducedMotion)
+  const effects = useParticleField(reducedMotion, css.motionParticle!)
+  const [squadEditing, setSquadEditing] = useState(false)
+  const [pendingNavigation, setPendingNavigation] = useState<Tab | 'close'>()
+  const hasOpened = useRef(false)
   const latestSnapshot = useRef<TraceWildSnapshot>()
   const actionInFlight = useRef(false)
   const pendingSnapshot = useRef<TraceWildSnapshot>()
@@ -415,6 +431,22 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   const launcherWasDragged = useRef(false)
   const pulseTimer = useRef<number>()
   const zh = t('title') === '码灵'
+  const rewardVisible = rewardQueue[0] !== undefined && snapshot?.state.starterChosen === true
+    && snapshot.state.battle === undefined && codekinDetail === undefined
+    && releaseCandidate === undefined && pendingNavigation === undefined
+
+  const navigate = useCallback((target: Tab | 'close'): void => {
+    setPendingNavigation(undefined)
+    setSquadEditing(false)
+    if (target === 'close') setOpen(false)
+    else setTab(target)
+  }, [])
+  const requestNavigation = useCallback((target: Tab | 'close'): void => {
+    if (target === tab) return
+    if (squadEditing && squadDraft.join('|') !== latestSnapshot.current?.state.squad.join('|')) {
+      setPendingNavigation(target)
+    } else navigate(target)
+  }, [navigate, squadDraft, squadEditing, tab])
 
   const adoptSnapshot = useCallback((value: TraceWildSnapshot, allowClockRefresh = false): void => {
     const previous = latestSnapshot.current
@@ -443,6 +475,20 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
     setSnapshot(value)
   }, [])
 
+  const receiveSnapshot = useCallback((value: TraceWildSnapshot, allowClockRefresh = false): void => {
+    if (!actionInFlight.current) { adoptSnapshot(value, allowClockRefresh); return }
+    // Both refreshes and subscriptions can see the committed turn before its
+    // presentation finishes. Keep the newest snapshot behind that presentation.
+    const pending = pendingSnapshot.current
+    if (pending !== undefined) {
+      const sameProfile = value.state.createdAt === pending.state.createdAt
+      if (sameProfile && (value.state.revision < pending.state.revision
+        || value.state.revision === pending.state.revision && value.serverTime <= pending.serverTime)) return
+      if (!sameProfile && value.serverTime < pending.serverTime) return
+    }
+    pendingSnapshot.current = value
+  }, [adoptSnapshot])
+
   const refresh = useCallback(async (signal?: AbortSignal) => {
     try {
       const [content, value] = await Promise.all([
@@ -450,12 +496,12 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
         connection.load(signal),
       ])
       activateCodekinContent(content)
-      adoptSnapshot(value, true)
+      receiveSnapshot(value, true)
       setOnline(true)
     } catch {
       if (signal?.aborted !== true) setOnline(false)
     }
-  }, [adoptSnapshot, connection])
+  }, [receiveSnapshot, connection])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -466,14 +512,10 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   useEffect(() => {
     if (snapshot?.state.enabled !== true) return
     const unsubscribe = connection.subscribe((value) => {
-      if (actionInFlight.current) {
-        pendingSnapshot.current = value
-        return
-      }
-      adoptSnapshot(value)
+      receiveSnapshot(value)
     }, setOnline)
     return unsubscribe
-  }, [adoptSnapshot, connection, snapshot?.state.enabled])
+  }, [receiveSnapshot, connection, snapshot?.state.enabled])
 
   useEffect(() => {
     const onSettingsChanged = (): void => { void refresh() }
@@ -485,8 +527,8 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   }, [])
 
   useEffect(() => {
-    if (snapshot !== undefined) setSquadDraft([...snapshot.state.squad])
-  }, [snapshot?.state.revision])
+    if (snapshot !== undefined && !squadEditing) setSquadDraft([...snapshot.state.squad])
+  }, [snapshot?.state.revision, squadEditing])
 
   useEffect(() => {
     if (codekinDetail === undefined) return
@@ -504,7 +546,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
 
   useEffect(() => {
     if (notice === undefined) return
-    const timer = window.setTimeout(() => { setNotice(undefined) }, 2_800)
+    const timer = window.setTimeout(() => { setNotice(undefined) }, 4_500)
     return () => { window.clearTimeout(timer) }
   }, [notice])
 
@@ -540,15 +582,36 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   useEffect(() => {
     if (!open) return
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return
-      if (rewardQueue.length > 0) setRewardQueue(queue => queue.slice(1))
+      if (event.key !== 'Escape' || event.defaultPrevented || busy
+        || (event.target instanceof Element && event.target.closest('[role="dialog"]') !== null)) return
+      if (rewardVisible) setRewardQueue(queue => queue.slice(1))
       else if (releaseCandidate !== undefined) setReleaseCandidate(undefined)
       else if (codekinDetail !== undefined) setCodekinDetail(undefined)
-      else if (snapshot?.state.battle === undefined) setOpen(false)
+      else if (snapshot?.state.battle === undefined) requestNavigation('close')
     }
     window.addEventListener('keydown', onKey)
     return () => { window.removeEventListener('keydown', onKey) }
-  }, [codekinDetail, open, releaseCandidate, rewardQueue.length, snapshot?.state.battle])
+  }, [busy, codekinDetail, open, releaseCandidate, requestNavigation, rewardVisible, snapshot?.state.battle])
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const rect = overlayElement.current?.getBoundingClientRect()
+      if (open && rect !== undefined) {
+        setWindowPosition(value => clampWindowPosition(value.x, value.y, rect.width, rect.height))
+        // A child dialog owns initial focus when present.
+        if (overlayElement.current?.querySelector('[role="dialog"]') === null) {
+          overlayElement.current.querySelector<HTMLButtonElement>('nav button[aria-current="page"]')?.focus()
+        }
+        hasOpened.current = true
+      } else if (!open) {
+        const launcherRect = launcherElement.current?.getBoundingClientRect()
+        if (launcherRect !== undefined) setLauncherPosition(value => value === undefined ? undefined
+          : clampFloatingPosition(value.x, value.y, launcherRect.width, launcherRect.height))
+        if (hasOpened.current) launcherElement.current?.focus()
+      }
+    })
+    return () => { cancelAnimationFrame(frame) }
+  }, [open])
 
   useEffect(() => {
     const clampCurrentPosition = (): void => {
@@ -571,24 +634,27 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
     if (event.button !== 0 || (event.target as HTMLElement).closest('button') !== null) return
     const rect = overlayElement.current?.getBoundingClientRect()
     if (rect === undefined) return
+    windowSpring.stop()
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
     windowDrag.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      x: windowPosition.x,
-      y: windowPosition.y,
+      x: pendingWindowPosition.current?.x ?? windowPosition.x,
+      y: pendingWindowPosition.current?.y ?? windowPosition.y,
       width: rect.width,
       height: rect.height,
+      velocity: { x: 0, y: 0 }, lastX: event.clientX, lastY: event.clientY, lastTime: performance.now(),
     }
-    pendingWindowPosition.current = windowPosition
+    pendingWindowPosition.current = { x: windowDrag.current.x, y: windowDrag.current.y }
     setDraggingWindow(true)
   }
 
   const moveWindowDrag = (event: ReactPointerEvent<HTMLElement>): void => {
     const drag = windowDrag.current
     if (drag === undefined || drag.pointerId !== event.pointerId) return
+    sampleDrag(drag, event)
     event.preventDefault()
     const next = clampWindowPosition(
       drag.x + event.clientX - drag.startX,
@@ -603,16 +669,31 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
 
   const finishWindowDrag = (event: ReactPointerEvent<HTMLElement>): void => {
     if (windowDrag.current?.pointerId !== event.pointerId) return
+    const drag = windowDrag.current
     windowDrag.current = undefined
     const next = pendingWindowPosition.current
-    pendingWindowPosition.current = undefined
-    if (next !== undefined) setWindowPosition(next)
+    if (next !== undefined) {
+      const velocity = event.type === 'pointercancel' || performance.now() - drag.lastTime > 90 ? { x: 0, y: 0 } : drag.velocity
+      const projected = reducedMotion ? next : projectRelease(next, velocity)
+      const target = clampWindowPosition(projected.x, projected.y, drag.width, drag.height)
+      windowSpring.animate(next, target, velocity, point => {
+        const bounded = clampWindowPosition(point.x, point.y, drag.width, drag.height)
+        pendingWindowPosition.current = bounded
+        overlayElement.current?.style.setProperty('--window-x', `${bounded.x}px`)
+        overlayElement.current?.style.setProperty('--window-y', `${bounded.y}px`)
+      }, point => {
+        pendingWindowPosition.current = undefined
+        setWindowPosition(point)
+        saveUiPreferences({ windowPosition: point })
+      })
+    }
     setDraggingWindow(false)
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
   }
 
   const beginLauncherDrag = (event: ReactPointerEvent<HTMLButtonElement>): void => {
     if (event.button !== 0) return
+    launcherSpring.stop()
     const rect = event.currentTarget.getBoundingClientRect()
     launcherWasDragged.current = false
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -624,6 +705,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
       y: rect.top,
       width: rect.width,
       height: rect.height,
+      velocity: { x: 0, y: 0 }, lastX: event.clientX, lastY: event.clientY, lastTime: performance.now(),
     }
     pendingLauncherPosition.current = { x: rect.left, y: rect.top }
     setDraggingLauncher(true)
@@ -632,6 +714,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   const moveLauncherDrag = (event: ReactPointerEvent<HTMLButtonElement>): void => {
     const drag = launcherDrag.current
     if (drag === undefined || drag.pointerId !== event.pointerId) return
+    sampleDrag(drag, event)
     const deltaX = event.clientX - drag.startX
     const deltaY = event.clientY - drag.startY
     if (Math.hypot(deltaX, deltaY) > 4) launcherWasDragged.current = true
@@ -655,10 +738,22 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
 
   const finishLauncherDrag = (event: ReactPointerEvent<HTMLButtonElement>): void => {
     if (launcherDrag.current?.pointerId !== event.pointerId) return
+    const drag = launcherDrag.current
     launcherDrag.current = undefined
     const next = pendingLauncherPosition.current
     pendingLauncherPosition.current = undefined
-    if (next !== undefined && launcherWasDragged.current) setLauncherPosition(next)
+    if (next !== undefined && launcherWasDragged.current) {
+      const velocity = event.type === 'pointercancel' || performance.now() - drag.lastTime > 90 ? { x: 0, y: 0 } : drag.velocity
+      const projected = projectRelease(next, reducedMotion ? { x: 0, y: 0 } : velocity)
+      const target = clampFloatingPosition(
+        projected.x + drag.width / 2 < window.innerWidth / 2 ? 12 : window.innerWidth - drag.width - 12,
+        projected.y, drag.width, drag.height,
+      )
+      launcherSpring.animate(next, target, velocity, point => {
+        const element = launcherElement.current
+        if (element !== null) { element.style.left = `${point.x}px`; element.style.top = `${point.y}px` }
+      }, point => { setLauncherPosition(point); saveUiPreferences({ launcherPosition: point }) })
+    }
     setDraggingLauncher(false)
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
   }
@@ -684,7 +779,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
       if (transitionKind !== undefined && latestSnapshot.current?.state.battle !== undefined) {
         setBattleTransition({ key: Date.now(), kind: transitionKind })
         await new Promise<void>(resolve => {
-          window.setTimeout(resolve, transitionKind === 'capture-failed' ? 720 : 1_080)
+          window.setTimeout(resolve, transitionKind === 'capture-failed' ? 900 : 1200)
         })
       }
       adoptSnapshot(response)
@@ -695,7 +790,6 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
       if (response.notice === 'battle-lost') setNotice(t('battleLost'))
       if (response.notice === 'wild-defeated') setNotice(t('wildDefeated'))
       if (response.notice === 'tower-cleared') setNotice(t('towerCleared'))
-      if (response.notice === 'skill-cast') setNotice(t('skillReleased'))
       if (response.notice === 'material-used') setNotice(t('materialUsed'))
       if (response.notice === 'idle-claimed') setNotice(t('idleClaimed'))
       if (response.notice === 'creature-released') setNotice(t('released'))
@@ -709,14 +803,14 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
         // the pieces spring back and the action is not consumed. Do not make
         // that feel like a stale Host/plugin error.
         if (action.type !== 'battle-swap') {
-          setNotice(action.type === 'claim-idle-reward'
+          setNotice(action.type === 'set-creature-appearance' ? t('appearanceFailed') : action.type === 'claim-idle-reward'
             ? t('rewardUnavailable')
             : battleAction
               ? t('battleActionUnavailable')
               : t('invalidSwap'))
         }
       } else {
-        setNotice(error instanceof TraceWildConnectionError && error.code === 'conflict'
+        setNotice(action.type === 'set-creature-appearance' ? t('appearanceFailed') : error instanceof TraceWildConnectionError && error.code === 'conflict'
           ? battleAction
             ? t('battleActionUnavailable')
             : t('invalidSwap')
@@ -727,15 +821,18 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
       actionInFlight.current = false
       const pending = pendingSnapshot.current
       pendingSnapshot.current = undefined
-      if (pending !== undefined) adoptSnapshot(pending)
+      if (pending !== undefined) adoptSnapshot(pending, true)
       setBusy(false)
     }
     return undefined
-  }, [adoptSnapshot, busy, connection, refresh, t])
+  }, [adoptSnapshot, busy, connection, reducedMotion, refresh, t])
 
   const state = snapshot?.state
   const uncaught = state?.encounters.length ?? 0
   const pendingIdleReward = state?.idle.pendingReward
+  const modalOpen = state !== undefined && (!state.starterChosen || state.battle !== undefined
+    || rewardVisible || codekinDetail !== undefined || releaseCandidate !== undefined || pendingNavigation !== undefined)
+  const inertBackground = (element: HTMLElement | null): void => { if (element !== null) element.inert = modalOpen }
   const claimIdleReward = (): void => {
     setOpen(true)
     void act({ type: 'claim-idle-reward' })
@@ -746,6 +843,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   const launcher = (
     <button
       ref={launcherElement}
+      data-motion={reducedMotion ? 'reduce' : 'full'}
       type="button"
       className={`${css.launcher} ${pendingIdleReward !== undefined ? css.launcherReward : ''} ${draggingLauncher ? css.launcherDragging : ''} ${pulse ? css.launcherPulse : ''}`}
       style={launcherPosition === undefined ? undefined : { left: launcherPosition.x, top: launcherPosition.y, right: 'auto', bottom: 'auto' }}
@@ -790,18 +888,42 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
   return (
     <section
         ref={overlayElement}
+        data-codekin-ui="reload"
+        data-motion={reducedMotion ? 'reduce' : 'full'}
+        onPointerDownCapture={(event) => {
+          if (event.button === 0 && event.target instanceof Element
+            && event.target.closest('button:not(:disabled):not([role="gridcell"])') !== null) {
+            effects.burst(event.clientX, event.clientY, '#7ef5ff', 5)
+          }
+        }}
         className={`${css.overlay} ${draggingWindow ? css.overlayDragging : ''} ${windowPosition.x > 140 ? css.overlayDockedRight : ''}`}
         style={{ '--window-x': `${windowPosition.x}px`, '--window-y': `${windowPosition.y}px` } as CSSProperties}
         aria-label={t('title')}
       >
-        <button type="button" className={css.windowClose} onClick={() => { setOpen(false) }} title={t('close')} aria-label={t('close')}>
+        <div ref={inertBackground} className={css.windowTools}>
+        {pendingIdleReward !== undefined && (
+          <IdleRewardButton reward={pendingIdleReward} t={t} zh={zh} busy={busy} claim={claimIdleReward} />
+        )}
+        <button type="button" className={css.motionToggle} aria-pressed={reducedMotion}
+          title={t(systemReducedMotion && motionPreference === undefined ? 'systemMotion' : 'reduceMotion')} aria-label={t('reduceMotion')}
+          onClick={() => { setMotionPreference(!reducedMotion); saveUiPreferences({ reducedMotion: !reducedMotion }) }}>
+          <span aria-hidden="true">{reducedMotion ? '◉' : '≈'}</span>
+        </button>
+        <button type="button" className={css.windowReset} title={t('resetWindow')} aria-label={t('resetWindow')}
+          onClick={() => { windowSpring.stop(); pendingWindowPosition.current = undefined; setWindowPosition({ x: 0, y: 0 }); saveUiPreferences({ windowPosition: { x: 0, y: 0 } }) }}>↙</button>
+        <button type="button" className={css.windowClose} onClick={() => { requestNavigation('close') }} title={t('close')} aria-label={t('close')}>
           <span aria-hidden="true">×</span>
         </button>
+        </div>
         <header
+          ref={inertBackground}
           className={css.header}
           title={t('dragWindow')}
           onDoubleClick={(event) => {
-            if ((event.target as HTMLElement).closest('button') === null) setWindowPosition({ x: 0, y: 0 })
+            if ((event.target as HTMLElement).closest('button') === null) {
+              windowSpring.stop(); pendingWindowPosition.current = undefined
+              setWindowPosition({ x: 0, y: 0 }); saveUiPreferences({ windowPosition: { x: 0, y: 0 } })
+            }
           }}
           onPointerDown={beginWindowDrag}
           onPointerMove={moveWindowDrag}
@@ -811,15 +933,12 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
           <div className={css.brand}>
             <span className={css.logoCore} aria-hidden="true" />
             <div>
-              <h1>{t('title')}</h1>
-              <p>{t('subtitle')}</p>
+              <h1><strong>CODEKIN</strong>{zh && <span>{t('title')}</span>}</h1>
+              <p>YOUR SIGNAL. YOUR WORLD.</p>
             </div>
           </div>
           <span className={css.dragHandle} aria-hidden="true"><i /><i /><i /><i /><i /></span>
           <div className={css.headerStats}>
-            {pendingIdleReward !== undefined && (
-              <IdleRewardButton reward={pendingIdleReward} t={t} zh={zh} busy={busy} claim={claimIdleReward} />
-            )}
             {CAPTURE_CORE_QUALITIES.map(quality => (
               <span
                 key={quality}
@@ -834,29 +953,42 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
         </header>
 
         {state === undefined
-          ? <div className={css.centerMessage}>{online ? t('loading') : t('disconnected')}</div>
+          ? <div className={css.centerMessage}><span className={css.loadingMark} aria-hidden="true">◌</span><p>{online ? t('loading') : t('disconnected')}</p>{!online && <button type="button" onClick={() => { void refresh() }}>{t('retry')}</button>}</div>
           : (
             <>
               {!state.starterChosen && (
                 <StarterSelection t={t} zh={zh} busy={busy} choose={creatureId => act({ type: 'choose-starter', creatureId })} />
               )}
-              <nav className={css.tabs} aria-label={t('title')}>
-                {(['map', 'tower', 'squad', 'dex', 'inventory'] as const).map(id => (
+              <nav ref={inertBackground} className={css.tabs} aria-label={t('title')}>
+                {(['map', 'tower', 'squad', 'dex', 'inventory'] as const).map((id, index) => (
                   <button
                     key={id}
                     type="button"
                     data-tab={id}
+                    aria-current={tab === id ? 'page' : undefined}
+                    aria-controls="codekin-page"
+                    tabIndex={tab === id ? 0 : -1}
                     className={tab === id ? css.tabActive : ''}
-                    onClick={() => { setTab(id) }}
+                    onClick={() => { requestNavigation(id) }}
+                    onKeyDown={event => {
+                      const tabs = ['map', 'tower', 'squad', 'dex', 'inventory'] as const
+                      const next = event.key === 'ArrowRight' ? (index + 1) % 5
+                        : event.key === 'ArrowLeft' ? (index + 4) % 5 : event.key === 'Home' ? 0 : event.key === 'End' ? 4 : -1
+                      if (next < 0) return
+                      event.preventDefault()
+                      requestNavigation(tabs[next]!)
+                      event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`[data-tab="${tabs[next]}"]`)?.focus()
+                    }}
                   >
-                    <span aria-hidden="true">{TAB_ICONS[id]}</span>
+                    <span aria-hidden="true">0{index + 1}<i>{TAB_ICONS[id]}</i></span>
                     <small>{id === 'tower' ? t('towerTitle') : t(id)}</small>
                   </button>
                 ))}
               </nav>
-              <main className={css.content}>
+              <main ref={inertBackground} key={tab} id="codekin-page" data-page={tab} className={css.content}>
+                {!online && <div className={css.connectionBanner} role="status"><span>{t('disconnected')}</span><button type="button" onClick={() => { void refresh() }}>{t('retry')}</button></div>}
                 {tab === 'map' && (
-                  <MapView
+                  <CodekinMapView
                     state={state}
                     serverTime={snapshot?.serverTime ?? state.updatedAt}
                     t={t}
@@ -884,6 +1016,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
                     busy={busy}
                     save={async () => (await act({ type: 'set-squad', instanceIds: squadDraft })) !== undefined}
                     inspect={setCodekinDetail}
+                    onEditingChange={setSquadEditing}
                   />
                 )}
                 {tab === 'dex' && <DexView state={state} t={t} zh={zh} />}
@@ -895,7 +1028,7 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
                   />
                 )}
               </main>
-              <footer className={css.footer}>{t('privacy')}</footer>
+              <footer ref={inertBackground} className={css.footer}><span>LOCAL / PRIVATE</span><small>{t('privacy')}</small></footer>
               {state.battle !== undefined && (
                 <BattleView
                   state={state}
@@ -904,10 +1037,15 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
                   busy={busy}
                   act={act}
                   transition={battleTransition}
+                  reducedMotion={reducedMotion}
+                  minimize={() => { navigate('close') }}
                 />
               )}
-              {notice !== undefined && <div className={css.toast} role="status">{notice}</div>}
-              {rewardQueue[0] !== undefined && (
+              {notice !== undefined && <div className={css.toast} role="status"><span>{notice}</span><button type="button" aria-label={t('dismissNotice')} onClick={() => { setNotice(undefined) }}>×</button></div>}
+              {pendingNavigation !== undefined && <UnsavedSquadModal t={t} busy={busy}
+                stay={() => { setPendingNavigation(undefined) }} discard={() => { navigate(pendingNavigation) }}
+                save={() => { void act({ type: 'set-squad', instanceIds: squadDraft }).then(response => { if (response !== undefined) navigate(pendingNavigation) }) }} />}
+              {rewardVisible && rewardQueue[0] !== undefined && (
                 <AcquiredItemsModal
                   items={rewardQueue[0]}
                   t={t}
@@ -921,12 +1059,14 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
                 if (captured === undefined || creature === undefined) return null
                 return (
                   <CodekinDetailModal
+                    key={captured.instanceId}
                     captured={captured}
                     creature={creature}
                     state={state}
                     t={t}
                     zh={zh}
                     busy={busy}
+                    reducedMotion={reducedMotion}
                     act={act}
                     dismiss={() => { setCodekinDetail(undefined) }}
                     release={() => {
@@ -958,8 +1098,23 @@ export function TraceWildOverlay({ t }: TraceWildOverlayProps) {
               })()}
             </>
           )}
+        <div ref={effects.layer} className={css.particleLayer} aria-hidden="true" />
       </section>
   )
+}
+
+function UnsavedSquadModal(props: { t: TraceWildOverlayProps['t']; busy: boolean; stay: () => void; discard: () => void; save: () => void }) {
+  const dialog = useDialogAccessibility(props.stay, props.busy)
+  return <div className={css.modalBackdrop}>
+    <section ref={dialog.dialogRef} className={css.confirmPanel} role="dialog" aria-modal="true"
+      aria-labelledby="codekin-unsaved-title" tabIndex={-1} onKeyDown={dialog.onDialogKeyDown}>
+      <span className={css.sectionKicker}>SQUAD / UNSAVED</span>
+      <h2 id="codekin-unsaved-title">{props.t('unsavedSquad')}</h2><p>{props.t('unsavedSquadHint')}</p>
+      <button type="button" data-dialog-initial-focus disabled={props.busy} onClick={props.stay}>{props.t('keepEditing')}</button>
+      <button type="button" disabled={props.busy} onClick={props.save}>{props.t('saveAndLeave')}</button>
+      <button type="button" className={css.discardButton} disabled={props.busy} onClick={props.discard}>{props.t('discardAndLeave')}</button>
+    </section>
+  </div>
 }
 
 function StarterSelection(props: {
@@ -1001,83 +1156,6 @@ function StarterSelection(props: {
   )
 }
 
-function MapView(props: {
-  state: TraceWildSnapshot['state']
-  serverTime: number
-  t: TraceWildOverlayProps['t']
-  zh: boolean
-  busy: boolean
-  start: (encounterId: string) => void
-}) {
-  const [clock, setClock] = useState(props.serverTime)
-  useEffect(() => {
-    const startedAt = Date.now()
-    setClock(props.serverTime)
-    const timer = window.setInterval(() => {
-      setClock(props.serverTime + Math.max(0, Date.now() - startedAt))
-    }, 30_000)
-    return () => { window.clearInterval(timer) }
-  }, [props.serverTime])
-
-  return (
-    <div className={css.mapFrame}>
-      <header className={css.mapIntro}>
-        <div>
-          <span>{props.t('mapKicker')}</span>
-          <h2>{props.t('map')}</h2>
-          <p>{props.t('mapSignalCount', { count: props.state.encounters.length, max: MAX_MAP_ENCOUNTERS })}</p>
-        </div>
-        <div className={css.mapRadar} aria-hidden="true"><i /><i /><i /><b /></div>
-      </header>
-      <div className={css.worldMap}>
-        <div className={css.mapAtmosphere} aria-hidden="true"><i /><i /><i /><i /><i /></div>
-        <div className={css.mapRoutes} aria-hidden="true"><i /><i /><i /><i /></div>
-        {(Object.keys(ECOLOGY_KEYS) as TraceEcology[]).map(ecology => (
-          <div key={ecology} className={`${css.regionLabel} ${css[`region_${ecology}`]}`}>
-            {props.t(ECOLOGY_KEYS[ecology])}
-          </div>
-        ))}
-        {props.state.encounters.map((encounter) => {
-          const creature = creatureById(encounter.creatureId)
-          if (creature === undefined) return null
-          const special = encounter.enhanced
-            || creature.rarity === 'rare'
-            || creature.rarity === 'apex'
-            || encounter.quality === 'nova'
-            || encounter.quality === 'origin'
-          const remaining = encounterTimeLabel(props.t, encounter.expiresAt, clock)
-          return (
-            <button
-              key={encounter.id}
-              type="button"
-              className={`${css.encounter} ${encounter.enhanced ? css.encounterEnhanced : ''}`}
-              style={{ left: `${encounter.mapX}%`, top: `${encounter.mapY}%` }}
-              data-special={special ? 'true' : undefined}
-              disabled={props.busy || !props.state.starterChosen}
-              onClick={() => { props.start(encounter.id) }}
-              title={`${creatureName(creature, props.zh)} · Lv.${encounter.level} · ${props.t(CORE_KEYS[encounter.quality])} · ${remaining}`}
-            >
-              <i className={css.encounterPulse} aria-hidden="true" />
-              <span className={`${css.encounterAvatar} ${special ? css.encounterSpecial : ''} ${special ? css[`encounterRing_${encounter.quality}`] : ''}`}>
-                <CreatureSprite creature={creature} size="small" />
-              </span>
-              <span className={css.encounterName}>{creatureName(creature, props.zh)}</span>
-              <small className={css.encounterMeta}>Lv.{encounter.level} · {remaining}</small>
-              {encounter.enhanced && <b>{props.t('enhanced')}</b>}
-            </button>
-          )
-        })}
-        {props.state.encounters.length === 0 && <div className={css.mapEmpty}>{props.t('mapEmpty')}</div>}
-      </div>
-      <div className={css.mapLegend}>
-        {(Object.keys(ECOLOGY_KEYS) as TraceEcology[]).map(ecology => (
-          <span key={ecology} data-ecology={ecology}>{props.t(ECOLOGY_KEYS[ecology])}</span>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 function TowerView(props: {
   state: TraceWildSnapshot['state']
   t: TraceWildOverlayProps['t']
@@ -1109,7 +1187,7 @@ function TowerView(props: {
         </div>
         <div className={css.towerBossCard}>
           <span>{props.t('towerCurrentTarget')}</span>
-          <CreatureSprite creature={towerBoss} size="large" eager />
+          <CreatureSprite creature={towerBoss} level={tower.level} size="large" eager />
           <div>
             <strong>{creatureName(towerBoss, props.zh)}</strong>
             <small>Lv.{tower.level} · {props.t(CORE_KEYS[tower.quality])}</small>
@@ -1275,16 +1353,6 @@ const SPECIAL_KEYS = {
   row: 'specialRow', column: 'specialColumn', burst: 'specialBurst', origin: 'specialOrigin',
 } as const
 
-const INTENT_KEYS: Record<EnemyIntent, TraceWildLocaleKey> = {
-  strike: 'intentStrike', guard: 'intentGuard', disrupt: 'intentDisrupt',
-  corrupt: 'intentCorrupt', mark: 'intentMark', lock: 'intentLock', freeze: 'intentFreeze',
-}
-
-const INTENT_DETAIL_KEYS: Record<EnemyIntent, TraceWildLocaleKey> = {
-  strike: 'intentDetailStrike', guard: 'intentDetailGuard', disrupt: 'intentDetailDisrupt',
-  corrupt: 'intentDetailCorrupt', mark: 'intentDetailMark', lock: 'intentDetailLock', freeze: 'intentDetailFreeze',
-}
-
 const SIGNAL_EFFECT_KEYS: Record<MatchSignalEffect['kind'], TraceWildLocaleKey> = {
   repair: 'signalRepair', guard: 'signalGuard', sync: 'signalSync',
   overclock: 'signalOverclock', breach: 'signalBreach',
@@ -1325,6 +1393,7 @@ interface TileGesture {
 interface SwapMotion {
   from: number
   to: number
+  returning?: boolean
 }
 
 interface DamageReadout {
@@ -1369,27 +1438,6 @@ function swipeTarget(index: number, deltaX: number, deltaY: number): number | un
   return undefined
 }
 
-function swapMotionClass(index: number, motion: SwapMotion | undefined): string {
-  if (motion === undefined || (index !== motion.from && index !== motion.to)) return ''
-  const delta = motion.to - motion.from
-  if (index === motion.from) {
-    return delta === 1
-      ? css.tileSwapRight ?? ''
-      : delta === -1
-        ? css.tileSwapLeft ?? ''
-        : delta === MATCH_BOARD_SIZE
-          ? css.tileSwapDown ?? ''
-          : css.tileSwapUp ?? ''
-  }
-  return delta === 1
-    ? css.tileSwapLeft ?? ''
-    : delta === -1
-      ? css.tileSwapRight ?? ''
-    : delta === MATCH_BOARD_SIZE
-        ? css.tileSwapUp ?? ''
-        : css.tileSwapDown ?? ''
-}
-
 function BattleView(props: {
   state: TraceWildSnapshot['state']
   t: TraceWildOverlayProps['t']
@@ -1397,10 +1445,16 @@ function BattleView(props: {
   busy: boolean
   act: (action: TraceWildAction, present?: BattleActionPresenter) => Promise<TraceWildActionResponse | undefined>
   transition?: BattleTransition | undefined
+  reducedMotion: boolean
+  minimize: () => void
 }) {
   const battle = props.state.battle!
   const dialog = useDialogAccessibility()
   const [selectedTile, setSelectedTile] = useState<number>()
+  const [focusedTile, setFocusedTile] = useState(0)
+  const boardElement = useRef<HTMLDivElement>(null)
+  const boardHadFocus = useRef(false)
+  const battleEffects = useParticleField(props.reducedMotion, css.motionParticle!)
   const [gesture, setGesture] = useState<TileGesture>()
   const [swapMotion, setSwapMotion] = useState<SwapMotion>()
   const [animating, setAnimating] = useState(false)
@@ -1414,6 +1468,10 @@ function BattleView(props: {
   const [captureIntro, setCaptureIntro] = useState(false)
   const [partyHitKey, setPartyHitKey] = useState(0)
   const [attackPresentation, setAttackPresentation] = useState<AttackPresentation>()
+  const [protocol, setProtocol] = useState<{ creature: CreatureDefinition; name: string; captured: CreatureLook }>()
+  const mounted = useRef(true)
+  const [handoff, setHandoff] = useState(false)
+  const [pageVisible, setPageVisible] = useState(() => !document.hidden)
   const [displayedWildHp, setDisplayedWildHp] = useState(battle.wildHp)
   const [displayedPartyHp, setDisplayedPartyHp] = useState(battle.partyHp)
   const [displayedWildShield, setDisplayedWildShield] = useState(battle.wildShield)
@@ -1426,7 +1484,6 @@ function BattleView(props: {
   const draggedTileElement = useRef<HTMLButtonElement>()
   const bossActionInFlight = useRef(false)
   const bossActionTimer = useRef<number>()
-  const swapTimer = useRef<number>()
   const motionTimers = useRef(new Map<number, () => void>())
   const animationEpoch = useRef(0)
   const suppressClick = useRef(false)
@@ -1438,8 +1495,13 @@ function BattleView(props: {
   const wild = creatureById(battle.wildCreatureId)
   const active = battle.party[battle.activeIndex]
   const activeDefinition = active === undefined ? undefined : creatureById(active.creatureId)
-  const locked = props.busy || animating
+  const locked = props.busy || animating || handoff
   const boardLocked = locked || battle.turnOwner === 'boss' || battle.captureWindow || battle.actionsRemaining <= 0
+  const keyboardTile = (visualBoard[focusedTile]?.lockedActions ?? 0) > 0
+    ? visualBoard.findIndex(tile => (tile.lockedActions ?? 0) === 0) : focusedTile
+  useEffect(() => {
+    if (!boardLocked && boardHadFocus.current) boardElement.current?.querySelector<HTMLButtonElement>(`[data-cell="${keyboardTile}"]`)?.focus({ preventScroll: true })
+  }, [boardLocked, keyboardTile])
   const showWildHp = useCallback((value: number): void => {
     displayedWildHpRef.current = value
     setDisplayedWildHp(value)
@@ -1495,6 +1557,7 @@ function BattleView(props: {
 
   useEffect(() => {
     animationEpoch.current += 1
+    setAnimating(false)
     setSwapMotion(undefined)
     setClearingTiles(undefined)
     setFallRows(undefined)
@@ -1503,6 +1566,7 @@ function BattleView(props: {
     setRecoveryReadout(undefined)
     setVisualBoard(battle.board.map(tile => ({ ...tile })))
     setAttackPresentation(undefined)
+    setProtocol(undefined)
     showWildHp(battle.wildHp)
     showPartyHp(battle.partyHp)
     showWildShield(battle.wildShield)
@@ -1525,32 +1589,42 @@ function BattleView(props: {
       setDamageReadout(undefined)
       return
     }
-    const wildDamage = previous.wildHp - battle.wildHp
-    if (wildDamage > 0) {
-      setDamageReadout({ key: Date.now(), actor: 'player', total: battle.lastTeamDamageApplied || wildDamage, settled: true })
-    } else if (!animating && battle.pendingTeamDamage > 0) {
-      setDamageReadout(current => ({
-        key: current?.key ?? Date.now(),
-        actor: 'player',
-        total: battle.pendingTeamDamage,
-        settled: false,
-      }))
-    }
     if (previous.partyHp > battle.partyHp) setPartyHitKey(value => value + 1)
     previousBattle.current = { id: battle.id, wildHp: battle.wildHp, partyHp: battle.partyHp }
-  }, [animating, battle.id, battle.lastTeamDamageApplied, battle.pendingTeamDamage, battle.wildHp, battle.partyHp])
+    if (animating || props.busy) return
+    const actor = battle.turnOwner === 'boss' ? 'boss' : 'player'
+    const total = actor === 'boss' ? battle.pendingBossDamage : battle.pendingTeamDamage
+    setDamageReadout(current => total > 0
+      ? { key: current?.actor === actor ? current.key : Date.now(), actor, total, settled: false }
+      : undefined)
+  }, [animating, props.busy, battle.id, battle.turnOwner, battle.pendingTeamDamage, battle.pendingBossDamage, battle.wildHp, battle.partyHp])
 
-  useEffect(() => () => {
-    animationEpoch.current += 1
-    if (bossActionTimer.current !== undefined) window.clearTimeout(bossActionTimer.current)
-    if (swapTimer.current !== undefined) window.clearTimeout(swapTimer.current)
-    if (suppressClickTimer.current !== undefined) window.clearTimeout(suppressClickTimer.current)
-    if (captureIntroTimer.current !== undefined) window.clearTimeout(captureIntroTimer.current)
-    for (const [timer, resolve] of motionTimers.current) {
-      window.clearTimeout(timer)
-      resolve()
+  useEffect(() => {
+    const update = (): void => { setPageVisible(!document.hidden) }
+    document.addEventListener('visibilitychange', update)
+    return () => { document.removeEventListener('visibilitychange', update) }
+  }, [])
+
+  useEffect(() => {
+    setHandoff(true)
+    const timer = window.setTimeout(() => { setHandoff(false) }, BATTLE_MOTION.handoff)
+    return () => { window.clearTimeout(timer) }
+  }, [battle.activeIndex, battle.turnOwner])
+
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      animationEpoch.current += 1
+      if (bossActionTimer.current !== undefined) window.clearTimeout(bossActionTimer.current)
+      if (suppressClickTimer.current !== undefined) window.clearTimeout(suppressClickTimer.current)
+      if (captureIntroTimer.current !== undefined) window.clearTimeout(captureIntroTimer.current)
+      for (const [timer, resolve] of motionTimers.current) {
+        window.clearTimeout(timer)
+        resolve()
+      }
+      motionTimers.current.clear()
     }
-    motionTimers.current.clear()
   }, [])
 
   const suppressNextClick = (duration: number): void => {
@@ -1573,10 +1647,10 @@ function BattleView(props: {
   const playCascade = async (
     animation: NonNullable<TraceWildActionResponse['animation']>,
     finalBattle: TraceWildSnapshot['state']['battle'],
+    epoch: number,
   ): Promise<void> => {
     if (animation.battleId !== battle.id) return
-    const epoch = ++animationEpoch.current
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const reducedMotion = props.reducedMotion
     setSignalReadout(undefined)
     setRecoveryReadout(undefined)
     for (const frame of animation.frames) {
@@ -1604,18 +1678,21 @@ function BattleView(props: {
       setVisualBoard(frame.before.map(tile => ({ ...tile })))
       setClearingTiles(new Set(frame.removed))
       setActiveChain(frame.chain)
-      await pause(reducedMotion ? 20 : animation.actor === 'boss' ? 230 : 190)
+      const colors: Record<TraceEcology, string> = { lumen: '#ffdc69', forge: '#ff897f', relay: '#72dcff', aegis: '#6cf0c1', glitch: '#d7a1ff' }
+      for (const index of frame.removed.slice(0, 12)) {
+        const rect = boardElement.current?.querySelector(`[data-cell="${index}"]`)?.getBoundingClientRect()
+        if (rect !== undefined) battleEffects.burst(rect.left + rect.width / 2, rect.top + rect.height / 2, colors[frame.before[index]!.ecology], 4)
+      }
+      await pause(reducedMotion ? 220 : BATTLE_MOTION.clear + 40)
       if (animationEpoch.current !== epoch) return
       setClearingTiles(undefined)
       setVisualBoard(frame.after.map(tile => ({ ...tile })))
       setFallRows(frame.fallRows)
-      const longestFall = Math.max(...frame.fallRows)
-      await pause(reducedMotion ? 20 : animation.actor === 'boss'
-        ? Math.min(600, 310 + longestFall * 38)
-        : Math.min(540, 270 + longestFall * 34))
+      const fallDuration = cascadeFallTime(frame.fallRows, MATCH_BOARD_SIZE)
+      await pause(reducedMotion ? 240 : fallDuration + 40)
       if (animationEpoch.current !== epoch) return
       setFallRows(undefined)
-      await pause(reducedMotion ? 0 : animation.actor === 'boss' ? 70 : 45)
+      await pause(BATTLE_MOTION.chainPause)
     }
     if (animationEpoch.current !== epoch) return
     setActiveChain(undefined)
@@ -1633,36 +1710,26 @@ function BattleView(props: {
       return
     }
     if (finalBattle === undefined) return
-    if (animation.actor !== 'boss') {
-      const total = finalBattle.pendingTeamDamage > 0
-        ? finalBattle.pendingTeamDamage
-        : finalBattle.lastTeamDamageApplied
-      setDamageReadout(total > 0
-        ? { key: Date.now(), actor: 'player', total, settled: finalBattle.pendingTeamDamage === 0 }
-        : undefined)
-    } else {
-      const total = finalBattle.turnOwner === 'boss'
-        ? finalBattle.pendingBossDamage
-        : finalBattle.lastBossAttack
-      setDamageReadout({
-        key: Date.now(),
-        actor: 'boss',
-        total,
-        settled: finalBattle.turnOwner !== 'boss',
-      })
-    }
+    const actor = finalBattle.turnOwner === 'boss' ? 'boss' : 'player'
+    const total = actor === 'boss' ? finalBattle.pendingBossDamage : finalBattle.pendingTeamDamage
+    setDamageReadout(total > 0 ? { key: Date.now(), actor, total, settled: false } : undefined)
   }
 
   const playStrike = async (
     strike: TraceWildBattleStrike,
     finalBattle: TraceWildSnapshot['state']['battle'],
+    epoch: number,
   ): Promise<void> => {
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const reducedMotion = props.reducedMotion
     const key = Date.now()
     setAttackPresentation({ ...strike, key, phase: 'flight' })
     setDamageReadout({ key, actor: strike.actor, total: strike.damage, settled: false })
-    await pause(reducedMotion ? 40 : 540)
+    await pause(reducedMotion ? 500 : BATTLE_MOTION.flight + 40)
+    if (animationEpoch.current !== epoch) return
     setAttackPresentation({ ...strike, key, phase: 'impact' })
+    const targetRect = dialog.dialogRef.current?.querySelector(`[data-strike-target="${strike.actor === 'player' ? 'boss' : 'player'}"]`)?.getBoundingClientRect()
+    if (targetRect !== undefined) battleEffects.burst(targetRect.left + targetRect.width / 2,
+      targetRect.top + targetRect.height / 2, strike.actor === 'player' ? '#7ef5ff' : '#ff7c92', 22)
     if (strike.actor === 'player') {
       showWildHp(strike.targetHpAfter)
       showWildShield(finalBattle?.wildShield ?? 0)
@@ -1675,12 +1742,14 @@ function BattleView(props: {
       ? { ...previousBattle.current, wildHp: strike.targetHpAfter }
       : { ...previousBattle.current, partyHp: strike.targetHpAfter }
     setDamageReadout({ key: key + 1, actor: strike.actor, total: strike.damage, settled: true })
-    await pause(reducedMotion ? 40 : 340)
+    await pause(BATTLE_MOTION.impact + 40)
+    if (animationEpoch.current !== epoch) return
     setAttackPresentation(undefined)
+    setDamageReadout(undefined)
   }
 
-  const playRecovery = async (recovery: TraceWildBattleRecovery): Promise<void> => {
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const playRecovery = async (recovery: TraceWildBattleRecovery, epoch: number): Promise<void> => {
+    const reducedMotion = props.reducedMotion
     const key = Date.now()
     if (recovery.actor === 'player') {
       showPartyHp(recovery.targetHpBefore)
@@ -1698,7 +1767,8 @@ function BattleView(props: {
       shieldTo: recovery.targetShieldAfter,
       settling: false,
     })
-    await pause(reducedMotion ? 30 : 360)
+    await pause(reducedMotion ? 300 : 400)
+    if (animationEpoch.current !== epoch) return
     setRecoveryReadout(value => value?.key === key ? { ...value, settling: true } : value)
     if (recovery.actor === 'player') {
       showPartyHp(recovery.targetHpAfter)
@@ -1707,29 +1777,34 @@ function BattleView(props: {
       showWildHp(recovery.targetHpAfter)
       showWildShield(recovery.targetShieldAfter)
     }
-    await pause(reducedMotion ? 30 : 620)
+    await pause(650)
+    if (animationEpoch.current !== epoch) return
     setRecoveryReadout(value => value?.key === key ? undefined : value)
   }
 
   const presentBattleResponse: BattleActionPresenter = async response => {
     const animation = response.animation
-    if (animation === undefined || animation.battleId !== battle.id) return
+    if (!mounted.current || animation === undefined || animation.battleId !== battle.id) return
+    const epoch = ++animationEpoch.current
     const finalBattle = response.state.battle?.id === battle.id ? response.state.battle : undefined
     const motion = animation.swap
     if (motion !== undefined && animation.actor === 'boss') {
       setSwapMotion(motion)
-      await pause(window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 20 : 220)
+      await pause(props.reducedMotion ? 220 : BATTLE_MOTION.swap + 30)
+      if (animationEpoch.current !== epoch) return
       setSwapMotion(undefined)
     } else {
       setSwapMotion(undefined)
     }
-    await playCascade(animation, finalBattle)
-    if (animation.recovery !== undefined) await playRecovery(animation.recovery)
-    if (animation.strike !== undefined) await playStrike(animation.strike, finalBattle)
+    await playCascade(animation, finalBattle, epoch)
+    if (animationEpoch.current !== epoch) return
+    if (animation.recovery !== undefined) await playRecovery(animation.recovery, epoch)
+    if (animationEpoch.current !== epoch) return
+    if (animation.strike !== undefined) await playStrike(animation.strike, finalBattle, epoch)
   }
 
   const runBossAction = (): void => {
-    if (battle.turnOwner !== 'boss' || props.busy || animating || bossActionInFlight.current) return
+    if (battle.turnOwner !== 'boss' || props.busy || animating || handoff || !pageVisible || bossActionInFlight.current) return
     bossActionInFlight.current = true
     setDamageReadout(current => current?.actor === 'boss'
       ? current
@@ -1737,6 +1812,7 @@ function BattleView(props: {
     setAnimating(true)
     void props.act({ type: 'battle-continue' }, presentBattleResponse).finally(() => {
       bossActionInFlight.current = false
+      if (!mounted.current) return
       setSwapMotion(undefined)
       setClearingTiles(undefined)
       setFallRows(undefined)
@@ -1748,38 +1824,29 @@ function BattleView(props: {
   }
 
   useEffect(() => {
-    if (battle.turnOwner !== 'boss' || props.busy || animating || bossActionInFlight.current) return
+    if (battle.turnOwner !== 'boss' || props.busy || animating || handoff || !pageVisible || bossActionInFlight.current) return
     bossActionTimer.current = window.setTimeout(() => {
       bossActionTimer.current = undefined
       runBossAction()
-    }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 30 : BOSS_ACTION_PAUSE_MS)
+    }, BATTLE_MOTION.enemyPause)
     return () => {
       if (bossActionTimer.current !== undefined) window.clearTimeout(bossActionTimer.current)
       bossActionTimer.current = undefined
     }
-  }, [battle.id, battle.turnOwner, battle.bossActionsRemaining, props.busy, animating])
+  }, [battle.id, battle.turnOwner, battle.bossActionsRemaining, props.busy, animating, handoff, pageVisible])
 
   if ((battle.mode === 'wild' && encounter === undefined) || wild === undefined || active === undefined || activeDefinition === undefined) return null
   const availableCores = CAPTURE_CORE_QUALITIES.filter(quality => props.state.cores[quality] > 0)
   const captureReady = battle.mode === 'wild' && battle.captureWindow
-  const playerStrikeLanded = attackPresentation?.actor === 'player' && attackPresentation.phase === 'impact'
-    || displayedWildHp < battle.wildHp
   const bossStrikeLanded = attackPresentation?.actor === 'boss' && attackPresentation.phase === 'impact'
     || displayedPartyHp < battle.partyHp
   const bossDamageForecast = damageReadout?.actor === 'boss' && !damageReadout.settled
     ? Math.max(battle.pendingBossDamage, damageReadout.total)
     : battle.pendingBossDamage
-  const predictedHp = playerStrikeLanded
-    ? displayedWildHp
-    : Math.max(0, displayedWildHp - Math.max(0, battle.pendingTeamDamage - displayedWildShield))
   const predictedPartyHp = bossStrikeLanded
     ? displayedPartyHp
     : Math.max(0, displayedPartyHp - Math.max(0, bossDamageForecast - displayedPartyShield))
   const partyDamagePreview = Math.max(0, displayedPartyHp - predictedPartyHp)
-  const wildPendingHealing = recoveryReadout?.actor === 'boss'
-    ? Math.max(0, recoveryReadout.to - recoveryReadout.from)
-    : battle.pendingWildHealing
-  const wildHealingFrom = recoveryReadout?.actor === 'boss' ? recoveryReadout.from : displayedWildHp
   const partyPendingHealing = recoveryReadout?.actor === 'player'
     ? Math.max(0, recoveryReadout.to - recoveryReadout.from)
     : battle.pendingPartyHealing
@@ -1814,17 +1881,6 @@ function BattleView(props: {
       ? `${source} · ${stat} · ${scope} · ${rounds}`
       : `${source} · ${stat} +${value} · ${scope} · ${rounds}`
   }
-  const enemyTarget = battle.enemyTargetScope === 'team'
-    ? props.t('targetTeam')
-    : battle.enemyTargetScope === 'self'
-      ? props.t('targetSelf')
-      : battle.enemyTargetScope === 'board'
-        ? props.t('targetBoard')
-      : (() => {
-          const target = battle.party[battle.enemyTargetIndex ?? battle.activeIndex]
-          const definition = target === undefined ? undefined : creatureById(target.creatureId)
-          return definition === undefined ? props.t('targetMember') : creatureName(definition, props.zh)
-        })()
   const bossHazardLimit = Math.min(6, 2 + battle.bossSkillTier)
   const bossLockLimit = Math.min(5, Math.max(3, battle.bossSkillTier))
   const bossSkillTitle = props.t('towerSkillTier', { tier: battle.bossSkillTier })
@@ -1837,13 +1893,6 @@ function BattleView(props: {
     ? props.t('bossSkillReadyDetail')
     : props.t('bossSkillChargingDetail', { remaining: Math.max(0, 24 - battle.bossEnergy) })}`
   const bossSkillLabel = `${bossSkillTitle}. ${bossSkillMeta}. ${bossSkillBody}`
-  const enemyIntentTitle = props.t(INTENT_KEYS[battle.enemyIntent])
-  const enemyIntentMeta = props.t('enemyIntentMeta', { target: enemyTarget })
-  const enemyIntentBody = props.t(INTENT_DETAIL_KEYS[battle.enemyIntent], {
-    count: battle.enemyIntent === 'corrupt' ? bossHazardLimit : bossLockLimit,
-  })
-  const enemyIntentLabel = `${enemyIntentTitle}. ${enemyIntentMeta}. ${enemyIntentBody}`
-  const lastLog = battle.log.at(-1)
   const transitionTitle = props.transition === undefined
     ? undefined
     : props.t(props.transition.kind === 'tower-cleared'
@@ -1867,24 +1916,45 @@ function BattleView(props: {
     setGesture(undefined)
     setSwapMotion({ from, to })
     setAnimating(true)
-    swapTimer.current = window.setTimeout(() => {
-      swapTimer.current = undefined
-      void props.act({ type: 'battle-swap', from, to }, presentBattleResponse).finally(() => {
-        setSwapMotion(undefined)
-        setClearingTiles(undefined)
-        setFallRows(undefined)
-        setActiveChain(undefined)
-        setSignalReadout(undefined)
-        setRecoveryReadout(undefined)
-        setAnimating(false)
-      })
-    }, 130)
+    void (async () => {
+      const epoch = animationEpoch.current
+      await pause(props.reducedMotion ? 180 : BATTLE_MOTION.swap + 30)
+      if (!mounted.current || animationEpoch.current !== epoch) return
+      const response = await props.act({ type: 'battle-swap', from, to }, presentBattleResponse)
+      if (!mounted.current) return
+      if (response === undefined) {
+        setSwapMotion({ from, to, returning: true })
+        await pause(props.reducedMotion ? 180 : BATTLE_MOTION.return + 30)
+        if (!mounted.current) return
+      }
+      setSwapMotion(undefined)
+      setClearingTiles(undefined)
+      setFallRows(undefined)
+      setActiveChain(undefined)
+      setSignalReadout(undefined)
+      setRecoveryReadout(undefined)
+      setAnimating(false)
+    })()
   }
 
   const castSkill = (creatureInstanceId: string): void => {
     if (boardLocked) return
     setAnimating(true)
-    void props.act({ type: 'battle-cast', creatureInstanceId }, presentBattleResponse).finally(() => {
+    void props.act({ type: 'battle-cast', creatureInstanceId }, async response => {
+      const member = battle.party.find(value => value.instanceId === creatureInstanceId)
+      const creature = member === undefined ? undefined : creatureById(member.creatureId)
+      const skill = member === undefined ? undefined : skillByCreatureId(member.creatureId)
+      const epoch = animationEpoch.current
+      if (creature !== undefined && skill !== undefined && member !== undefined) {
+        setProtocol({ creature, name: props.zh ? skill.activeNameZh : skill.activeNameEn, captured: props.state.creatures.find(value => value.instanceId === creatureInstanceId) ?? member })
+        await pause(BATTLE_MOTION.protocol + 40)
+        if (!mounted.current || animationEpoch.current !== epoch) return
+        setProtocol(undefined)
+      }
+      await presentBattleResponse(response)
+    }).finally(() => {
+      if (!mounted.current) return
+      setProtocol(undefined)
       setClearingTiles(undefined)
       setFallRows(undefined)
       setActiveChain(undefined)
@@ -1948,17 +2018,6 @@ function BattleView(props: {
         tabIndex={-1}
         onKeyDown={dialog.onDialogKeyDown}
       >
-        {attackPresentation !== undefined && (
-          <div
-            key={attackPresentation.key}
-            className={`${css.attackSequence} ${attackPresentation.actor === 'player' ? css.attackSequencePlayer : css.attackSequenceBoss} ${attackPresentation.phase === 'impact' ? css.attackSequenceImpact : ''}`}
-            role="img"
-            aria-label={`${props.t(attackPresentation.actor === 'boss' ? 'enemyDamage' : 'totalDamage')} ${attackPresentation.damage}`}
-          >
-            <i className={css.attackWave} aria-hidden="true" />
-            <span className={css.attackImpact} aria-hidden="true" />
-          </div>
-        )}
         <header className={css.battleHeader}>
           <div>
             <h2>{battle.mode === 'tower' ? props.t('towerBattle') : props.t('battle')}</h2>
@@ -1969,162 +2028,19 @@ function BattleView(props: {
                 : `${props.t('movesRemaining')} ${battle.actionsRemaining}/5`}
             </span>
           </div>
-          <button type="button" className={css.flee} disabled={locked || battle.turnOwner === 'boss'} onClick={() => { void props.act({ type: 'flee' }) }}>{props.t('flee')}</button>
+          <div className={css.battleWindowActions}>
+            <button type="button" className={css.flee} disabled={locked || battle.turnOwner === 'boss'} onClick={() => { void props.act({ type: 'flee' }) }}>{props.t('flee')}</button>
+            <button type="button" className={css.flee} disabled={locked} onClick={props.minimize} aria-label={props.t('minimizeBattle')} title={props.t('minimizeBattle')}>−</button>
+          </div>
         </header>
 
-        <div className={`${css.wildBanner} ${encounter?.enhanced === true || battle.mode === 'tower' ? css.fighterEnhanced : ''} ${playerStrikeLanded ? css.wildWasHit : ''}`} key={battle.id}>
-          <div className={css.enemyAura} aria-hidden="true" />
-          <CreatureSprite creature={wild} size="medium" eager />
-          <div className={css.wildVitals}>
-            <div className={css.fighterName}>
-              <strong>{creatureName(wild, props.zh)}</strong>
-              <span
-                className={battle.mode === 'tower' ? css.battleHoverTrigger : undefined}
-                {...(battle.mode === 'tower' ? { tabIndex: 0, 'aria-label': bossSkillLabel } : {})}
-              >
-                Lv.{battle.wildLevel} · {props.t(CORE_KEYS[battle.wildQuality])} · {props.t(ECOLOGY_KEYS[wild.ecology])}
-                {battle.mode === 'tower' && (
-                  <> · {bossSkillTitle}<BattleHoverDetail title={bossSkillTitle} meta={bossSkillMeta} body={bossSkillBody} /></>
-                )}
-              </span>
-            </div>
-            <div className={`${css.hpBar} ${css.hpWild}`}>
-              <em style={{ width: `${percent(predictedHp, battle.wildMaxHp)}%` }} />
-              <i style={{ width: `${percent(displayedWildHp, battle.wildMaxHp)}%` }} />
-              {wildPendingHealing > 0 && (
-                <span
-                  key={recoveryReadout?.actor === 'boss' ? recoveryReadout.key : `wild-heal-${battle.turn}`}
-                  className={`${css.hpHealingBudget} ${recoveryReadout?.actor === 'boss' && recoveryReadout.settling ? css.hpHealingSettling : ''}`}
-                  style={{
-                    left: `${percent(wildHealingFrom, battle.wildMaxHp)}%`,
-                    width: `${percent(wildPendingHealing, battle.wildMaxHp)}%`,
-                  }}
-                />
-              )}
-              {visibleWildShield > 0 && (
-                <b
-                  className={`${css.hpShieldBar} ${signalReadout?.actor === 'boss' && signalReadout.kind === 'guard' ? css.hpShieldActive : ''}`}
-                  style={{ width: `${percent(visibleWildShield, battle.wildMaxHp)}%` }}
-                />
-              )}
-            </div>
-            <div className={css.wildHpNumbers}>
-              <div className={css.enemyModifierStrip}>
-                {battle.bossAmplifiers.map(amplifier => (
-                  <span
-                    key={`${amplifier.signal}-${amplifier.stat}-${amplifier.scope}`}
-                    className={`${css.combatModifierIcon} ${amplifier.stat === 'attack' ? css.modifierAttack : css.modifierPierce}`}
-                    data-tooltip={amplifierTitle(amplifier, 'boss')}
-                    aria-label={amplifierTitle(amplifier, 'boss')}
-                    tabIndex={0}
-                  >{amplifier.stat === 'attack' ? '⚔' : '◇'}</span>
-                ))}
-                {visibleWildShield > 0 && (
-                  <span
-                    className={`${css.combatModifierIcon} ${css.modifierDefense}`}
-                    data-tooltip={`${props.t('shield')} · ${visibleWildShield.toLocaleString()}`}
-                    aria-label={`${props.t('shield')} ${visibleWildShield.toLocaleString()}`}
-                    tabIndex={0}
-                  >⬢</span>
-                )}
-              </div>
-              {wildPendingHealing > 0 && (
-                <em className={css.hpHealingValue}>+{wildPendingHealing.toLocaleString()}</em>
-              )}
-              <strong>{props.t('health')} {displayedWildHp.toLocaleString()}/{battle.wildMaxHp.toLocaleString()}</strong>
-            </div>
-            <small>
-              {props.t('armor')} {battle.wildArmor}
-              {battle.pendingTeamDamage > 0 ? ` · ${props.t('pendingDamage')} ${battle.pendingTeamDamage.toLocaleString()}` : ''}
-            </small>
-            <div className={css.energyBar}><i style={{ width: `${percent(battle.bossEnergy, 24)}%` }} /></div>
-            <small
-              className={css.battleHoverTrigger}
-              tabIndex={0}
-              aria-label={bossSkillLabel}
-            >
-              {props.t('bossEnergy')} {battle.bossEnergy}/24 · {battle.bossSkillArmed ? props.t('skillReady') : props.t('skillCharging')}
-              {battle.turnOwner === 'boss' ? ` · ${props.t('bossCharge')} ${battle.bossAttackCharge.toFixed(1)}` : ''}
-              <BattleHoverDetail title={bossSkillTitle} meta={bossSkillMeta} body={bossSkillBody} />
-            </small>
-          </div>
-          <div
-            className={`${css.enemyIntent} ${css.battleHoverTrigger}`}
-            tabIndex={0}
-            aria-label={enemyIntentLabel}
-          >
-            <span>{props.t('enemyIntent')}</span>
-            <strong>{enemyIntentTitle}</strong>
-            <small>{enemyTarget}</small>
-            <BattleHoverDetail title={enemyIntentTitle} meta={enemyIntentMeta} body={enemyIntentBody} />
-          </div>
-          {damageReadout !== undefined && (
-            <div
-              key={damageReadout.key}
-              className={`${css.totalDamageHud} ${damageReadout.settled ? css.totalDamageSettled : ''}`}
-              aria-live="polite"
-            >
-              <span>{props.t(damageReadout.actor === 'boss' ? 'enemyDamage' : 'totalDamage')}</span>
-              <strong>{damageReadout.total.toLocaleString()}</strong>
-              {damageReadout.current !== undefined && (
-                <em className={css[`damage_${damageReadout.effectiveness ?? 'neutral'}`]}>
-                  +{damageReadout.current.toLocaleString()}
-                </em>
-              )}
-            </div>
-          )}
-          {lastLog?.kind === 'combo' && <strong className={css.comboBurst}>CHAIN ×{lastLog.amount ?? 1}</strong>}
-        </div>
-
+        <BattleStage battle={battle} creatures={props.state.creatures} t={props.t} zh={props.zh} locked={locked}
+          reducedMotion={props.reducedMotion} onCast={castSkill}
+          displayedWildHp={displayedWildHp} displayedWildShield={visibleWildShield}
+          displayedPartyHp={displayedPartyHp} displayedPartyShield={visiblePartyShield}
+          damage={damageReadout} attack={attackPresentation} />
         <div className={css.matchBattleLayout}>
           <div className={css.partyColumn}>
-            <div className={css.partyBattleList} key={`party-${partyHitKey}-${battle.activeIndex}`}>
-              {battle.party.map((member, index) => {
-                const creature = creatureById(member.creatureId)
-                const skill = skillByCreatureId(member.creatureId)
-                if (creature === undefined || skill === undefined) return null
-                const isActive = battle.turnOwner === 'player' && index === battle.activeIndex
-                const skillReady = member.energy >= skill.energyCost && !member.skillUsedStage && member.skillSealedStages === 0
-                const canCast = battle.turnOwner === 'player' && isActive && battle.partyHp > 0 && battle.actionsRemaining > 0
-                  && !battle.captureWindow && skillReady
-                const portraitStyle = {
-                  '--energy-progress': `${percent(member.energy, skill.energyCost) * 3.6}deg`,
-                } as CSSProperties
-                return (
-                  <article
-                    key={member.instanceId}
-                    className={`${css.partyCombatant} ${isActive ? css.partyCombatantActive : ''} ${skillReady ? css.partyCombatantReady : ''} ${member.skillSealedStages > 0 ? css.partyCombatantSealed : ''} ${battle.partyHp <= 0 ? css.partyCombatantDown : ''}`}
-                    title={`${props.t('passiveSkill')} · ${props.zh ? skill.passiveNameZh : skill.passiveNameEn}\n${props.zh ? skill.passiveDescriptionZh : skill.passiveDescriptionEn}`}
-                  >
-                    <span className={css.partySlot}>{index + 1}</span>
-                    <div className={css.partyPortrait} style={portraitStyle}>
-                      <CreatureSprite creature={creature} size="small" eager />
-                      <i className={css.partyEnergyRing} aria-hidden="true" />
-                    </div>
-                    <div className={css.partyCombatantBody}>
-                      <div className={css.fighterName}>
-                        <strong>{creatureName(creature, props.zh)}</strong>
-                        <span>Lv.{member.level} · {props.t(CORE_KEYS[member.quality])}</span>
-                      </div>
-                      <div className={css.energyBar}><i style={{ width: `${percent(member.energy, skill.energyCost)}%` }} /></div>
-                      <small>{props.t('energy')} {member.energy}/{skill.energyCost}</small>
-                      {member.stageDamage > 0 && <small className={css.partyDamageBadge}>+{member.stageDamage}</small>}
-                      {member.frozenStages > 0 && <strong className={css.frozenBadge}>{props.t('frozen')}</strong>}
-                      {member.skillSealedStages > 0 && <strong className={css.sealedBadge}>{props.t('skillSealed')}</strong>}
-                      <button
-                        type="button"
-                        className={css.skillButton}
-                        disabled={locked || !canCast}
-                        onClick={() => { castSkill(member.instanceId) }}
-                        title={props.zh ? skill.activeDescriptionZh : skill.activeDescriptionEn}
-                      >
-                        {skillReady ? props.t('skillOk') : props.zh ? skill.activeNameZh : skill.activeNameEn}
-                      </button>
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
             <div className={css.sharedPartyVitals}>
               <div className={css.sharedHpHeader}>
                 <span>{props.t('teamRuntime')}</span>
@@ -2166,7 +2082,7 @@ function BattleView(props: {
           </div>
 
           <div className={css.boardColumn}>
-            <div className={`${css.turnSummary} ${battle.turnOwner === 'boss' ? css.turnSummaryBoss : ''}`}>
+            <div className={`${css.turnSummary} ${battle.turnOwner === 'boss' ? css.turnSummaryBoss : ''}`} aria-live="polite">
               <span className={`${css.ecologyPip} ${css[`pip_${battle.turnOwner === 'boss' ? wild.ecology : activeDefinition.ecology}`]}`}>
                 {TILE_SYMBOLS[battle.turnOwner === 'boss' ? wild.ecology : activeDefinition.ecology]}
               </span>
@@ -2209,38 +2125,71 @@ function BattleView(props: {
               {activeChain !== undefined && <span className={css.cascadePill}>CHAIN {activeChain}</span>}
             </div>
             <div className={css.boardStage}>
-              {battle.turnOwner === 'boss' && (
-                <div className={css.enemyActionAlert} role="status" aria-live="polite">
-                  <i aria-hidden="true" />
-                  <strong>{props.t('enemyActing')}</strong>
-                  <span>ENEMY TURN</span>
+              {protocol !== undefined && (
+                <div className={css.protocolBanner} role="status" aria-live="polite">
+                  <CreatureSprite creature={protocol.creature} captured={protocol.captured} size="medium" eager />
+                  <div><small>{props.t('activeSkill')}</small><strong>{protocol.name}</strong><span>{creatureName(protocol.creature, props.zh)}</span></div>
                 </div>
               )}
               <div
+                ref={boardElement}
                 className={css.matchBoard}
                 role="grid"
                 aria-label={props.t('boardHelp')}
+                aria-description={props.t('keyboardBoard')}
+                aria-rowcount={MATCH_BOARD_SIZE}
+                aria-colcount={MATCH_BOARD_SIZE}
                 aria-busy={boardLocked}
+                onFocusCapture={() => { boardHadFocus.current = true }}
+                onBlurCapture={event => { if (event.relatedTarget !== null && !event.currentTarget.contains(event.relatedTarget as Node)) boardHadFocus.current = false }}
               >
-                {visualBoard.map((tile, index) => {
+                {Array.from({ length: MATCH_BOARD_SIZE }, (_, row) => <div key={row} role="row" className={css.boardRow}>
+                {visualBoard.slice(row * MATCH_BOARD_SIZE, (row + 1) * MATCH_BOARD_SIZE).map((tile, column) => {
+                const index = row * MATCH_BOARD_SIZE + column
                 const dragging = gesture?.index === index
                 const fallDistance = fallRows?.[index] ?? 0
                 const tileStyle = {
                   '--tile-row': Math.floor(index / MATCH_BOARD_SIZE),
                   '--drag-x': `${dragging ? gesture.offsetX : 0}px`,
                   '--drag-y': `${dragging ? gesture.offsetY : 0}px`,
-                  '--fall-y': `${fallDistance * -110}%`,
-                  '--fall-duration': `${240 + fallDistance * 34}ms`,
-                  '--fall-delay': `${(index % MATCH_BOARD_SIZE) * 8}ms`,
+                  '--fall-y': `calc(${-fallDistance} * (100% + var(--board-gap)))`,
+                  '--fall-duration': `${tileFallTime(fallDistance)}ms`,
+                  '--fall-delay': `${column * BATTLE_MOTION.fallStagger}ms`,
+                  '--swap-duration': `${BATTLE_MOTION.swap}ms`,
+                  '--return-duration': `${BATTLE_MOTION.return}ms`,
+                  '--clear-duration': `${BATTLE_MOTION.clear}ms`,
+                  '--swap-x': swapMotion === undefined ? '0px' : `calc(${((index === swapMotion.from ? swapMotion.to : swapMotion.from) % MATCH_BOARD_SIZE - column)} * (100% + var(--board-gap)))`,
+                  '--swap-y': swapMotion === undefined ? '0px' : `calc(${(Math.floor((index === swapMotion.from ? swapMotion.to : swapMotion.from) / MATCH_BOARD_SIZE) - row)} * (100% + var(--board-gap)))`,
                 } as CSSProperties
                 return (
                   <button
                     key={index}
                     type="button"
                     role="gridcell"
+                    data-cell={index}
+                    tabIndex={keyboardTile === index ? 0 : -1}
+                    aria-selected={selectedTile === index}
+                    aria-rowindex={row + 1}
+                    aria-colindex={column + 1}
+                    onFocus={() => { setFocusedTile(index) }}
+                    onKeyDown={event => {
+                      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
+                      event.preventDefault()
+                      event.stopPropagation()
+                      let next = boardNeighbour(index, event.key)
+                      for (let tries = 0; tries < MATCH_BOARD_SIZE && (visualBoard[next]?.lockedActions ?? 0) > 0; tries += 1) {
+                        const candidate = boardNeighbour(next, event.key === 'Home' ? 'ArrowRight' : event.key === 'End' ? 'ArrowLeft' : event.key)
+                        if (candidate === next) break
+                        next = candidate
+                      }
+                      if ((visualBoard[next]?.lockedActions ?? 0) === 0) {
+                        setFocusedTile(next)
+                        boardElement.current?.querySelector<HTMLButtonElement>(`[data-cell="${next}"]`)?.focus({ preventScroll: true })
+                      }
+                    }}
                     draggable={false}
                     style={tileStyle}
-                    className={`${css.matchTile} ${css[`tile_${tile.ecology}`]} ${selectedTile === index ? css.matchTileSelected : ''} ${dragging ? css.matchTileDragging : ''} ${clearingTiles?.has(index) === true ? css.matchTileClearing : ''} ${fallDistance > 0 ? css.matchTileFalling : ''} ${tile.special !== 'none' ? css.matchTileSpecial : ''} ${(tile.lockedActions ?? 0) > 0 ? css.matchTileLocked : ''} ${(tile.hazardActions ?? 0) > 0 ? css.matchTileHazard : ''} ${swapMotionClass(index, swapMotion)}`}
+                    className={`${css.matchTile} ${css[`tile_${tile.ecology}`]} ${selectedTile === index ? css.matchTileSelected : ''} ${dragging ? css.matchTileDragging : ''} ${clearingTiles?.has(index) === true ? css.matchTileClearing : ''} ${fallDistance > 0 ? css.matchTileFalling : ''} ${tile.special !== 'none' ? css.matchTileSpecial : ''} ${(tile.lockedActions ?? 0) > 0 ? css.matchTileLocked : ''} ${(tile.hazardActions ?? 0) > 0 ? css.matchTileHazard : ''} ${swapMotion !== undefined && (index === swapMotion.from || index === swapMotion.to) ? swapMotion.returning ? css.tileReturning : css.tileSwapping : ''}`}
                     aria-label={tileLabel(tile, index, props.t)}
                     disabled={boardLocked || (tile.lockedActions ?? 0) > 0}
                     onClick={() => {
@@ -2252,7 +2201,7 @@ function BattleView(props: {
                     }}
                     onDragStart={(event) => { event.preventDefault() }}
                     onPointerDown={(event) => {
-                      if (boardLocked || (tile.lockedActions ?? 0) > 0) return
+                      if (event.button !== 0 || boardLocked || (tile.lockedActions ?? 0) > 0) return
                       event.currentTarget.setPointerCapture(event.pointerId)
                       draggedTileElement.current = event.currentTarget
                       resetDraggedTile(event.currentTarget)
@@ -2300,7 +2249,7 @@ function BattleView(props: {
                     {(tile.hazardActions ?? 0) > 0 && <small className={css.hazardMark} aria-hidden="true">!</small>}
                   </button>
                 )
-                })}
+                })}</div>)}
               </div>
               {captureReady && (
                 <section className={`${css.captureBoardOverlay} ${captureIntro ? css.captureBoardIntro : ''}`} aria-live="polite">
@@ -2368,6 +2317,7 @@ function BattleView(props: {
             <strong>{transitionTitle}</strong>
           </div>
         )}
+        <div ref={battleEffects.layer} className={css.particleLayer} aria-hidden="true" />
       </section>
     </div>
   )

@@ -23,6 +23,7 @@ import {
   wildStats,
 } from './balance.ts'
 import { currentEngineContent } from './content.ts'
+import { CREATURE_EVOLUTION_LEVEL } from './appearance.ts'
 import { MATCH_BOARD_CELLS, findFirstLegalBattleSwap } from './match3.ts'
 import {
   ENERGY_LIMIT,
@@ -414,11 +415,18 @@ export function restoreTraceWildState(value: unknown, now = Date.now()): TraceWi
     const savedXp = root.schemaVersion === 3
       ? Math.max(levelFloorXp, safeInt(row.xp, levelFloorXp, totalXpForLevel(MAX_PLAYER_LEVEL, quality)))
       : levelFloorXp
+    const level = levelForXp(savedXp, quality)
+    const appearance = savedLevel < CREATURE_EVOLUTION_LEVEL && level >= CREATURE_EVOLUTION_LEVEL
+      ? 'evolved'
+      : row.appearance === 'original' || (row.appearance === 'evolved' && level >= CREATURE_EVOLUTION_LEVEL)
+        ? row.appearance
+        : undefined
     next.creatures.push({
       instanceId,
       creatureId,
       quality,
-      level: levelForXp(savedXp, quality),
+      level,
+      ...(appearance === undefined ? {} : { appearance }),
       xp: savedXp,
       wins: safeInt(row.wins, 0, 999999),
       caughtAt: safeInt(row.caughtAt, next.createdAt),

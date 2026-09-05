@@ -94,7 +94,7 @@ describe('Codekin content packs', () => {
     expect(registry.creatures).toHaveLength(25)
     expect(registry.skills).toHaveLength(25)
     expect(registry.mechanics).toHaveLength(25)
-    expect(registry.assets).toHaveLength(26)
+    expect(registry.assets).toHaveLength(51)
     expect(registry.creature('forge-rivetclaw')).toMatchObject({
       name: { zhCN: '铆钉蟹', en: 'Rivetclaw' },
       sprite: 'creature:forge-rivetclaw:sprite',
@@ -107,6 +107,11 @@ describe('Codekin content packs', () => {
     expect(registry.asset('creature:forge-rivetclaw:sprite')?.path).toBe(
       'sprites/forge-rivetclaw.webp',
     )
+    for (const creature of registry.creatures) {
+      expect(registry.asset(`creature:${creature.id}:evolved`)).toMatchObject({
+        path: `evolved/${creature.id}.webp`, mime: 'image/webp', kind: 'creature',
+      })
+    }
     const assetRoot = new URL('../assets/creatures/', import.meta.url)
     expect(registry.assets.filter(asset => (
       !existsSync(fileURLToPath(new URL(asset.path, assetRoot)))

@@ -1,4 +1,5 @@
-import type { CaptureCoreQuality, CreatureDefinition, TraceEcology } from '../../../engine/src/types.ts';
+import type { CaptureCoreQuality, CreatureDefinition, CreatureAppearance, TraceEcology } from '../../../engine/src/types.ts';
+import { type CreatureLook } from '../appearance-presentation.ts';
 import type { TraceWildLocaleKey } from '../locales.ts';
 export declare const ECOLOGY_KEYS: Record<TraceEcology, TraceWildLocaleKey>;
 export declare const CORE_KEYS: Record<CaptureCoreQuality, TraceWildLocaleKey>;
@@ -13,6 +14,9 @@ export declare const CreatureSprite: import("react").MemoExoticComponent<(props:
     size?: "tiny" | "small" | "medium" | "large";
     unknown?: boolean;
     eager?: boolean;
+    captured?: CreatureLook | undefined;
+    level?: number | undefined;
+    appearance?: CreatureAppearance | undefined;
 }) => import("react/jsx-runtime").JSX.Element>;
 export declare function creatureName(creature: CreatureDefinition, zh: boolean): string;
 //# sourceMappingURL=creature-presentation.d.ts.map

@@ -1,7 +1,15 @@
 export const NS = 'tracewild'
 
 export const zh = {
+  appearanceTitle: '更换外观', appearanceClose: '关闭外观选择', appearanceOriginal: '原形', appearanceEvolved: '进化形',
+  appearanceSelected: '当前外观', appearanceChoose: '使用此外观', appearanceUnlockLevel: 'Lv.{level} 解锁',
+  appearanceHint: '外观独立保存，不影响属性与战斗能力。', appearanceBattleLocked: '战斗结束后可以更换外观。',
+  appearanceUnavailable: '进化立绘暂不可用', evolutionUnlocked: '进化形解锁 · Lv.30', appearanceFailed: '外观未能更换，请稍后重试。',
+  reduceMotion: '减少动态效果', resetWindow: '窗口归位', dismissNotice: '关闭提示',
+  unsavedSquad: '保存这次编队调整？', unsavedSquadHint: '离开前可以保存，也可以保留原来的编队。', keepEditing: '继续编辑', saveAndLeave: '保存并离开', discardAndLeave: '放弃调整',
+  searchCodekin: '搜索名称或图鉴编号', emptySlot: '选择伙伴', squadSlot: '出战 {slot} · {name}', keyboardBoard: '方向键移动，空格或回车选择两个相邻色块。',
   title: '码灵', subtitle: '你的 DSH 活动正在生成一座码灵世界', open: '打开码灵', close: '关闭', dragWindow: '按住标题栏可拖动，双击归位', dragLauncher: '可拖动入口位置',
+  minimizeBattle: '收起窗口，保留战斗', systemMotion: '已跟随系统设置减少动态效果',
   settingsTitle: '码灵', settingsDescription: '管理码灵玩法是否响应你的 DSH 会话事件。', settingsEnabled: '启用码灵', settingsEnabledHint: '关闭后入口会隐藏，并暂停事件奖励、野生码灵刷新和挂机计时；已有进度会保留。',
   settingsOn: '已启用', settingsOff: '已停用', settingsLoading: '正在读取码灵设置…', settingsUnavailable: '码灵设置暂时不可用，请稍后重试。', settingsOnHint: '码灵正在监听不含正文的会话结果事件。', settingsOffHint: '码灵已暂停；你的编队与道具不会被删除。',
   settingsStorage: '本地存档与卸载', settingsStorageHint: '通过 dsh-web 插件管理器卸载时会保留此存档。若要彻底卸载，请先在这里永久删除存档，再卸载插件。',
@@ -92,7 +100,15 @@ export const zh = {
 } as const
 
 export const en: Record<keyof typeof zh, string> = {
+  appearanceTitle: 'Change appearance', appearanceClose: 'Close appearance selection', appearanceOriginal: 'Original', appearanceEvolved: 'Evolved',
+  appearanceSelected: 'Current appearance', appearanceChoose: 'Use this appearance', appearanceUnlockLevel: 'Unlocks at Lv.{level}',
+  appearanceHint: 'Saved for this Codekin. Stats and abilities stay the same.', appearanceBattleLocked: 'Change appearance after the battle.',
+  appearanceUnavailable: 'Evolved art unavailable', evolutionUnlocked: 'Evolution unlocked · Lv.30', appearanceFailed: 'Could not change appearance. Please try again.',
+  reduceMotion: 'Reduce motion', resetWindow: 'Center window', dismissNotice: 'Dismiss notice',
+  unsavedSquad: 'Save your squad changes?', unsavedSquadHint: 'Save this lineup before leaving, or keep your previous squad.', keepEditing: 'Keep editing', saveAndLeave: 'Save & leave', discardAndLeave: 'Discard changes',
+  searchCodekin: 'Search name or index number', emptySlot: 'Choose a partner', squadSlot: 'Slot {slot} · {name}', keyboardBoard: 'Arrow keys to move. Space or Enter to select adjacent panels.',
   title: 'Codekin', subtitle: 'Your DSH activity is growing a world of Codekin', open: 'Open Codekin', close: 'Close', dragWindow: 'Drag the title bar to move; double-click to center', dragLauncher: 'Drag to reposition',
+  minimizeBattle: 'Minimize and keep battle', systemMotion: 'Reduced motion follows your system setting',
   settingsTitle: 'Codekin', settingsDescription: 'Control whether Codekin responds to your DSH session events.', settingsEnabled: 'Enable Codekin', settingsEnabledHint: 'Turning it off hides the launcher and pauses event rewards, wild spawns, and idle time. Existing progress is preserved.',
   settingsOn: 'Enabled', settingsOff: 'Disabled', settingsLoading: 'Loading Codekin settings…', settingsUnavailable: 'Codekin settings are temporarily unavailable. Try again shortly.', settingsOnHint: 'Codekin is listening for content-free session outcome events.', settingsOffHint: 'Codekin is paused. Your squad and inventory remain intact.',
   settingsStorage: 'Local save & uninstall', settingsStorageHint: 'The dsh-web plugin manager preserves this save when uninstalling. For a complete removal, permanently delete the save here before uninstalling the plugin.',

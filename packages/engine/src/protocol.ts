@@ -74,6 +74,14 @@ export function normalizeTraceWildAction(value: unknown): TraceWildAction {
     case 'release-creature':
       exactKeys(row, ['type', 'creatureInstanceId'])
       return { type: 'release-creature', creatureInstanceId: safeId(row.creatureInstanceId, 'pet_') }
+    case 'set-creature-appearance':
+      exactKeys(row, ['type', 'creatureInstanceId', 'appearance'])
+      if (row.appearance !== 'original' && row.appearance !== 'evolved') throw new TypeError('invalid action')
+      return {
+        type: 'set-creature-appearance',
+        creatureInstanceId: safeId(row.creatureInstanceId, 'pet_'),
+        appearance: row.appearance,
+      }
     case 'flee':
       exactKeys(row, ['type'])
       return { type: 'flee' }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { CAPTURE_CORE_QUALITIES, TRACE_ECOLOGIES } from '../../../content-sdk/src/types.ts'
 import {
@@ -33,6 +33,8 @@ import {
   creatureName,
 } from './creature-presentation.tsx'
 import { useDialogAccessibility } from './dialog-accessibility.ts'
+import { CreatureAppearancePicker, CreatureAppearancePortrait } from './CreatureAppearance.tsx'
+import appearanceCss from './creature-appearance.module.css'
 import css from './tracewild.module.css'
 
 type TraceWildTranslate = PropsLocale<'tracewild'>['t']
@@ -60,12 +62,15 @@ export function CodekinView(props: {
   busy: boolean
   save: () => Promise<boolean>
   inspect: (instanceId: string) => void
+  onEditingChange?: (editing: boolean) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [ecologyFilter, setEcologyFilter] = useState<CodekinRosterEcology>('all')
   const [qualityFilter, setQualityFilter] = useState<CodekinRosterQuality>('all')
   const [rosterSort, setRosterSort] = useState<CodekinRosterSort>('default')
+  const [query, setQuery] = useState('')
+  useEffect(() => { props.onEditingChange?.(editing) }, [editing, props.onEditingChange])
   const roster = useMemo<CodekinRosterEntry[]>(() => {
     const entries: CodekinRosterEntry[] = []
     props.state.creatures.forEach((captured, sourceIndex) => {
@@ -80,10 +85,12 @@ export function CodekinView(props: {
         ecology: ecologyFilter,
         quality: qualityFilter,
         sort: rosterSort,
-      }), [editing, ecologyFilter, qualityFilter, roster, rosterSort])
+        query,
+      }), [editing, ecologyFilter, qualityFilter, query, roster, rosterSort])
   const activeFilterCount = Number(ecologyFilter !== 'all')
     + Number(qualityFilter !== 'all')
     + Number(rosterSort !== 'default')
+    + Number(query.trim().length > 0)
   const toggle = (instanceId: string): void => {
     if (props.draft.includes(instanceId)) {
       if (props.draft.length > 1) props.setDraft(props.draft.filter(id => id !== instanceId))
@@ -107,11 +114,13 @@ export function CodekinView(props: {
     setEcologyFilter('all')
     setQualityFilter('all')
     setRosterSort('default')
+    setQuery('')
   }
   return (
     <div className={`${css.panelPage} ${editing ? css.codekinEditMode : ''}`}>
       <div className={css.pageHeading}>
         <div>
+          <span className={css.sectionKicker}>YOUR COLLECTION</span>
           <h2>{props.t('squad')}</h2>
           <p>{props.t(editing ? 'squadEditHelp' : 'squadHelp')}</p>
         </div>
@@ -139,6 +148,22 @@ export function CodekinView(props: {
               </>}
         </div>
       </div>
+      {editing ? <div className={css.squadSlots} aria-label={props.t('squadSelection', { count: props.draft.length })}>
+        {[0, 1, 2].map(index => {
+          const entry = roster.find(row => row.captured.instanceId === props.draft[index])
+          return <button key={index} type="button" disabled={props.busy || entry === undefined || props.draft.length <= 1}
+            aria-label={props.t('squadSlot', { slot: index + 1, name: entry === undefined ? props.t('emptySlot') : creatureName(entry.creature, props.zh) })}
+            onClick={() => { if (entry !== undefined) toggle(entry.captured.instanceId) }}>
+            <b>0{index + 1}</b>{entry === undefined ? <span>＋</span> : <CreatureSprite creature={entry.creature} captured={entry.captured} size="small" />}
+            <small>{entry === undefined ? props.t('emptySlot') : creatureName(entry.creature, props.zh)}</small>
+          </button>
+        })}
+      </div> : <div className={css.rosterSearch}>
+        <span aria-hidden="true">⌕</span>
+        <input type="search" maxLength={80} value={query} aria-label={props.t('searchCodekin')}
+          placeholder={props.t('searchCodekin')} onChange={event => { setQuery(event.target.value) }} />
+        <small aria-live="polite">{visibleRoster.length} / {roster.length}</small>
+      </div>}
       {!editing && filtersOpen && (
         <section id="codekin-roster-controls" className={css.rosterControls} aria-label={props.t('rosterControls')}>
           <div className={css.rosterControlRow}>
@@ -205,6 +230,16 @@ export function CodekinView(props: {
               className={`${css.creatureCard} ${css.codekinCard} ${css[`core_${captured.quality}`]} ${deployed ? css.codekinDeployed : ''} ${editing && draftPosition >= 0 ? css.creatureSelected : ''} ${selectionLocked ? css.codekinSelectionLocked : ''}`}
               data-quality={captured.quality}
               data-deployed={deployed ? 'true' : undefined}
+              onPointerMove={event => {
+                if (event.pointerType !== 'mouse' || event.currentTarget.closest('[data-motion="reduce"]') !== null) return
+                const rect = event.currentTarget.getBoundingClientRect()
+                event.currentTarget.style.setProperty('--tilt-x', `${(0.5 - (event.clientY - rect.top) / rect.height) * 5}deg`)
+                event.currentTarget.style.setProperty('--tilt-y', `${((event.clientX - rect.left) / rect.width - 0.5) * 6}deg`)
+              }}
+              onPointerLeave={event => {
+                event.currentTarget.style.setProperty('--tilt-x', '0deg')
+                event.currentTarget.style.setProperty('--tilt-y', '0deg')
+              }}
             >
               <span className={css.codekinNumber}>#{String(creature.number).padStart(2, '0')}</span>
               {editing && draftPosition >= 0 && <span className={css.partyIndex}>{draftPosition + 1}</span>}
@@ -218,13 +253,14 @@ export function CodekinView(props: {
               <button
                 type="button"
                 className={css.creatureSelect}
+                disabled={props.busy || selectionLocked || (editing && draftPosition >= 0 && props.draft.length === 1)}
                 aria-pressed={editing ? draftPosition >= 0 : undefined}
                 aria-label={editing
                   ? `${creatureName(creature, props.zh)} · ${props.t('squadSelection', { count: props.draft.length })}`
                   : `${creatureName(creature, props.zh)} · ${props.t('level')} ${captured.level} · ${props.t(ECOLOGY_KEYS[creature.ecology])} · ${props.t(CORE_KEYS[captured.quality])}${deployed ? ` · ${props.t('rosterDeployed')} ${squadPosition + 1}` : ''} · ${props.t('codekinDetail')}`}
                 onClick={() => { editing ? toggle(captured.instanceId) : props.inspect(captured.instanceId) }}
               >
-                <CreatureSprite creature={creature} size="medium" />
+                <CreatureSprite creature={creature} captured={captured} size="medium" />
                 <strong>{creatureName(creature, props.zh)}</strong>
                 <span className={css.codekinBasics}>
                   <b>Lv.{captured.level}</b>
@@ -254,10 +290,15 @@ export function CodekinDetailModal(props: {
   t: TraceWildTranslate
   zh: boolean
   busy: boolean
+  reducedMotion?: boolean
   act: (action: TraceWildAction) => Promise<TraceWildActionResponse | undefined>
   dismiss: () => void
   release: () => void
 }) {
+  const [appearanceOpen, setAppearanceOpen] = useState(false)
+  const [appearanceChanging, setAppearanceChanging] = useState(false)
+  const hanger = useRef<HTMLButtonElement>(null)
+  const closeAppearance = () => { setAppearanceOpen(false); hanger.current?.focus({ preventScroll: true }) }
   const dialog = useDialogAccessibility(props.dismiss, props.busy)
   const stats = playerStats(props.creature.stats, props.captured.level, props.captured.quality)
   const skill = skillByCreatureId(props.creature.id)
@@ -281,9 +322,18 @@ export function CodekinDetailModal(props: {
         aria-modal="true"
         aria-labelledby="codekin-detail-title"
         tabIndex={-1}
-        onKeyDown={dialog.onDialogKeyDown}
+        onKeyDown={event => {
+          if (appearanceOpen && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeAppearance() }
+          else dialog.onDialogKeyDown(event)
+        }}
         onClick={(event) => { event.stopPropagation() }}
       >
+        <button ref={hanger} type="button" className={appearanceCss.hanger} disabled={props.busy}
+          aria-label={props.t('appearanceTitle')} title={props.t('appearanceTitle')}
+          aria-expanded={appearanceOpen} aria-controls="codekin-appearance-picker"
+          onClick={() => { setAppearanceOpen(value => !value) }}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6a3 3 0 1 1 4.5 2.6c-1 .5-1.5 1-1.5 2.4v1M12 12 3 18v2h18v-2l-9-6Z" /></svg>
+        </button>
         <button
           type="button"
           className={css.codekinDetailClose}
@@ -296,8 +346,9 @@ export function CodekinDetailModal(props: {
         >
           <span aria-hidden="true">×</span>
         </button>
-        <header className={css.codekinDetailHero}>
-          <CreatureSprite creature={props.creature} size="large" eager />
+        <header className={`${css.codekinDetailHero} ${appearanceCss.hero}`}>
+          <CreatureAppearancePortrait captured={props.captured} creature={props.creature} t={props.t}
+            reducedMotion={props.reducedMotion ?? false} onChanging={setAppearanceChanging} />
           <div>
             <p>CODEKIN #{String(props.creature.number).padStart(2, '0')}</p>
             <h2 id="codekin-detail-title">{creatureName(props.creature, props.zh)}</h2>
@@ -309,6 +360,14 @@ export function CodekinDetailModal(props: {
             <small>{props.t('level')} {props.captured.level} · {props.t('wins')} {props.captured.wins}</small>
           </div>
         </header>
+
+        {appearanceOpen && <CreatureAppearancePicker captured={props.captured} creature={props.creature} t={props.t}
+          busy={props.busy || appearanceChanging} battleActive={props.state.battle !== undefined} onClose={closeAppearance}
+          onSelect={appearance => {
+            if (props.busy || appearanceChanging || props.state.battle !== undefined) return
+            void props.act({ type: 'set-creature-appearance', creatureInstanceId: props.captured.instanceId, appearance })
+              .then(response => { if (response !== undefined) closeAppearance() })
+          }} />}
 
         <section className={css.codekinDetailSection}>
           <h3>{props.t('codekinStats')}</h3>
@@ -348,7 +407,7 @@ export function CodekinDetailModal(props: {
                   : `${props.t('xp')} ${progress}/${needed}`}
               </small>
             </div>
-            <b>Lv.{props.captured.level}</b>
+            <b key={props.captured.level} className={css.levelPulse}>Lv.{props.captured.level}</b>
           </header>
           <div className={css.growthXpTrack} aria-hidden="true">
             <i style={{ width: `${progressPercent}%` }} />
@@ -360,7 +419,7 @@ export function CodekinDetailModal(props: {
                 key={quality}
                 type="button"
                 className={css[`core_${quality}`]}
-                disabled={props.busy || props.captured.level >= MAX_PLAYER_LEVEL || props.state.materials[quality] <= 0}
+                disabled={props.busy || appearanceChanging || props.captured.level >= MAX_PLAYER_LEVEL || props.state.materials[quality] <= 0}
                 onClick={() => { void props.act({ type: 'feed-material', creatureInstanceId: props.captured.instanceId, quality, count: 1 }) }}
                 title={`${props.t('feed')} · ${materialItemName(props.t, quality)} · +${MATERIAL_XP[quality]} EXP`}
                 aria-label={`${props.t('feed')} ${materialItemName(props.t, quality)} · +${MATERIAL_XP[quality]} EXP`}

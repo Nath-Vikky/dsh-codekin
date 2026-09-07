@@ -368,12 +368,15 @@ async function runBrowserSmoke(browserUrl: string): Promise<string> {
       'textarea:not([disabled])',
       '[tabindex]:not([tabindex="-1"])',
     ].join(','))
+    const firstControl = focusable.first()
     const lastControl = focusable.last()
     assert.ok(await focusable.count() > 0, 'detail dialog requires at least one focusable control')
-    await close.press('Shift+Tab')
+    // Initial focus stays on Close; the wardrobe now precedes it in tab order.
+    await firstControl.focus()
+    await firstControl.press('Shift+Tab')
     assert.equal(await lastControl.evaluate(element => element === document.activeElement), true, 'Shift+Tab should wrap to the last enabled dialog control')
     await lastControl.press('Tab')
-    assert.equal(await close.evaluate(element => element === document.activeElement), true, 'Tab should wrap to the first dialog control')
+    assert.equal(await firstControl.evaluate(element => element === document.activeElement), true, 'Tab should wrap to the first dialog control')
     await dialog.press('Escape')
     await dialog.waitFor({ state: 'hidden', timeout: 5_000 })
     assert.equal(await card.evaluate(element => element === document.activeElement), true, 'closing the detail should restore card focus')

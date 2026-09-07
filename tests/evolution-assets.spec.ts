@@ -62,7 +62,7 @@ describe('production evolution asset delivery', () => {
         expect(res.body().subarray(0, 4).toString('ascii'), creature.id).toBe('RIFF')
         expect(res.body().subarray(8, 12).toString('ascii'), creature.id).toBe('WEBP')
         expect(res.headers()['content-length']).toBe(String(res.body().byteLength))
-        expect(res.body(), creature.id).toEqual(await readFile(join(assetDirectory, asset!.path)))
+        expect(res.body().equals(await readFile(join(assetDirectory, asset!.path))), creature.id).toBe(true)
       }
     } finally {
       group.close()

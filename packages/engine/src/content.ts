@@ -29,7 +29,7 @@ export interface CodekinEngineContent {
   encounterVariantCreatureId(variant: string): string | undefined
 }
 
-export const CODEKIN_ENGINE_VERSION = '0.3.6-rc.1' as const
+export const CODEKIN_ENGINE_VERSION = '0.3.7-rc.1' as const
 
 export class EngineContentError extends TypeError {
   readonly issues: readonly string[]

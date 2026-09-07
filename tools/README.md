@@ -50,7 +50,7 @@ pnpm performance -- --check --output performance-report.json
 
 The `codekin-performance-v1` report measures a typical authoritative battle action, a 750-Codekin restore, content-registry construction, the fixed simulation matrix, browser and total JavaScript bundles, core assets, and large-roster JSON size. Cross-platform release ceilings live in `performance-budget.json`; timing gates use p95 samples and intentionally leave headroom for shared CI hosts.
 
-The core image budget is 3 MB for the launcher, 25 original sprites, and 25 transparent 768px evolution portraits. Evolution uses WebP with preserved alpha; review galleries, source masters, and processing prompts remain outside the repository and package. Appearance changes do not add gameplay random draws or alter combat values.
+The core image budget is 4 MB for the launcher, 25 original sprites, 25 transparent 768px evolution portraits, and five ultimate scene/silhouette pairs. Appearance images use WebP with preserved alpha. Ultimate scenes retain the character's themed environment while removing the outer paper background; separate alpha masks keep the charged battle glow on the character outline. Review galleries, source masters, and processing prompts remain outside the repository and package. Appearance changes do not add gameplay random draws or alter combat values.
 
 ## Installed DSH lifecycle
 
@@ -58,6 +58,6 @@ The core image budget is 3 MB for the launcher, 25 original sprites, and 25 tran
 pnpm lifecycle:dsh
 ```
 
-This release gate creates an isolated DSH Web Alpha profile, installs a local package tarball, starts the host, exercises the state and action routes, runs a headless Chrome/Edge roster and keyboard-accessibility smoke test, disables Codekin, restarts DSH, removes and reinstalls the plugin, and verifies that the same save and starter survive every transition. Pass `--source <package-spec>` to test a Git commit or registry package through the same path. Failed runs retain their temporary profile for diagnosis; successful runs remove it unless `--keep` is supplied. `--skip-browser` is available for host-only diagnosis but is not used by the release gate.
+This release gate creates an isolated DSH Web `0.1.2-rc.1` profile, installs a local package tarball, starts the host, exercises the state and action routes, runs a headless Chrome/Edge roster and keyboard-accessibility smoke test, disables Codekin, restarts DSH, removes and reinstalls the plugin, and verifies that the same save and starter survive every transition. Pass `--source <package-spec>` to test a Git commit, release tarball, or registry package through the same path. Failed runs retain their temporary profile for diagnosis; successful runs remove it unless `--keep` is supplied. `--skip-browser` is available for host-only diagnosis but is not used by the release gate.
 
 The browser smoke also checks that reduced motion follows the system until the player explicitly enables full motion, and that this override is persisted. Battle timing lives in `packages/renderer-react/src/battle-motion.ts`; reduced motion removes travel without removing turn and protocol reading time.

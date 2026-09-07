@@ -33,7 +33,13 @@ Actual Codekin `0.3.7-rc.1` screens captured in an isolated demonstration profil
 
 Use **DSH `0.1.2-rc.1`**. As of September 7, 2026, the latest [dsh-web release is `0.3.17`](https://github.com/zhu1090093659/dsh-web/releases/tag/v0.3.17). Its [desktop runtime pins DSH `0.1.2-rc.1`](https://github.com/zhu1090093659/dsh-web/blob/v0.3.17/desktop/runtime/host/package.json), and its [aggregate package declares the same minimum host version](https://github.com/zhu1090093659/dsh-web/blob/v0.3.17/packages/dsh-web-all/package.json). Codekin uses that exact host and SDK version for this release.
 
-Install the GitHub Release tarball explicitly:
+Install from npm with explicit versions:
+
+```sh
+pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 plugin --profile web add @nath-vikky/dsh-codekin@0.3.7-rc.1
+```
+
+The same release is also available as a GitHub Release tarball:
 
 ```sh
 pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.7-rc.1/nath-vikky-dsh-codekin-0.3.7-rc.1.tgz
@@ -41,16 +47,16 @@ pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 plugin --profile web add --ignore-scripts h
 
 Use the same `DSH_HOME` as your existing DSH installation so the command updates the intended profile. Restart DSH Web, then enable **DSH Settings → Codekin**. The draggable launcher opens the portrait game window and becomes a gift reminder when idle supplies are ready.
 
-This version is distributed through **GitHub Releases**. The npm `latest` tag still points to `0.3.5-alpha.2`; an unpinned npm install will not install this release. Release tags and active development branches include reviewed runtime bundles for source installs.
+The npm `latest` tag points to **`0.3.7-rc.1`**. The GitHub Release and npm package contain the same runtime and artwork; the npm package additionally updates these installation instructions. Release tags and active development branches include reviewed runtime bundles for source installs.
 
 ### Version pairings
 
 | Codekin | DSH host | Distribution / status |
 | --- | --- | --- |
-| **`0.3.7-rc.1`** | **`0.1.2-rc.1`** | Current GitHub release; same host baseline as dsh-web `0.3.17` |
+| **`0.3.7-rc.1`** | **`0.1.2-rc.1`** | npm `latest` and current GitHub release; same host baseline as dsh-web `0.3.17` |
 | `0.3.6-rc.1` | `0.1.2-rc.1` | Previous GitHub compatibility release |
 | `0.3.6-alpha.3` | `0.1.2-alpha.5` | Historical GitHub release |
-| `0.3.5-alpha.2` | `0.1.2-alpha.2` | Current npm `latest`; older content |
+| `0.3.5-alpha.2` | `0.1.2-alpha.2` | Previous npm release; older content |
 | `0.2.0` | `0.1.0-rc.5` | Legacy package; source on `stable/0.2.x` |
 
 These are explicit version pairings, not a claim of support for every upstream prerelease. DSH `0.1.3-alpha.2` is on the separate `alpha` channel and is not the target of this release.

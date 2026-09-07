@@ -33,7 +33,13 @@
 
 请使用 **DSH `0.1.2-rc.1`**。截至 2026 年 9 月 7 日，[dsh-web 最新版为 `0.3.17`](https://github.com/zhu1090093659/dsh-web/releases/tag/v0.3.17)，其[桌面包固定内置 DSH `0.1.2-rc.1`](https://github.com/zhu1090093659/dsh-web/blob/v0.3.17/desktop/runtime/host/package.json)，[聚合插件也声明相同的最低宿主版本](https://github.com/zhu1090093659/dsh-web/blob/v0.3.17/packages/dsh-web-all/package.json)。码灵本次发布沿用这一宿主与 SDK 基线。
 
-通过明确的 GitHub Release 安装包地址安装：
+通过 npm 安装，并明确指定版本：
+
+```sh
+pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 plugin --profile web add @nath-vikky/dsh-codekin@0.3.7-rc.1
+```
+
+同一版本也可通过 GitHub Release 安装包安装：
 
 ```sh
 pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.7-rc.1/nath-vikky-dsh-codekin-0.3.7-rc.1.tgz
@@ -41,16 +47,16 @@ pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 plugin --profile web add --ignore-scripts h
 
 执行命令时，请沿用现有 DSH 的 `DSH_HOME`，以更新正确的 Profile。安装后重启 DSH Web，在 **DSH 设置 → 码灵** 中启用。可拖动的入口会打开竖屏游戏窗口；挂机补给可领取时，入口会变成礼盒提醒。
 
-本版本通过 **GitHub Releases** 分发。npm `latest` 仍指向 `0.3.5-alpha.2`，直接安装未指定版本的 npm 包不会得到本次更新。发布标签与活跃开发分支均包含经过检查的运行时 Bundle，支持源码安装。
+npm `latest` 指向 **`0.3.7-rc.1`**。GitHub Release 与 npm 包包含相同的程序和立绘素材；npm 包另行更新了此处的安装说明。发布标签与活跃开发分支均包含经过检查的运行时 Bundle，支持源码安装。
 
 ### 版本对应关系
 
 | 码灵 | DSH 宿主 | 分发与状态 |
 | --- | --- | --- |
-| **`0.3.7-rc.1`** | **`0.1.2-rc.1`** | 当前 GitHub 版本；与 dsh-web `0.3.17` 使用相同宿主基线 |
+| **`0.3.7-rc.1`** | **`0.1.2-rc.1`** | npm `latest` 与当前 GitHub 版本；与 dsh-web `0.3.17` 使用相同宿主基线 |
 | `0.3.6-rc.1` | `0.1.2-rc.1` | 上一版 GitHub 兼容版本 |
 | `0.3.6-alpha.3` | `0.1.2-alpha.5` | 历史 GitHub 版本 |
-| `0.3.5-alpha.2` | `0.1.2-alpha.2` | 当前 npm `latest`，内容较旧 |
+| `0.3.5-alpha.2` | `0.1.2-alpha.2` | 上一版 npm 包，内容较旧 |
 | `0.2.0` | `0.1.0-rc.5` | 旧版；源码保留在 `stable/0.2.x` |
 
 以上是明确的版本配对，不表示支持所有上游预发行版本。DSH `0.1.3-alpha.2` 属于单独的 `alpha` 通道，不是本次发布的目标。

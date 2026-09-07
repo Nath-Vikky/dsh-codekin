@@ -30,6 +30,7 @@ export const CreatureSprite = memo(function CreatureSprite(props: {
   captured?: CreatureLook | undefined
   level?: number | undefined
   appearance?: CreatureAppearance | undefined
+  silhouetteMask?: string | undefined
 }) {
   const [failedSources, setFailedSources] = useState<ReadonlySet<string>>(() => new Set())
   const look = props.captured ?? { level: props.level ?? 1, ...(props.appearance === undefined ? {} : { appearance: props.appearance }) }
@@ -47,6 +48,7 @@ export const CreatureSprite = memo(function CreatureSprite(props: {
     <img
       className={className}
       src={source}
+      style={props.silhouetteMask !== undefined && source === resolved.source ? { maskImage: `url("${props.silhouetteMask}")`, maskSize: '100% 100%' } : undefined}
       data-creature-id={props.creature.id}
       data-creature-instance={look.instanceId}
       data-creature-appearance={source === resolved.source ? resolved.appearance : 'original'}

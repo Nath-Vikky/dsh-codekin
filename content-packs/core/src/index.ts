@@ -93,5 +93,17 @@ export const CORE_CONTENT_PACK = defineContentPack({
       mime: 'image/webp' as const,
       kind: 'creature' as const,
     })),
+    ...CREATURE_CATALOG.filter(creature => creature.rarity === 'apex').map(creature => ({
+      key: `creature:${creature.id}:ultimate`,
+      path: `ultimate/${creature.id}-theme.webp`,
+      mime: 'image/webp' as const,
+      kind: 'creature' as const,
+    })),
+    ...CREATURE_CATALOG.filter(creature => creature.rarity === 'apex').map(creature => ({
+      key: `creature:${creature.id}:ultimate-silhouette`,
+      path: `ultimate/${creature.id}-silhouette.webp`,
+      mime: 'image/webp' as const,
+      kind: 'creature' as const,
+    })),
   ],
 })

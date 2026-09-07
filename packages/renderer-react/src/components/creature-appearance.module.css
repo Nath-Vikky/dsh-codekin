@@ -6,6 +6,9 @@
 .hero { grid-template-columns: 168px minmax(0,1fr); min-height: 212px; padding-top: 24px; }
 .portrait { position: relative; height: 186px; width: 164px; isolation: isolate; display: grid; place-items: center; }
 .portrait img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; image-rendering: auto; user-select: none; pointer-events: none; filter: drop-shadow(4px 7px 4px #01265a4d); }
+.hero:has([data-portrait-appearance=ultimate]) { grid-template-columns: minmax(0,1fr); }
+.portrait[data-portrait-appearance=ultimate] { width: 100%; height: min(62vh,520px); }
+.portrait[data-portrait-appearance=ultimate] img { filter: none; }
 .current { z-index: 1; }
 .departing { z-index: 2; }
 .placeholder { color: #98e2ff; font-size: 80px; }
@@ -21,6 +24,7 @@
 .picker header small { display: block; margin-top: 5px; font-size: 10px; line-height: 1.5; color: #add8f0; }
 .picker header>button { width: 28px; height: 28px; flex-shrink: 0; color: #d8f8ff; border: 1px solid #82c4eb; background: #092e69; cursor: pointer; }
 .options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.options[data-option-count="3"] { grid-template-columns: repeat(3,minmax(0,1fr)); }
 .options>button { display: grid; justify-items: center; gap: 5px; min-width: 0; padding: 8px; border: 1px solid #6194c7; color: #d3f3ff; background: #073b7c; cursor: pointer; }
 .options>button[aria-pressed=true] { border-color: #a9ffff; background: #1258a0; box-shadow: inset 0 0 0 1px #a9ffff; }
 .options>button:disabled { cursor: default; }

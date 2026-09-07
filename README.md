@@ -94,6 +94,7 @@ Progress, encounters, inventory, squads, and tower state remain local to the plu
   on every other turn they remain ordinary damage panels.
 - Level 1–100 progression, five qualities of growth material, idle supplies, and local persistence.
 - Cosmetic evolution unlocks at level 30 with a smooth portrait transition. The hanger beside the detail panel's close button selects an original or evolved appearance for each owned Codekin. Saved choices do not affect stats, skills, or rewards.
+- The five apex Codekin unlock full-scene ultimate portraits at level 60 and switch automatically with the same smooth transition. The hanger can restore either earlier form. Existing level-60 saves receive the unlock once, then retain subsequent appearance choices.
 - The owned-Codekin roster keeps formation editing separate from browsing: three unique slots can be adjusted and saved explicitly, while each card shows its portrait, number, level, attribute, quality-colored frame, and deployed slot.
 - Roster controls filter by attribute and quality, and sort by level in either direction without crowding the cards with combat values.
 - Selecting a Codekin opens a dismissible detail panel for combat values, skills, and material-based upgrading, keeping growth tools usable as the collection expands.

@@ -45,6 +45,40 @@ function response() {
 }
 
 describe('production evolution asset delivery', () => {
+  it('serves all five apex ultimate portraits through the registered asset route', async () => {
+    const group = createTraceWildRoutes({} as TraceWildService, assetDirectory, CORE_CONTENT_VIEW)
+    const route = group.routes.find(row => row.path === `${TRACEWILD_API_PREFIX}/assets`)!
+    const assets = CORE_CONTENT_VIEW.assets.filter(row => row.key.endsWith(':ultimate'))
+    expect(assets).toHaveLength(5)
+    expect(assets.map(asset => asset.key)).toEqual(CORE_CONTENT_VIEW.creatures.filter(creature => creature.rarity === 'apex').map(creature => `creature:${creature.id}:ultimate`))
+    try {
+      for (const asset of assets) {
+        const res = response()
+        await route.handler(request(asset.path), res.response)
+        expect(res.status(), asset.key).toBe(200)
+        expect(res.headers()['content-type']).toBe('image/webp')
+        expect(res.body().subarray(8, 12).toString('ascii')).toBe('WEBP')
+        // Extended WebP's alpha flag prevents an opaque paper-backed replacement.
+        expect(res.body().subarray(12, 16).toString('ascii'), asset.key).toBe('VP8X')
+        expect(res.body()[20]! & 0x10, asset.key).toBe(0x10)
+        expect(res.body().equals(await readFile(join(assetDirectory, asset.path)))).toBe(true)
+      }
+      const silhouettes = CORE_CONTENT_VIEW.assets.filter(row => row.key.endsWith(':ultimate-silhouette'))
+      expect(silhouettes).toHaveLength(5)
+      for (const asset of silhouettes) {
+        const res = response()
+        await route.handler(request(asset.path), res.response)
+        expect(res.status(), asset.key).toBe(200)
+        expect(res.headers()['content-type']).toBe('image/webp')
+        expect(res.body().equals(await readFile(join(assetDirectory, asset.path)))).toBe(true)
+      }
+      const filenames = await readdir(join(assetDirectory, 'ultimate'))
+      expect(filenames.sort()).toEqual([...assets, ...silhouettes].map(asset => asset.path.split('/').at(-1)).sort())
+      const metadata = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as { files: string[] }
+      expect(metadata.files).toContain('assets/creatures/ultimate')
+    } finally { group.close() }
+  })
+
   it('serves each of the 25 registered evolved images through the actual asset route', async () => {
     const group = createTraceWildRoutes({} as TraceWildService, assetDirectory, CORE_CONTENT_VIEW)
     const route = group.routes.find(row => row.path === `${TRACEWILD_API_PREFIX}/assets`)!
@@ -80,6 +114,8 @@ describe('production evolution asset delivery', () => {
         'gallery.html',
         'evolved/gallery.html',
         'evolved/production-manifest.json',
+        'ultimate/gallery.html',
+        'ultimate/manifest.json',
         'prompts/lumen-indeximp.md',
         'codekin-internal-docs/art/evolution/EVOLUTION_ART_STYLE_GUIDE.zh-CN.md',
         '../../codekin-internal-docs/art/evolution/EVOLUTION_ART_STYLE_GUIDE.zh-CN.md',

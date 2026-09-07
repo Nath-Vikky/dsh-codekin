@@ -27,6 +27,35 @@ function fixture() {
 afterEach(() => { activateCodekinContent(CORE_CONTENT_VIEW); vi.unstubAllGlobals() })
 
 describe('Codekin appearance presentation', () => {
+  it('shows the apex ultimate option locked at 59, selected at 60, and retains complete portrait framing', () => {
+    const { captured } = fixture()
+    activateCodekinContent(CORE_CONTENT_VIEW)
+    const creature = CORE_CODEKIN_RUNTIME.content.creature('relay-mesh-jelly')!
+    const render = (level: number) => renderToStaticMarkup(<CreatureAppearancePicker
+      captured={{ ...captured, creatureId: creature.id, level }} creature={creature} t={t}
+      busy={false} battleActive={false} onSelect={() => undefined} onClose={() => undefined} />)
+    expect(render(59)).toMatch(/aria-pressed="false" data-appearance-option="ultimate" disabled=""/)
+    expect(render(59)).toContain('Lv.60 解锁')
+    expect(render(60)).toContain('aria-pressed="true" data-appearance-option="ultimate"')
+    expect(render(60).match(/data-appearance-option=/g)).toHaveLength(3)
+    const markup = renderToStaticMarkup(<CreatureAppearancePortrait captured={{ ...captured, creatureId: creature.id, level: 60 }}
+      creature={creature} t={t} reducedMotion={false} onChanging={() => undefined} />)
+    expect(markup).toContain('data-portrait-appearance="ultimate"')
+    expect(markup).toContain('/ultimate/relay-mesh-jelly-theme.webp')
+    expect(markup).toContain('data-appearance-transition="none"')
+    activateCodekinContent({ ...CORE_CONTENT_VIEW, assets: CORE_CONTENT_VIEW.assets.filter(asset => !asset.key.endsWith(':ultimate')) })
+    expect(resolveCreatureSprite(creature.id, { level: 60, appearance: 'ultimate' }).appearance).toBe('evolved')
+  })
+
+  it('celebrates crossing 60 but uses a simple change for later wardrobe selections', () => {
+    const evolved = { identity: 'apex', level: 59, source: 'evolved.webp', appearance: 'evolved' as const }
+    const ultimate = { ...evolved, level: 60, source: 'ultimate.webp', appearance: 'ultimate' as const }
+    expect(appearanceTransition(evolved, ultimate)).toBe('evolution')
+    expect(appearanceTransition(ultimate, ultimate)).toBe('none')
+    expect(appearanceTransition({ ...evolved, level: 60 }, ultimate)).toBe('change')
+    expect(appearanceTransition(ultimate, { ...evolved, level: 60 })).toBe('change')
+  })
+
   it('renders each owned instance preference independently and uses level for wild portraits', () => {
     const { captured, creature } = fixture()
     const markup = renderToStaticMarkup(<>

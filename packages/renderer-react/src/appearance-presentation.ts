@@ -1,15 +1,17 @@
-import { CREATURE_EVOLUTION_LEVEL, resolveCreatureAppearance } from '../../engine/src/appearance.ts'
+import { CREATURE_EVOLUTION_LEVEL, CREATURE_ULTIMATE_LEVEL, resolveCreatureAppearance } from '../../engine/src/appearance.ts'
 import type { CapturedCreature, CreatureAppearance } from '../../engine/src/types.ts'
-import { contentAssetUrl } from './content.ts'
+import { contentAssetUrl, creatureById } from './content.ts'
 
 export type CreatureLook = Pick<CapturedCreature, 'level' | 'appearance'> & { instanceId?: string | undefined }
 export const APPEARANCE_MOTION = { evolution: 1400, change: 380 } as const
 
 export function resolveCreatureSprite(creatureId: string, look: CreatureLook = { level: 1 }) {
   const original = contentAssetUrl(`creature:${creatureId}:sprite`)
-  const appearance = resolveCreatureAppearance(look)
-  const evolved = appearance === 'evolved' ? contentAssetUrl(`creature:${creatureId}:evolved`) : undefined
-  return { source: evolved ?? original, fallback: original, appearance: evolved === undefined ? 'original' as const : appearance }
+  const ultimate = creatureById(creatureId)?.rarity === 'apex' ? contentAssetUrl(`creature:${creatureId}:ultimate`) : undefined
+  const appearance = resolveCreatureAppearance(look, ultimate !== undefined)
+  const evolved = appearance !== 'original' ? contentAssetUrl(`creature:${creatureId}:evolved`) : undefined
+  const source = appearance === 'ultimate' ? ultimate : evolved
+  return { source: source ?? original, fallback: original, appearance: source === undefined ? 'original' as const : appearance }
 }
 
 export interface PresentedAppearance {
@@ -21,8 +23,8 @@ export interface PresentedAppearance {
 
 export function appearanceTransition(previous: PresentedAppearance, next: PresentedAppearance): 'none' | 'change' | 'evolution' {
   if (previous.identity !== next.identity || previous.source === next.source) return 'none'
-  return previous.level < CREATURE_EVOLUTION_LEVEL && next.level >= CREATURE_EVOLUTION_LEVEL && next.appearance === 'evolved'
-    ? 'evolution' : 'change'
+  const threshold = next.appearance === 'ultimate' ? CREATURE_ULTIMATE_LEVEL : CREATURE_EVOLUTION_LEVEL
+  return previous.level < threshold && next.level >= threshold && next.appearance !== 'original' ? 'evolution' : 'change'
 }
 
 /** Decode before swapping a visible portrait, retaining the old image on failure. */

@@ -2,6 +2,7 @@ export const NS = 'tracewild'
 
 export const zh = {
   appearanceTitle: '更换外观', appearanceClose: '关闭外观选择', appearanceOriginal: '原形', appearanceEvolved: '进化形',
+  appearanceUltimate: '完全体', ultimateUnlocked: '完全体解锁 · Lv.60',
   appearanceSelected: '当前外观', appearanceChoose: '使用此外观', appearanceUnlockLevel: 'Lv.{level} 解锁',
   appearanceHint: '外观独立保存，不影响属性与战斗能力。', appearanceBattleLocked: '战斗结束后可以更换外观。',
   appearanceUnavailable: '进化立绘暂不可用', evolutionUnlocked: '进化形解锁 · Lv.30', appearanceFailed: '外观未能更换，请稍后重试。',
@@ -101,6 +102,7 @@ export const zh = {
 
 export const en: Record<keyof typeof zh, string> = {
   appearanceTitle: 'Change appearance', appearanceClose: 'Close appearance selection', appearanceOriginal: 'Original', appearanceEvolved: 'Evolved',
+  appearanceUltimate: 'Ultimate', ultimateUnlocked: 'Ultimate form unlocked · Lv.60',
   appearanceSelected: 'Current appearance', appearanceChoose: 'Use this appearance', appearanceUnlockLevel: 'Unlocks at Lv.{level}',
   appearanceHint: 'Saved for this Codekin. Stats and abilities stay the same.', appearanceBattleLocked: 'Change appearance after the battle.',
   appearanceUnavailable: 'Evolved art unavailable', evolutionUnlocked: 'Evolution unlocked · Lv.30', appearanceFailed: 'Could not change appearance. Please try again.',

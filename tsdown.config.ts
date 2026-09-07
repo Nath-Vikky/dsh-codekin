@@ -64,6 +64,7 @@ const client: UserConfig = {
   format: 'cjs',
   platform: 'browser',
   target: 'es2024',
+  minify: true,
   dts: false,
   sourcemap: true,
   clean: false,

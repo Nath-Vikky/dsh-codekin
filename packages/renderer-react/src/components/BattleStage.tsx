@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { playerStats } from '../../../engine/src/balance.ts'
-import { CREATURE_EVOLUTION_LEVEL } from '../../../engine/src/appearance.ts'
 import type { BattlePartyMember, BattleState, CapturedCreature, EnemyIntent } from '../../../engine/src/types.ts'
 import { resolveCreatureSprite, type CreatureLook } from '../appearance-presentation.ts'
-import { creatureById, skillByCreatureId } from '../content.ts'
+import { contentAssetUrl, creatureById, skillByCreatureId } from '../content.ts'
 import { BATTLE_MOTION } from '../battle-motion.ts'
+import { battlePortraitFraming } from '../battle-portrait-framing.ts'
 import type { TraceWildLocaleKey } from '../locales.ts'
 import { CORE_KEYS, CreatureSprite, ECOLOGY_KEYS, creatureName } from './creature-presentation.tsx'
 import css, { styleText } from './battle-stage.module.css'
@@ -46,8 +46,8 @@ const intentDetails: Record<EnemyIntent, TraceWildLocaleKey> = {
 const ratio = (value: number, max: number) => Math.max(0, Math.min(1, value / Math.max(1, max)))
 
 /** Retain the departing portrait until its crossfade finishes, without remounting controls. */
-function Portrait(props: { creatureId: string; look: CreatureLook; reducedMotion: boolean }) {
-  const key = `${props.look.instanceId ?? props.creatureId}:${props.look.appearance ?? 'auto'}:${props.look.level >= CREATURE_EVOLUTION_LEVEL}`
+function Portrait(props: { creatureId: string; look: CreatureLook; reducedMotion: boolean; frame: 'body' | 'face' }) {
+  const key = `${props.look.instanceId ?? props.creatureId}:${resolveCreatureSprite(props.creatureId, props.look).appearance}`
   const last = useRef({ key, creatureId: props.creatureId, look: props.look })
   const [departing, setDeparting] = useState<typeof last.current>()
   useEffect(() => {
@@ -60,11 +60,25 @@ function Portrait(props: { creatureId: string; look: CreatureLook; reducedMotion
     const timer = window.setTimeout(() => { setDeparting(undefined) }, BATTLE_MOTION.handoff + 20)
     return () => { window.clearTimeout(timer) }
   }, [key, props.creatureId, props.reducedMotion])
-  const current = creatureById(props.creatureId)
-  const previous = departing === undefined ? undefined : creatureById(departing.creatureId)
+  const picture = (creatureId: string, look: CreatureLook) => {
+    const creature = creatureById(creatureId)
+    if (creature === undefined) return undefined
+    const framing = resolveCreatureSprite(creatureId, look).appearance === 'ultimate' ? battlePortraitFraming(creatureId, props.frame) : undefined
+    const sprite = <CreatureSprite creature={creature} captured={look} eager />
+    if (framing === undefined) return sprite
+    const silhouette = contentAssetUrl(`creature:${creatureId}:ultimate-silhouette`)
+    return <>
+      <span className={`${css.portraitCrop} ${silhouette === undefined ? '' : css.portraitScene}`} data-portrait-crop={props.frame} style={framing}>{sprite}</span>
+      {silhouette !== undefined && <span className={css.portraitGlow}>
+        <span className={css.portraitCrop} data-portrait-crop={props.frame} style={framing}>
+          <CreatureSprite creature={creature} captured={look} silhouetteMask={silhouette} eager />
+        </span>
+      </span>}
+    </>
+  }
   return <span className={css.portraitLayers} aria-hidden="true">
-    {previous !== undefined && <span key={`out-${departing?.key}`} className={css.departing}><CreatureSprite creature={previous} captured={departing?.look} eager /></span>}
-    {current !== undefined && <span key={key} className={css.arriving}><CreatureSprite creature={current} captured={props.look} eager /></span>}
+    {departing !== undefined && <span key={`out-${departing.key}`} className={css.departing}>{picture(departing.creatureId, departing.look)}</span>}
+    <span key={key} className={css.arriving}>{picture(props.creatureId, props.look)}</span>
   </span>
 }
 
@@ -161,7 +175,7 @@ export function BattleStage(props: BattleStageProps) {
             setPinnedDetail(value => value === id ? undefined : id); setHoveredDetail(undefined)
           }
         }}>
-        <Portrait creatureId={creature.id} look={look} reducedMotion={props.reducedMotion} />
+        <Portrait creatureId={creature.id} look={look} reducedMotion={props.reducedMotion} frame={small ? 'face' : 'body'} />
         {!enemy && appearance === 'original' && <svg className={css.halo} viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" /><circle cx="50" cy="50" r="46" strokeDasharray="289.03" strokeDashoffset={289.03 * (1 - ratio(energy, maxEnergy))} /></svg>}
       </button>
       {enemy ? <div className={css.enemyMeters}>

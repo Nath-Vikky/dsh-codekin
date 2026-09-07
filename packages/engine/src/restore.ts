@@ -23,7 +23,7 @@ import {
   wildStats,
 } from './balance.ts'
 import { currentEngineContent } from './content.ts'
-import { CREATURE_EVOLUTION_LEVEL } from './appearance.ts'
+import { CREATURE_EVOLUTION_LEVEL, CREATURE_ULTIMATE_LEVEL } from './appearance.ts'
 import { MATCH_BOARD_CELLS, findFirstLegalBattleSwap } from './match3.ts'
 import {
   ENERGY_LIMIT,
@@ -416,17 +416,22 @@ export function restoreTraceWildState(value: unknown, now = Date.now()): TraceWi
       ? Math.max(levelFloorXp, safeInt(row.xp, levelFloorXp, totalXpForLevel(MAX_PLAYER_LEVEL, quality)))
       : levelFloorXp
     const level = levelForXp(savedXp, quality)
-    const appearance = savedLevel < CREATURE_EVOLUTION_LEVEL && level >= CREATURE_EVOLUTION_LEVEL
-      ? 'evolved'
-      : row.appearance === 'original' || (row.appearance === 'evolved' && level >= CREATURE_EVOLUTION_LEVEL)
-        ? row.appearance
-        : undefined
+    const ultimateUnlocked = level >= CREATURE_ULTIMATE_LEVEL && currentEngineContent().hasUltimateAppearance(creatureId)
+    const appearance = ultimateUnlocked && (row.ultimateAppearanceUnlocked !== true || savedLevel < CREATURE_ULTIMATE_LEVEL)
+      ? 'ultimate'
+      : savedLevel < CREATURE_EVOLUTION_LEVEL && level >= CREATURE_EVOLUTION_LEVEL
+        ? 'evolved'
+        : row.appearance === 'original' || (row.appearance === 'evolved' && level >= CREATURE_EVOLUTION_LEVEL)
+          || (row.appearance === 'ultimate' && ultimateUnlocked)
+          ? row.appearance
+          : undefined
     next.creatures.push({
       instanceId,
       creatureId,
       quality,
       level,
       ...(appearance === undefined ? {} : { appearance }),
+      ...(ultimateUnlocked ? { ultimateAppearanceUnlocked: true } : {}),
       xp: savedXp,
       wins: safeInt(row.wins, 0, 999999),
       caughtAt: safeInt(row.caughtAt, next.createdAt),

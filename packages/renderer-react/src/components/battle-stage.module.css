@@ -58,13 +58,24 @@
 .enemy>.enemyMeters { top: 125px; }
 .active>.portraitButton { position: absolute; left: 12px; bottom: 30px; width: 25%; max-width: 132px; }
 .active>.portraitName { position: absolute; left: 9px; bottom: 7px; width: 27%; }
-.fighter[data-appearance=evolved]>.portraitButton { border-radius: 0; background: none; box-shadow: none; }
-.fighter[data-appearance=evolved] .portraitLayers { overflow: visible; }
+.fighter:is([data-appearance=evolved],[data-appearance=ultimate])>.portraitButton { border-radius: 0; background: none; box-shadow: none; }
+.fighter:is([data-appearance=evolved],[data-appearance=ultimate]) .portraitLayers { overflow: visible; }
 .active[data-appearance=evolved]>.portraitButton { left: 0; width: 31%; max-width: none; height: calc(var(--stage-height)*.66); aspect-ratio: auto; }
 .active[data-appearance=evolved] .portraitLayers img { position: absolute; left: 50%; bottom: 0; width: calc(var(--stage-height)*.74); height: auto; max-width: 145%; transform: translateX(-50%); }
 .active[data-appearance=evolved]>.portraitName { left: 0; width: 31%; }
-.fighter[data-appearance=evolved].ready .arriving img { filter: drop-shadow(0 0 2px #efffff) drop-shadow(0 0 5px #6df6ff); animation: silhouetteReady 2.8s ease-in-out infinite; }
-.fighter[data-appearance=evolved] [data-can-cast]:hover .arriving img { filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 10px #6df6ff); }
+.active[data-appearance=ultimate]>.portraitButton { left: 0; width: 31%; max-width: none; height: calc(var(--stage-height)*.68); aspect-ratio: auto; }
+.active[data-appearance=ultimate]>.portraitName { left: 0; width: 31%; }
+.fighter[data-appearance=ultimate] .portraitLayers img { width: 100%; height: 100%; object-fit: contain; filter: none; }
+.portraitGlow,.portraitCrop { position: absolute; inset: 0; }
+.portraitCrop { overflow: hidden; }
+.portraitScene { opacity: .3; }
+.portraitScene[data-portrait-crop=face] { opacity: .15; }
+.portraitCrop:has(img[data-creature-appearance=ultimate]) { mask-image: linear-gradient(transparent,#000 7% 78%,transparent),linear-gradient(90deg,transparent,#000 9% 91%,transparent); mask-composite: intersect; }
+.portraitLayers .portraitCrop img[data-creature-appearance=ultimate] { position: absolute; left: 50%; top: var(--portrait-top); width: auto; height: var(--portrait-height); max-width: none; transform: translateX(var(--portrait-anchor)); }
+.teammate[data-appearance=ultimate] .portraitButton { width: 60px; height: 53px; aspect-ratio: auto; max-width: 96%; }
+.portraitCrop[data-portrait-crop=face]:has(img[data-creature-appearance=ultimate]) { mask-image: linear-gradient(transparent,#000 5% 82%,transparent),linear-gradient(90deg,transparent,#000 6% 94%,transparent); }
+.fighter[data-appearance=evolved].ready .arriving img,.fighter[data-appearance=ultimate].ready .arriving .portraitGlow { filter: drop-shadow(0 0 2px #efffff) drop-shadow(0 0 5px #6df6ff); animation: silhouetteReady 2.8s ease-in-out infinite; }
+.fighter[data-appearance=evolved] [data-can-cast]:hover .arriving img,.fighter[data-appearance=ultimate] [data-can-cast]:hover .arriving .portraitGlow { filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 10px #6df6ff); }
 .teammate .detail { left: -45%; right: 0; top: calc(96px - var(--stage-height)); max-height: calc(var(--stage-height) - 106px); }
 .detail>strong { display: block; font-size: 18px; margin-bottom: 5px; }
 .detail small { display: block; font-size: 11px; color: #9cddf3; }
@@ -92,5 +103,5 @@
 .stage[data-reduced] .departing,.stage[data-reduced] .wave { display: none; }
 .stage[data-reduced] .halo circle,.stage[data-reduced] .hp i,.stage[data-reduced] .energy i,.stage[data-reduced] .skillMeter i { transition: none; }
 .stage[data-reduced] .impact { animation: none; opacity: .5; transform: none; }
-.stage[data-reduced] .fighter[data-appearance=evolved].ready .arriving img { animation: none; }
+.stage[data-reduced] .fighter[data-appearance=evolved].ready .arriving img,.stage[data-reduced] .fighter[data-appearance=ultimate].ready .arriving .portraitGlow { animation: none; }
 @media(max-width:420px) { .stage { --stage-height: 280px; } .stageLabel { font-size: 18px; left: 12px; } .tray { gap: 4px; right: 7px; } .skill { padding: 7px 5px; } .skill strong { font-size: 10px; } .skill small { font-size: 8px; flex-wrap: wrap; gap: 1px; } .damageLane { gap: 5px; right: 7px; bottom: 96px; } .damage { padding-left: 5px; } .damage em { font-size: 8px; } .damage strong { font-size: 22px; } .enemy>.portraitButton { height: 112px; } .enemy>.enemyMeters { top: 114px; } .teammate .portraitName { font-size: 8px; } .active>.portraitName { font-size: 10px; } }

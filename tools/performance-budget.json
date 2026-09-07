@@ -8,6 +8,6 @@
   "clientBundleBytes": 400000,
   "clientBundleGzipBytes": 90000,
   "shippedJavaScriptBytes": 800000,
-  "coreAssetBytes": 3000000,
+  "coreAssetBytes": 4000000,
   "largeRosterJsonBytes": 500000
 }

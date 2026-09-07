@@ -94,7 +94,7 @@ describe('Codekin content packs', () => {
     expect(registry.creatures).toHaveLength(25)
     expect(registry.skills).toHaveLength(25)
     expect(registry.mechanics).toHaveLength(25)
-    expect(registry.assets).toHaveLength(51)
+    expect(registry.assets).toHaveLength(61)
     expect(registry.creature('forge-rivetclaw')).toMatchObject({
       name: { zhCN: '铆钉蟹', en: 'Rivetclaw' },
       sprite: 'creature:forge-rivetclaw:sprite',

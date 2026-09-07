@@ -22,6 +22,7 @@ export interface CodekinEngineContent {
   readonly starterCreatureIds: readonly string[]
   readonly towerRotation: readonly string[]
   creature(id: string): CreatureDefinition | undefined
+  hasUltimateAppearance(creatureId: string): boolean
   creaturesInEcology(ecology: TraceEcology): readonly CreatureDefinition[]
   skill(creatureId: string): CreatureSkillDefinition | undefined
   creatureMechanics(creatureId: string): ContentCreatureMechanicsDefinition | undefined
@@ -133,6 +134,10 @@ export function createEngineContent(registry: ContentRegistry): CodekinEngineCon
     starterCreatureIds,
     towerRotation,
     creature: (creatureId: string) => creatureMap.get(registry.resolveId(creatureId)),
+    hasUltimateAppearance: (creatureId: string) => {
+      const id = registry.resolveId(creatureId)
+      return creatureMap.get(id)?.rarity === 'apex' && registry.asset(`creature:${id}:ultimate`) !== undefined
+    },
     creaturesInEcology: (ecology: TraceEcology) => byEcology.get(ecology) ?? [],
     skill: (creatureId: string) => skillMap.get(registry.resolveId(creatureId)),
     creatureMechanics: (creatureId: string) => mechanicsMap.get(registry.resolveId(creatureId)),

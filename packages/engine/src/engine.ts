@@ -60,7 +60,7 @@ import {
   updateDex,
 } from './state.ts'
 import { settleTraceWildIdleRewards } from './world.ts'
-import { CREATURE_EVOLUTION_LEVEL } from './appearance.ts'
+import { CREATURE_EVOLUTION_LEVEL, CREATURE_ULTIMATE_LEVEL } from './appearance.ts'
 import type {
   BattleAmplifier,
   BattlePartyMember,
@@ -2323,13 +2323,19 @@ export function applyTraceWildAction(
     if (current.battle !== undefined) throw new TraceWildRuleError('conflict')
     const creature = current.creatures.find(row => row.instanceId === action.creatureInstanceId)
     if (creature === undefined
-      || (action.appearance !== 'original' && action.appearance !== 'evolved')
-      || (action.appearance === 'evolved' && creature.level < CREATURE_EVOLUTION_LEVEL)) {
+      || !['original', 'evolved', 'ultimate'].includes(action.appearance)
+      || (action.appearance === 'evolved' && creature.level < CREATURE_EVOLUTION_LEVEL)
+      || (action.appearance === 'ultimate' && (creature.level < CREATURE_ULTIMATE_LEVEL
+        || !currentEngineContent().hasUltimateAppearance(creature.creatureId)))) {
       throw new TraceWildRuleError('invalid-action')
     }
     // A cosmetic choice must not settle rewards or consume the gameplay random stream.
     const next = structuredClone(current)
-    next.creatures.find(row => row.instanceId === action.creatureInstanceId)!.appearance = action.appearance
+    const selected = next.creatures.find(row => row.instanceId === action.creatureInstanceId)!
+    selected.appearance = action.appearance
+    if (selected.level >= CREATURE_ULTIMATE_LEVEL && currentEngineContent().hasUltimateAppearance(selected.creatureId)) {
+      selected.ultimateAppearanceUnlocked = true
+    }
     return { state: commit(next, now) }
   }
   const settled = settleTraceWildIdleRewards(current, now, random)
@@ -2460,6 +2466,11 @@ export function applyTraceWildAction(
       creature.level = levelForXp(creature.xp, creature.quality)
       if (previousLevel < CREATURE_EVOLUTION_LEVEL && creature.level >= CREATURE_EVOLUTION_LEVEL) {
         creature.appearance = 'evolved'
+      }
+      if (previousLevel < CREATURE_ULTIMATE_LEVEL && creature.level >= CREATURE_ULTIMATE_LEVEL
+        && currentEngineContent().hasUltimateAppearance(creature.creatureId)) {
+        creature.appearance = 'ultimate'
+        creature.ultimateAppearanceUnlocked = true
       }
       notice = 'material-used'
       break

@@ -111,6 +111,16 @@ export declare const CORE_CONTENT_PACK: {
         path: string;
         mime: "image/webp";
         kind: "creature";
+    } | {
+        key: string;
+        path: string;
+        mime: "image/webp";
+        kind: "creature";
+    } | {
+        key: string;
+        path: string;
+        mime: "image/webp";
+        kind: "creature";
     })[]];
 };
 //# sourceMappingURL=index.d.ts.map

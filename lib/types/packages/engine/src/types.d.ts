@@ -1,6 +1,6 @@
 import type { CaptureCoreQuality, GrowthMaterialQuality, IndividualQuality, TraceEcology } from '../../content-sdk/src/types.ts';
 export type { CaptureCoreQuality, CreatureDefinition, CreatureStats, GrowthMaterialQuality, IndividualQuality, TraceEcology, TraceRarity, } from '../../content-sdk/src/types.ts';
-export type CreatureAppearance = 'original' | 'evolved';
+export type CreatureAppearance = 'original' | 'evolved' | 'ultimate';
 export interface CapturedCreature {
     instanceId: string;
     creatureId: string;
@@ -8,6 +8,8 @@ export interface CapturedCreature {
     level: number;
     /** Per-instance cosmetic choice; omitted legacy values follow the level default. */
     appearance?: CreatureAppearance;
+    /** Records the first Lv.60 unlock so later saved outfit choices are retained. */
+    ultimateAppearanceUnlocked?: boolean;
     xp: number;
     wins: number;
     caughtAt: number;

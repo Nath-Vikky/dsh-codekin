@@ -4,6 +4,8 @@ export declare const zh: {
     readonly appearanceClose: "关闭外观选择";
     readonly appearanceOriginal: "原形";
     readonly appearanceEvolved: "进化形";
+    readonly appearanceUltimate: "完全体";
+    readonly ultimateUnlocked: "完全体解锁 · Lv.60";
     readonly appearanceSelected: "当前外观";
     readonly appearanceChoose: "使用此外观";
     readonly appearanceUnlockLevel: "Lv.{level} 解锁";

@@ -17,6 +17,7 @@ export declare const CreatureSprite: import("react").MemoExoticComponent<(props:
     captured?: CreatureLook | undefined;
     level?: number | undefined;
     appearance?: CreatureAppearance | undefined;
+    silhouetteMask?: string | undefined;
 }) => import("react/jsx-runtime").JSX.Element>;
 export declare function creatureName(creature: CreatureDefinition, zh: boolean): string;
 //# sourceMappingURL=creature-presentation.d.ts.map

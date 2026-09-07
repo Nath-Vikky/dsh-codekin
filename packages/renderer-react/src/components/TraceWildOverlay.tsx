@@ -2082,7 +2082,7 @@ function BattleView(props: {
           </div>
 
           <div className={css.boardColumn}>
-            <div className={`${css.turnSummary} ${battle.turnOwner === 'boss' ? css.turnSummaryBoss : ''}`} aria-live="polite">
+            <div className={`${css.turnSummary} ${battle.turnOwner === 'boss' ? css.turnSummaryBoss : ''}`} data-turn-owner={battle.turnOwner} aria-live="polite">
               <span className={`${css.ecologyPip} ${css[`pip_${battle.turnOwner === 'boss' ? wild.ecology : activeDefinition.ecology}`]}`}>
                 {TILE_SYMBOLS[battle.turnOwner === 'boss' ? wild.ecology : activeDefinition.ecology]}
               </span>

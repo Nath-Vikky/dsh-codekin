@@ -4,7 +4,7 @@ import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { playerStats } from '../../../engine/src/balance.ts'
 import { CREATURE_EVOLUTION_LEVEL } from '../../../engine/src/appearance.ts'
 import type { BattlePartyMember, BattleState, CapturedCreature, EnemyIntent } from '../../../engine/src/types.ts'
-import type { CreatureLook } from '../appearance-presentation.ts'
+import { resolveCreatureSprite, type CreatureLook } from '../appearance-presentation.ts'
 import { creatureById, skillByCreatureId } from '../content.ts'
 import { BATTLE_MOTION } from '../battle-motion.ts'
 import type { TraceWildLocaleKey } from '../locales.ts'
@@ -112,6 +112,8 @@ export function BattleStage(props: BattleStageProps) {
     const enemy = member === undefined
     const creature = enemy ? wild : creatureById(member.creatureId)
     if (creature === undefined) return null
+    const look = enemy ? { level: battle.wildLevel } : props.creatures?.find(value => value.instanceId === member.instanceId) ?? member
+    const appearance = resolveCreatureSprite(creature.id, look).appearance
     const skill = skillByCreatureId(creature.id)
     const id = enemy ? 'enemy' : member.instanceId
     const detailId = `combat-${battle.id}-${id}`
@@ -128,7 +130,7 @@ export function BattleStage(props: BattleStageProps) {
     const portraitAction = portraitCanCast
       ? `${t('castSkill')} · ${zh ? skill?.activeNameZh : skill?.activeNameEn}`
       : zh ? '战斗详情' : 'Battle details'
-    return <div className={`${css.fighter} ${enemy ? css.enemy : small ? css.teammate : css.active} ${ready ? css.ready : ''}`} data-detail-open={detailOpen || undefined}
+    return <div className={`${css.fighter} ${enemy ? css.enemy : small ? css.teammate : css.active} ${ready ? css.ready : ''}`} data-detail-open={detailOpen || undefined} data-appearance={appearance}
       onPointerEnter={event => { if (event.pointerType !== 'touch') openDetail(id) }}
       onPointerLeave={event => {
         if (event.currentTarget.contains(document.activeElement)) return
@@ -159,8 +161,8 @@ export function BattleStage(props: BattleStageProps) {
             setPinnedDetail(value => value === id ? undefined : id); setHoveredDetail(undefined)
           }
         }}>
-        <Portrait creatureId={creature.id} look={enemy ? { level: battle.wildLevel } : props.creatures?.find(value => value.instanceId === member.instanceId) ?? member} reducedMotion={props.reducedMotion} />
-        {!enemy && <svg className={css.halo} viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" /><circle cx="50" cy="50" r="46" strokeDasharray="289.03" strokeDashoffset={289.03 * (1 - ratio(energy, maxEnergy))} /></svg>}
+        <Portrait creatureId={creature.id} look={look} reducedMotion={props.reducedMotion} />
+        {!enemy && appearance === 'original' && <svg className={css.halo} viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" /><circle cx="50" cy="50" r="46" strokeDasharray="289.03" strokeDashoffset={289.03 * (1 - ratio(energy, maxEnergy))} /></svg>}
       </button>
       {enemy ? <div className={css.enemyMeters}>
         <div className={css.hp} role="meter" aria-label={t('health')} aria-valuenow={hp} aria-valuemin={0} aria-valuemax={maxHp}><i style={{ width: `${ratio(hp, maxHp) * 100}%` }} /><span>{hp.toLocaleString()} / {maxHp.toLocaleString()}</span></div>

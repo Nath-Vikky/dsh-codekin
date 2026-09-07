@@ -133,7 +133,7 @@
 .boardColumn, .partyColumn { min-width: 0; }
 .turnSummary { min-height: 29px; display: flex; align-items: center; gap: 6px; margin-bottom: 3px; padding: 0 4px; font-size: 9px; }
 .turnSummary > strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.turnSummaryBoss { margin-inline: -2px; padding-inline: 6px; border: 1px solid #d9898930; border-radius: 9px; }
+.turnSummaryBoss { margin-inline: -2px; padding-inline: 8px; border: 1px solid #ffadad; border-left: 4px solid #fff1e7; border-radius: 0; }
 .ecologyPip { width: 23px; height: 23px; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-size: 12px; }
 .pip_lumen { color: #d9b866; } .pip_forge { color: #ce7565; } .pip_relay { color: #6faec5; } .pip_aegis { color: #6fba91; } .pip_glitch { color: #aa78bd; }
 .actionDots { margin-left: auto; display: flex; gap: 5px; }
@@ -513,7 +513,7 @@
 .hpBar i { background: linear-gradient(90deg, #57b78f, #92ca7a); }
 .boardColumn { border-color: #ffffffcc; }
 .turnSummary { color: #354c4b; }
-.turnSummaryBoss { border-color: #cf718d31; background: linear-gradient(90deg, #f7dce442, #eadbf24a); color: #8e4d63; }
+.turnSummaryBoss { background: linear-gradient(110deg,#b70c32,#d92039); color: #fff; box-shadow: 0 0 14px #fa27452b; }
 .ecologyPip { background: #ffffffb8; }
 .actionDots .actionDotActive { border-color: #4fa88b; background: #64bea2; box-shadow: 0 0 8px #58af9445; }
 .matchBoard { border-color: #ffffffdc; }
@@ -1234,6 +1234,11 @@
 .hpBar { height: 12px; border: 1px solid #83d4fa53; border-radius: 1px; background: #041531; box-shadow: none; }
 .hpBar > i, .hpBar > em { border-radius: 0; }
 .turnSummary > strong { color: #d6efff; font-size: 11px; }
+.turnSummaryBoss > strong { color: #fff; }
+.turnSummaryBoss .ecologyPip { color: #fff; border-color: #ffc8ca; background: #72062066; }
+.turnSummaryBoss .actionDots i { border-color: #ffc8ca66; background: #760721; }
+.turnSummaryBoss .actionDots .actionDotActive { border-color: #fff; background: #ffe4d4; box-shadow: none; }
+.turnSummaryBoss .cascadePill { color: #fff; border-color: #ffc8ca; background: #740823; }
 .turnSkipButton { border-radius: 0; background: #164578; color: #d8f6ff; border-color: #a4e0ff70; min-height: 27px; }
 .signalRule { border-radius: 0; background: #123962; color: #bce9ff; border-color: #83c9ff44; font-size: 10px; }
 .towerBattleStatus { border-radius: 0; background: #0b2e60; border-color: #7ac3ff55; box-shadow: none; }

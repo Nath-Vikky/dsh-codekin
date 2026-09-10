@@ -29,39 +29,48 @@
 
 ## 安装与启用
 
-### 当前版本：码灵 `0.3.7-rc.1`
+### 当前版本：码灵 `0.3.8-rc.1`
 
-请使用 **DSH `0.1.2-rc.1`**。截至 2026 年 9 月 7 日，[dsh-web 最新版为 `0.3.17`](https://github.com/zhu1090093659/dsh-web/releases/tag/v0.3.17)，其[桌面包固定内置 DSH `0.1.2-rc.1`](https://github.com/zhu1090093659/dsh-web/blob/v0.3.17/desktop/runtime/host/package.json)，[聚合插件也声明相同的最低宿主版本](https://github.com/zhu1090093659/dsh-web/blob/v0.3.17/packages/dsh-web-all/package.json)。码灵本次发布沿用这一宿主与 SDK 基线。
+本次发布面向 **DSH `0.1.5-rc.1` + dsh-web `0.3.20`**。截至 2026 年 9 月 10 日，[dsh-web `0.3.20`](https://github.com/zhu1090093659/dsh-web/releases/tag/v0.3.20) 已将 SDK 和[桌面内置宿主](https://github.com/zhu1090093659/dsh-web/blob/v0.3.20/desktop/runtime/host/package.json)升级到 DSH `0.1.5-rc.1`。
+
+`0.3.8-rc.1` 同步了宿主最低版本与 SDK 依赖，并适配 Session V3 的工具结果重写，避免历史整理被重复计入会话奖励。游戏引擎、内容包和存档格式沿用 `0.3.7-rc.1`；码灵存档继续保存在同一 `DSH_HOME/codekinsave` 目录。
 
 通过 npm 安装，并明确指定版本：
 
 ```sh
-pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 plugin --profile web add @nath-vikky/dsh-codekin@0.3.7-rc.1
+pnpm dlx @deepseek-ai/dsh@0.1.5-rc.1 plugin --profile web add @nath-vikky/dsh-codekin@0.3.8-rc.1
 ```
 
 同一版本也可通过 GitHub Release 安装包安装：
 
 ```sh
-pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.7-rc.1/nath-vikky-dsh-codekin-0.3.7-rc.1.tgz
+pnpm dlx @deepseek-ai/dsh@0.1.5-rc.1 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.8-rc.1/nath-vikky-dsh-codekin-0.3.8-rc.1.tgz
 ```
 
 执行命令时，请沿用现有 DSH 的 `DSH_HOME`，以更新正确的 Profile。安装后重启 DSH Web，在 **DSH 设置 → 码灵** 中启用。可拖动的入口会打开竖屏游戏窗口；挂机补给可领取时，入口会变成礼盒提醒。
 
-npm `latest` 指向 **`0.3.7-rc.1`**。GitHub Release 与 npm 包包含相同的程序和立绘素材；npm 包另行更新了此处的安装说明。发布标签与活跃开发分支均包含经过检查的运行时 Bundle，支持源码安装。
+npm `latest` 指向 **`0.3.8-rc.1`**。npm 与 GitHub Release 使用同一份安装包。发布标签与活跃开发分支均包含经过检查的运行时 Bundle，支持源码安装。
 
 ### 版本对应关系
 
 | 码灵 | DSH 宿主 | 分发与状态 |
 | --- | --- | --- |
-| **`0.3.7-rc.1`** | **`0.1.2-rc.1`** | npm `latest` 与当前 GitHub 版本；与 dsh-web `0.3.17` 使用相同宿主基线 |
+| **`0.3.8-rc.1`** | **`0.1.5-rc.1`** | npm `latest` 与当前 GitHub 版本；已验证 dsh-web `0.3.20` 组合 |
+| `0.3.7-rc.1` | `0.1.2-rc.1` | 上一版 npm / GitHub 版本；已验证 dsh-web `0.3.17` 组合 |
 | `0.3.6-rc.1` | `0.1.2-rc.1` | 上一版 GitHub 兼容版本 |
 | `0.3.6-alpha.3` | `0.1.2-alpha.5` | 历史 GitHub 版本 |
 | `0.3.5-alpha.2` | `0.1.2-alpha.2` | 上一版 npm 包，内容较旧 |
 | `0.2.0` | `0.1.0-rc.5` | 旧版；源码保留在 `stable/0.2.x` |
 
-以上是明确的版本配对，不表示支持所有上游预发行版本。DSH `0.1.3-alpha.2` 属于单独的 `alpha` 通道，不是本次发布的目标。
+以上是明确的版本配对；未列出的 Alpha、RC 和正式版需要独立验证。新版实装检查同时覆盖官方 DSH `0.1.5-rc.1` 和安装 dsh-web `0.3.20` 的组合，包括界面操作、重启与卸载重装后的存档保留。
 
-## `0.3.7-rc.1` 更新内容
+## `0.3.8-rc.1` 更新内容
+
+- **DSH 兼容：**宿主与 SDK 依赖同步到 DSH `0.1.5-rc.1`，适配 dsh-web `0.3.20`。
+- **Session V3 奖励：**历史整理产生的工具结果重写不再重复计入活动，也不会干扰当前回合的奖励分类；子会话活动同样受保护。
+- **实装验证：**官方 DSH 与 dsh-web 组合均覆盖浏览器操作、重启、卸载重装和存档保留，组合检查命令见[开发工具](tools/README.md)。
+
+### 沿用 `0.3.7-rc.1` 的立绘与战斗功能
 
 - **30 级进化：**25 只码灵均解锁女性二次元进化立绘，升级时平滑切换，仅改变外观，不影响数值、技能和奖励。
 - **60 级完全体：**星图鹿、炉心巨像、群星水母、曙光狮、溢流巨兽解锁全景完全体立绘。去除外围底色，保留人物与各自的主题场景。
@@ -111,7 +120,7 @@ pnpm check
 pnpm lifecycle:dsh
 ```
 
-`pnpm check` 覆盖类型检查、单元测试、内容与资源校验、固定回放、七场景战斗模拟、生产构建和性能预算。CI 配置覆盖 Windows、macOS、Ubuntu 的 Node.js 22/24。安装生命周期在 DSH `0.1.2-rc.1` 中验证带认证的浏览器交互、键盘焦点、重启、卸载重装与存档保留。
+`pnpm check` 覆盖类型检查、单元测试、内容与资源校验、固定回放、七场景战斗模拟、生产构建和性能预算。CI 配置覆盖 Windows、macOS、Ubuntu 的 Node.js 22/24。安装生命周期在 DSH `0.1.5-rc.1` 中验证带认证的浏览器交互、键盘焦点、重启、卸载重装与存档保留，同时覆盖官方 DSH 和安装 dsh-web `0.3.20` 的组合。
 
 仓库包含最终游戏素材与公开的实机截图。内部进化对照图册、参考图、源文件、提示词与测试存档均保留在仓库及发行包之外。
 

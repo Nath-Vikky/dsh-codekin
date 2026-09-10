@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   compatibility:
-    name: DSH 0.1.2 RC.1 (${{ matrix.os }}, Node ${{ matrix.node }})
+    name: DSH 0.1.5 RC.1 (${{ matrix.os }}, Node ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
@@ -91,8 +91,8 @@ jobs:
       - name: Install lifecycle test dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: Verify isolated tarball install, restart, removal, and reinstall
-        run: node tools/dsh-lifecycle.ts --json
+      - name: Verify tarball lifecycle with dsh-web 0.3.20
+        run: node tools/dsh-lifecycle.ts --with-dsh-web 0.3.20 --json
 
       - name: Verify Git commit installation lifecycle
         if: github.event_name == 'push'

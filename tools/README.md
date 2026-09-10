@@ -56,8 +56,9 @@ The core image budget is 4 MB for the launcher, 25 original sprites, 25 transpar
 
 ```sh
 pnpm lifecycle:dsh
+pnpm lifecycle:dsh --with-dsh-web 0.3.20
 ```
 
-This release gate creates an isolated DSH Web `0.1.2-rc.1` profile, installs a local package tarball, starts the host, exercises the state and action routes, runs a headless Chrome/Edge roster and keyboard-accessibility smoke test, disables Codekin, restarts DSH, removes and reinstalls the plugin, and verifies that the same save and starter survive every transition. Pass `--source <package-spec>` to test a Git commit, release tarball, or registry package through the same path. Failed runs retain their temporary profile for diagnosis; successful runs remove it unless `--keep` is supplied. `--skip-browser` is available for host-only diagnosis but is not used by the release gate.
+This release gate creates an isolated DSH Web `0.1.5-rc.1` profile, installs a local package tarball, starts the host, exercises the state and action routes, runs a headless Chrome/Edge roster and keyboard-accessibility smoke test, disables Codekin, restarts DSH, removes and reinstalls the plugin, and verifies that the same save and starter survive every transition. `--with-dsh-web 0.3.20` first installs and verifies that exact aggregate version, then runs the same lifecycle with both plugins present. CI uses this combined path for tarballs and the standalone path for Git sources. Pass `--source <package-spec>` to test a Git commit, release tarball, or registry package through the same path. Failed runs retain their temporary profile for diagnosis; successful runs remove it unless `--keep` is supplied. `--skip-browser` is available for host-only diagnosis but is not used by the release gate.
 
 The browser smoke also checks that reduced motion follows the system until the player explicitly enables full motion, and that this override is persisted. Battle timing lives in `packages/renderer-react/src/battle-motion.ts`; reduced motion removes travel without removing turn and protocol reading time.

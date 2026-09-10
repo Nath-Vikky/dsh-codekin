@@ -29,39 +29,48 @@ Actual Codekin `0.3.7-rc.1` screens captured in an isolated demonstration profil
 
 ## Install and enable
 
-### Current release: Codekin `0.3.7-rc.1`
+### Current release: Codekin `0.3.8-rc.1`
 
-Use **DSH `0.1.2-rc.1`**. As of September 7, 2026, the latest [dsh-web release is `0.3.17`](https://github.com/zhu1090093659/dsh-web/releases/tag/v0.3.17). Its [desktop runtime pins DSH `0.1.2-rc.1`](https://github.com/zhu1090093659/dsh-web/blob/v0.3.17/desktop/runtime/host/package.json), and its [aggregate package declares the same minimum host version](https://github.com/zhu1090093659/dsh-web/blob/v0.3.17/packages/dsh-web-all/package.json). Codekin uses that exact host and SDK version for this release.
+This release targets **DSH `0.1.5-rc.1` + dsh-web `0.3.20`**. As of September 10, 2026, [dsh-web `0.3.20`](https://github.com/zhu1090093659/dsh-web/releases/tag/v0.3.20) has moved its SDK and [bundled desktop host](https://github.com/zhu1090093659/dsh-web/blob/v0.3.20/desktop/runtime/host/package.json) to DSH `0.1.5-rc.1`.
+
+`0.3.8-rc.1` aligns the host minimum and SDK dependencies, and handles Session V3 tool-result rewrites so history maintenance does not count again toward activity rewards. The game engine, content pack, and save format remain at the `0.3.7-rc.1` baseline; Codekin saves continue to use the same `DSH_HOME/codekinsave` directory.
 
 Install from npm with explicit versions:
 
 ```sh
-pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 plugin --profile web add @nath-vikky/dsh-codekin@0.3.7-rc.1
+pnpm dlx @deepseek-ai/dsh@0.1.5-rc.1 plugin --profile web add @nath-vikky/dsh-codekin@0.3.8-rc.1
 ```
 
 The same release is also available as a GitHub Release tarball:
 
 ```sh
-pnpm dlx @deepseek-ai/dsh@0.1.2-rc.1 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.7-rc.1/nath-vikky-dsh-codekin-0.3.7-rc.1.tgz
+pnpm dlx @deepseek-ai/dsh@0.1.5-rc.1 plugin --profile web add --ignore-scripts https://github.com/Nath-Vikky/dsh-codekin/releases/download/v0.3.8-rc.1/nath-vikky-dsh-codekin-0.3.8-rc.1.tgz
 ```
 
 Use the same `DSH_HOME` as your existing DSH installation so the command updates the intended profile. Restart DSH Web, then enable **DSH Settings → Codekin**. The draggable launcher opens the portrait game window and becomes a gift reminder when idle supplies are ready.
 
-The npm `latest` tag points to **`0.3.7-rc.1`**. The GitHub Release and npm package contain the same runtime and artwork; the npm package additionally updates these installation instructions. Release tags and active development branches include reviewed runtime bundles for source installs.
+The npm `latest` tag points to **`0.3.8-rc.1`**. npm and GitHub Release use the same package archive. Release tags and active development branches include reviewed runtime bundles for source installs.
 
 ### Version pairings
 
 | Codekin | DSH host | Distribution / status |
 | --- | --- | --- |
-| **`0.3.7-rc.1`** | **`0.1.2-rc.1`** | npm `latest` and current GitHub release; same host baseline as dsh-web `0.3.17` |
+| **`0.3.8-rc.1`** | **`0.1.5-rc.1`** | npm `latest` and current GitHub release; tested with dsh-web `0.3.20` |
+| `0.3.7-rc.1` | `0.1.2-rc.1` | Previous npm / GitHub release; tested with dsh-web `0.3.17` |
 | `0.3.6-rc.1` | `0.1.2-rc.1` | Previous GitHub compatibility release |
 | `0.3.6-alpha.3` | `0.1.2-alpha.5` | Historical GitHub release |
 | `0.3.5-alpha.2` | `0.1.2-alpha.2` | Previous npm release; older content |
 | `0.2.0` | `0.1.0-rc.5` | Legacy package; source on `stable/0.2.x` |
 
-These are explicit version pairings, not a claim of support for every upstream prerelease. DSH `0.1.3-alpha.2` is on the separate `alpha` channel and is not the target of this release.
+These are explicit version pairings; unlisted Alpha, RC, and stable versions need separate validation. Installed checks cover both standalone DSH `0.1.5-rc.1` and the combination with dsh-web `0.3.20`, including browser interactions and save preservation across restart, removal, and reinstall.
 
-## What's new in `0.3.7-rc.1`
+## What's new in `0.3.8-rc.1`
+
+- **DSH compatibility:** host and SDK dependencies now match DSH `0.1.5-rc.1`, paired with dsh-web `0.3.20`.
+- **Session V3 rewards:** rewritten tool results from history maintenance no longer duplicate activity signals or disrupt the current turn's reward classification, including child-session activity.
+- **Installed validation:** standalone and dsh-web integration checks cover browser interactions, restart, uninstall/reinstall, and save preservation. See the [tooling guide](tools/README.md) for the combined check.
+
+### Artwork and battle features from `0.3.7-rc.1`
 
 - **Level-30 evolution:** all 25 Codekin unlock female anime-style evolution portraits. Leveling smoothly switches artwork without changing stats, abilities, or rewards.
 - **Level-60 ultimate appearances:** Atlas Hart, Kiln Colossus, Mesh Jelly, Dawnguard Lion, and Overflow Maw unlock full-scene artwork. Transparent outer edges preserve each character and her themed surroundings.
@@ -111,7 +120,7 @@ pnpm check
 pnpm lifecycle:dsh
 ```
 
-`pnpm check` runs type checks, unit tests, content/asset validation, a fixed replay, a seven-scenario combat simulation, production builds, and performance budgets. CI covers Windows, macOS, and Ubuntu with Node.js 22 and 24. Installed lifecycle checks exercise authenticated browser interaction, keyboard focus, restart, uninstall/reinstall, and save preservation on DSH `0.1.2-rc.1`.
+`pnpm check` runs type checks, unit tests, content/asset validation, a fixed replay, a seven-scenario combat simulation, production builds, and performance budgets. CI covers Windows, macOS, and Ubuntu with Node.js 22 and 24. Installed lifecycle checks exercise authenticated browser interaction, keyboard focus, restart, uninstall/reinstall, and save preservation on DSH `0.1.5-rc.1`, both standalone and with dsh-web `0.3.20`.
 
 Final game artwork and public gameplay screenshots are included in the repository. Internal evolution comparison galleries, references, source masters, prompts, and test saves remain outside the repository and release package.
 

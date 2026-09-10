@@ -13,7 +13,8 @@ import { chromium } from 'playwright-core'
 import type { Page } from 'playwright-core'
 
 export const DSH_LIFECYCLE_FORMAT = 'codekin-dsh-lifecycle-v1' as const
-const DEFAULT_DSH_VERSION = '0.1.2-rc.1'
+const DEFAULT_DSH_VERSION = '0.1.5-rc.1'
+const DSH_WEB_PACKAGE = '@linxin666/dsh-web-all'
 const PACKAGE_NAME = '@nath-vikky/dsh-codekin'
 const API_PREFIX = '/api/tracewild'
 const PROCESS_TIMEOUT_MS = 180_000
@@ -33,6 +34,7 @@ interface HttpResult {
 export interface DshLifecycleReport {
   format: typeof DSH_LIFECYCLE_FORMAT
   dshVersion: string
+  dshWebVersion?: string
   source: string
   packageMode: 'tarball' | 'explicit'
   routesReady: boolean
@@ -487,6 +489,7 @@ async function verifyDumpConfig(dshVersion: string, env: NodeJS.ProcessEnv): Pro
 
 export async function runDshLifecycle(options: {
   dshVersion?: string
+  dshWebVersion?: string
   source?: string
   keep?: boolean
   browser?: boolean
@@ -500,6 +503,12 @@ export async function runDshLifecycle(options: {
   let succeeded = false
   try {
     if (source === undefined) source = await packTarball(root)
+    if (options.dshWebVersion !== undefined) {
+      await pluginCommand(dshVersion, env, 'add', `${DSH_WEB_PACKAGE}@${options.dshWebVersion}`)
+      const installed = JSON.parse(await readFile(join(home, 'profiles', 'web', 'node_modules',
+        ...DSH_WEB_PACKAGE.split('/'), 'package.json'), 'utf8')) as { version?: string }
+      assert.equal(installed.version, options.dshWebVersion, 'the tested dsh-web version must be installed')
+    }
     await pluginCommand(dshVersion, env, 'add', source)
     await verifyDumpConfig(dshVersion, env)
 
@@ -545,6 +554,7 @@ export async function runDshLifecycle(options: {
     const report: DshLifecycleReport = Object.freeze({
       format: DSH_LIFECYCLE_FORMAT,
       dshVersion,
+      ...(options.dshWebVersion === undefined ? {} : { dshWebVersion: options.dshWebVersion }),
       source,
       packageMode: options.source === undefined ? 'tarball' : 'explicit',
       routesReady: true,
@@ -567,6 +577,7 @@ export async function runDshLifecycle(options: {
 
 export async function dshLifecycleCli(argv: readonly string[]): Promise<number> {
   let dshVersion = DEFAULT_DSH_VERSION
+  let dshWebVersion: string | undefined
   let source: string | undefined
   let output: string | undefined
   let keep = false
@@ -580,17 +591,21 @@ export async function dshLifecycleCli(argv: readonly string[]): Promise<number> 
       return next
     }
     if (argument === '--dsh-version') dshVersion = value()
+    else if (argument === '--with-dsh-web') dshWebVersion = value()
     else if (argument === '--source') source = value()
     else if (argument === '--output') output = resolve(value())
     else if (argument === '--keep') keep = true
     else if (argument === '--skip-browser') browser = false
     else if (argument === '--json') json = true
     else if (argument === '--help' || argument === '-h') {
-      console.log('Usage: node tools/dsh-lifecycle.ts [--dsh-version 0.1.2-rc.1] [--source package-spec] [--skip-browser] [--keep] [--json] [--output report.json]')
+      console.log('Usage: node tools/dsh-lifecycle.ts [--dsh-version 0.1.5-rc.1] [--with-dsh-web 0.3.20] [--source package-spec] [--skip-browser] [--keep] [--json] [--output report.json]')
       return 0
     } else throw new TypeError(`unknown option ${argument}`)
   }
-  const result = await runDshLifecycle({ dshVersion, ...(source === undefined ? {} : { source }), keep, browser })
+  const result = await runDshLifecycle({
+    dshVersion, ...(dshWebVersion === undefined ? {} : { dshWebVersion }),
+    ...(source === undefined ? {} : { source }), keep, browser,
+  })
   if (output !== undefined) await writeFile(output, `${JSON.stringify(result.report, null, 2)}\n`, 'utf8')
   if (json) console.log(JSON.stringify(result.report, null, 2))
   else console.log(`DSH lifecycle OK: ${result.report.packageMode}, save ${result.report.saveSha256}${result.temporaryRoot === undefined ? '' : `, kept at ${result.temporaryRoot}`}`)

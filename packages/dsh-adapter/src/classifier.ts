@@ -55,6 +55,9 @@ export class TraceWildEventClassifier {
   private readonly activity = new WeakMap<Session, SessionActivityClock>()
 
   observe(session: Session, event: SessionEvent): TraceSignal | undefined {
+    // Session V3 can rewrite an earlier tool result during compaction. It is
+    // history maintenance, not another execution or a new activity signal.
+    if (event.type === 'tool/result' && event.surfaceOp !== 'append') return undefined
     const activeMinutes = this.observeActivity(session, event.time)
     switch (event.type) {
       case 'turn/start':
@@ -114,6 +117,7 @@ export class TraceWildEventClassifier {
 
   /** Fold child activity into its live top-level turn without ever minting a child reward. */
   observeRelatedActivity(session: Session, event: SessionEvent): void {
+    if (event.type === 'tool/result' && event.surfaceOp !== 'append') return
     this.observeActivity(session, event.time)
     const trace = this.traces.get(session)
     if (trace === undefined) return
